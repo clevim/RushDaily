@@ -169,9 +169,14 @@ let responses = [];
 let view = null;
 const aiMemory = {};
 
+// Deck embaralhado pela seed (FORMATS.classico.shuffle): partidas gravadas sem o marcador `shuffled` e replays v1
+// são de antes do embaralhamento e só se repetem com a ordem antiga. Revanche e recomeço já embaralham.
+const shuffledDuel = replay ? replay.v >= 2 : !(saved?.responses?.length && !saved.shuffled);
+const mark = shuffledDuel ? { shuffled: true } : {};
+
 function start() {
   duel?.destroy();
-  duel = createDuel(lib, { seed: duelSeed, format: FORMAT, decks, puzzle: puzzle && { name: `${puzzle.id}.lua`, script: puzzle.script }, cards, readScript, onError: (text) => console.warn('[motor]', text) });
+  duel = createDuel(lib, { seed: duelSeed, format: FORMAT, decks, shuffle: Boolean(FORMAT.shuffle) && shuffledDuel, puzzle: puzzle && { name: `${puzzle.id}.lua`, script: puzzle.script }, cards, readScript, onError: (text) => console.warn('[motor]', text) });
 }
 
 /* ---------- Desenho ---------- */
@@ -666,7 +671,7 @@ async function pump({ replay: redo = [] } = {}) {
     }
     if (!response) { console.warn('sem resposta para', prompt); break; }
     responses.push(response);
-    if (!quick) writeJson(saveKey, { responses, round });
+    if (!quick) writeJson(saveKey, { responses, round, ...mark });
     duel.respond(response);
   }
   pumping = false;
@@ -711,7 +716,7 @@ function endReplay(winner, broken = false) {
 
 /** Link de replay desta partida (decks, seed e todas as respostas, comprimidos no #). */
 async function replayLink() {
-  const data = { v: 1, kind: puzzle ? 'puzzle' : 'duel', seed: duelSeed, me: ME, label, date, responses, ...(puzzle ? { puzzle: puzzle.id } : { decks }) };
+  const data = { v: 2, kind: puzzle ? 'puzzle' : 'duel', seed: duelSeed, me: ME, label, date, responses, ...(puzzle ? { puzzle: puzzle.id } : { decks }) };
   return `${location.origin}${location.pathname}#r=${await encodeReplay(data)}`;
 }
 async function shareReplay() {
@@ -725,7 +730,7 @@ async function shareReplay() {
 }
 
 async function finish(winner) {
-  writeJson(saveKey, { responses, done: true, round });
+  writeJson(saveKey, { responses, done: true, round, ...mark });
   const result = winner === ME ? 'win' : winner === FOE ? 'loss' : 'draw';
   if (puzzle) { finishPuzzle(result); return; }
   // Só o PvP entra no histórico, e uma vez só (a partida terminada é repetida ao reabrir a página).
