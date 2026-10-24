@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RushDaily Admin</title>
+<style>
+:root{--lacquer:#0a0807;--felt:#0f2a25;--felt-deep:#06130f;--gold:#f5b21a;--gold-hi:#ffe596;--gold-lo:#9a5b0b;--ivory:#f4ecdc;--ivory-dim:#b8ad97;--blood:#e0303f;--ok:#5fcf8a;--rule:rgb(245 178 26/.28);--display:'Dela Gothic One','Arial Black',sans-serif;--body:'Archivo','Segoe UI',system-ui,sans-serif;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;min-height:100dvh;background:radial-gradient(ellipse at top,#12362f,var(--felt-deep) 70%) fixed;color:var(--ivory);font:400 1rem/1.5 var(--body);overflow-x:clip}
+:focus-visible{outline:3px solid var(--gold-hi);outline-offset:2px}
+header{padding:20px 16px 8px;max-width:1200px;margin:auto}
+h1{font:400 1.6rem/1.1 var(--display);margin:0;background:linear-gradient(160deg,var(--gold-hi),var(--gold) 45%,var(--gold-lo));-webkit-background-clip:text;background-clip:text;color:transparent}
+header p{margin:4px 0 0;color:var(--ivory-dim);font-size:.9rem}
+main{max-width:1200px;margin:auto;padding:8px 16px 40px;display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr))}
+section{background:rgb(6 19 15/.78);border:1px solid var(--rule);border-radius:6px;padding:16px;min-width:0}
+section.largo{grid-column:1/-1}
+h2{font:400 1rem/1.2 var(--display);color:var(--gold);margin:0 0 12px;letter-spacing:.02em}
+.etapa{display:grid;grid-template-columns:auto 1fr auto;gap:2px 12px;padding:10px 0;border-top:1px solid var(--rule)}
+.etapa:first-of-type{border-top:0}
+.sel{width:.9rem;height:.9rem;border-radius:50%;margin-top:.35rem;background:var(--blood)}
+.sel.ok{background:var(--ok)}.sel.parcial{background:var(--gold)}
+.etapa b{font-weight:700}.etapa small{color:var(--ivory-dim);display:block;overflow-wrap:anywhere}
+.etapa .dir{text-align:right;font-size:.85rem;color:var(--ivory-dim);white-space:nowrap}
+.tag{font-size:.75rem;font-weight:700;color:var(--ivory-dim)}
+label{display:grid;gap:4px;font-size:.85rem;color:var(--ivory-dim);margin:8px 0}
+input,select{background:var(--lacquer);color:var(--ivory);border:1px solid var(--rule);border-radius:4px;padding:10px;font:inherit;min-height:44px;width:100%}
+input[type=checkbox]{width:auto;min-height:0;transform:scale(1.3);margin-right:8px}
+label.chk{display:flex;align-items:center;color:var(--ivory)}
+button{cursor:pointer;min-height:44px;padding:8px 16px;border-radius:4px;border:1px solid var(--gold-lo);background:linear-gradient(180deg,var(--gold),var(--gold-lo));color:var(--lacquer);font-weight:700}
+button.sec{background:transparent;color:var(--gold);border-color:var(--gold-lo)}
+button.perigo{background:var(--blood);border-color:#7d1520;color:#fff}
+button:disabled{opacity:.45;cursor:not-allowed}
+.linha{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+.linha>*{flex:1 1 140px}
+.barra{height:14px;background:var(--lacquer);border:1px solid var(--rule);border-radius:7px;overflow:hidden;margin:8px 0}
+.barra i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--gold-lo),var(--gold-hi));transition:width .3s}
+.barra.indet i{width:35%!important;animation:vai 1.2s infinite ease-in-out}
+@keyframes vai{0%{margin-left:-35%}100%{margin-left:100%}}
+@media(prefers-reduced-motion:reduce){.barra.indet i{animation:none;margin-left:0}}
+pre{margin:0;background:#020605;border:1px solid var(--rule);border-radius:4px;padding:10px;height:320px;overflow:auto;font:.8rem/1.4 ui-monospace,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+td,th{text-align:left;padding:6px 4px;border-top:1px solid var(--rule);vertical-align:top}
+th{color:var(--ivory-dim);font-weight:400}
+tr.clic{cursor:pointer}tr.clic:hover{background:rgb(245 178 26/.08)}
+.cod0{color:var(--ok)}.codx{color:var(--blood)}
+.aviso{border-left:3px solid var(--gold);padding:8px 12px;background:rgb(245 178 26/.08);margin:8px 0;font-size:.9rem}
+.aviso code{color:var(--gold-hi)}
+dialog{background:var(--felt);color:var(--ivory);border:1px solid var(--gold);border-radius:6px;max-width:min(92vw,460px)}
+dialog::backdrop{background:rgb(0 0 0/.7)}
+#msg{position:fixed;bottom:12px;left:12px;right:12px;max-width:520px;margin:auto;background:var(--blood);padding:10px 14px;border-radius:4px;z-index:9}
+.fila{font-size:.85rem;color:var(--ivory-dim)}
+.cartoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px}
+.cartao{border:1px solid var(--rule);border-radius:4px;padding:10px;background:rgb(0 0 0/.25)}
+.cartao b{display:block;font:400 1.6rem/1.1 var(--display);color:var(--gold-hi)}
+.cartao span{font-size:.8rem;color:var(--ivory-dim)}
+.graf{width:100%;height:120px;display:block;margin:4px 0 12px}
+.graf rect{fill:var(--gold)}.graf rect.zero{fill:var(--rule)}.graf.novas rect{fill:var(--ok)}
+.graf text{fill:var(--ivory-dim);font-size:10px}
+th.ord{cursor:pointer;color:var(--gold);white-space:nowrap}
+th.ord:hover{text-decoration:underline}
+.mono{font-family:ui-monospace,Menlo,monospace}
+.pag{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.pag button{min-height:44px}
+.detalhe{border:1px solid var(--gold-lo);border-radius:4px;padding:12px;margin-top:12px;background:rgb(0 0 0/.25)}
+.detalhe dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 12px;margin:8px 0}
+.detalhe dt{font-size:.75rem;color:var(--ivory-dim)}.detalhe dd{margin:0}
+</style>
+</head>
+<body>
+<header><h1>RushDaily · Admin</h1><p>Painel local: acompanhe os dados e dispare tarefas. Só funciona neste computador.</p></header>
+<main>
+<section class="largo" aria-labelledby="h-status">
+  <h2 id="h-status">Status do setup</h2>
+  <div id="etapas" aria-live="polite">Carregando…</div>
+  <p class="tag" id="caches"></p>
+</section>
+
+<section class="largo" aria-labelledby="h-jog">
+  <h2 id="h-jog">Jogadores</h2>
+  <div id="jogConf" class="aviso" hidden></div>
+  <div id="jog" hidden>
+    <div class="cartoes" id="cartoes"></div>
+    <p class="tag">Jogadores ativos por dia (últimos 60 dias, fuso de Brasília)</p>
+    <svg id="grafAtivos" class="graf" role="img" aria-label="Jogadores ativos por dia"></svg>
+    <p class="tag">Chaves novas por dia</p>
+    <svg id="grafNovas" class="graf novas" role="img" aria-label="Chaves novas por dia"></svg>
+    <div class="linha"><label>Buscar chave<input id="jogBusca" maxlength="6" placeholder="ABC123" autocomplete="off"></label><button id="jogAtualizar" class="sec">Atualizar</button></div>
+    <div style="overflow-x:auto"><table><thead><tr id="jogCab"></tr></thead><tbody id="jogLinhas"></tbody></table></div>
+    <div class="pag"><button class="sec" id="jogAnt">Anterior</button><span id="jogPag" class="tag"></span><button class="sec" id="jogProx">Próxima</button></div>
+    <div id="jogDet" class="detalhe" hidden aria-live="polite"></div>
+  </div>
+</section>
+
+<section aria-labelledby="h-exec">
+  <h2 id="h-exec">Executar tarefa</h2>
+  <label>Tarefa<select id="tarefa"></select></label>
+  <p id="desc" class="tag"></p>
+  <div id="params"></div>
+  <button id="rodar">Executar</button>
+</section>
+
+<section aria-labelledby="h-atual">
+  <h2 id="h-atual">Em andamento</h2>
+  <div id="atual" aria-live="polite">Nada em execução.</div>
+  <div class="barra" id="barra" role="progressbar" aria-valuemin="0" aria-valuemax="100" hidden><i></i></div>
+  <p class="tag" id="prog"></p>
+  <button id="cancelar" class="perigo" hidden>Cancelar</button>
+  <div id="fila" class="fila"></div>
+</section>
+
+<section class="largo" aria-labelledby="h-log">
+  <h2 id="h-log">Log <span class="tag" id="logtitulo"></span></h2>
+  <pre id="log" tabindex="0" aria-label="Saída da tarefa"></pre>
+</section>
+
+<section aria-labelledby="h-cfg">
+  <h2 id="h-cfg">Configuração</h2>
+  <label>Temporadas ativas do clássico (1..N)
+    <span class="linha"><select id="temps"></select><button id="aplicarTemps" class="sec">Aplicar (build --ate N)</button></span></label>
+  <p class="tag" id="tempsInfo"></p>
+  <label>Teto de nós da busca de puzzles<input id="nos" type="number" min="100" max="1000000" step="100"></label>
+  <label>Meta de puzzles validados (a busca para ao atingir)<input id="meta" type="number" min="1" max="200"></label>
+  <button id="salvarCfg" class="sec">Salvar busca de puzzles</button>
+  <hr style="border-color:var(--rule)">
+  <button id="invalidar" class="sec">Invalidar cache das cartas no navegador</button>
+  <div id="invInfo" class="aviso" hidden></div>
+</section>
+
+<section aria-labelledby="h-hist">
+  <h2 id="h-hist">Histórico</h2>
+  <div style="overflow-x:auto"><table><thead><tr><th>Tarefa</th><th>Início</th><th>Duração</th><th>Saída</th></tr></thead><tbody id="hist"></tbody></table></div>
+</section>
+</main>
+<dialog id="dlg"><form method="dialog"><p id="dlgTxt"></p><div class="linha"><button value="nao" class="sec">Voltar</button><button value="sim" id="dlgOk">Confirmar</button></div></form></dialog>
+<div id="msg" role="alert" hidden></div>
+<script>
+const $ = (id) => document.getElementById(id);
+const url = new URL(location.href);
+let token = url.searchParams.get('t');
+try { if (token) sessionStorage.setItem('t', token); else token = sessionStorage.getItem('t'); } catch {}
+if (url.searchParams.has('t')) history.replaceState(null, '', location.pathname); // tira o token da barra de endereço
+const H = { 'x-admin-token': token || '', 'content-type': 'application/json' };
+const api = async (rota, metodo = 'GET', corpo) => {
+  const r = await fetch('/api/' + rota, { method: metodo, headers: H, body: corpo ? JSON.stringify(corpo) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(r.status === 401 ? 'Token inválido: abra de novo a URL impressa no terminal.' : j.erro || r.statusText);
+  return j;
+};
+let msgT;
+const aviso = (t) => { $('msg').textContent = t; $('msg').hidden = false; clearTimeout(msgT); msgT = setTimeout(() => $('msg').hidden = true, 6000); };
+const erro = (e) => aviso(e.message);
+const fmtB = (b) => b >= 1e9 ? (b / 1e9).toFixed(2) + ' GB' : b >= 1e6 ? (b / 1e6).toFixed(1) + ' MB' : b >= 1e3 ? (b / 1e3).toFixed(0) + ' KB' : b + ' B';
+const fmtD = (ms) => { const s = Math.round(ms / 1000); return s >= 3600 ? `${Math.floor(s / 3600)}h${String(Math.floor(s % 3600 / 60)).padStart(2, '0')}` : s >= 60 ? `${Math.floor(s / 60)}min${String(s % 60).padStart(2, '0')}s` : s + 's'; };
+const fmtT = (t) => t ? new Date(t).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'nunca';
+const el = (tag, props = {}, ...filhos) => { const e = Object.assign(document.createElement(tag), props); e.append(...filhos); return e; };
+const confirmar = (txt) => new Promise((ok) => { $('dlgTxt').textContent = txt; $('dlg').onclose = () => ok($('dlg').returnValue === 'sim'); $('dlg').showModal(); });
+
+// ---- status ----
+async function status() {
+  try {
+    const s = await api('status');
+    $('etapas').replaceChildren(...s.etapas.map((e) => el('div', { className: 'etapa' },
+      el('span', { className: 'sel ' + (e.pronto ? 'ok' : e.parcial ? 'parcial' : ''), title: e.pronto ? 'pronta' : e.parcial ? 'parcial' : 'faltando' }),
+      el('div', {}, el('b', {}, e.nome, ' ', el('span', { className: 'tag' }, e.pronto ? '· pronta' : e.parcial ? '· parcial' : '· faltando')), el('small', {}, e.desc), e.contagem ? el('small', {}, e.contagem) : ''),
+      el('div', { className: 'dir' }, fmtB(e.bytes), el('br'), fmtT(e.geradoEm)))));
+    $('caches').textContent = 'Caches (tools/*/cache): ' + fmtB(s.cacheTotal) + ' · ' + s.caches.map((c) => `${c.nome} ${fmtB(c.bytes)}`).join(' · ');
+  } catch (e) { $('etapas').textContent = e.message; }
+}
+
+// ---- tarefas ----
+let meta, etapas = [];
+const CAMPOS = {
+  temporadas: () => fmtN('temporadas', 'Temporadas liberadas (1..5)', 1, 5, 1),
+  semRender: () => chk('semRender', 'Não desenhar as imagens (--sem-render)'),
+  etapa: () => sel('etapa', 'Etapa', etapas.map((e) => [e.nome, `${e.nome}: ${e.desc}`])),
+  force: () => chk('force', 'Refazer mesmo se já existir (--force)'),
+  comando: () => sel('comando', 'Comando', ['fetch', 'decks', 'build', 'art', 'puzzles'].map((c) => [c, c])),
+  ate: () => fmtN('ate', 'Temporadas (só para build --ate N)', 1, 5, 1),
+  nos: () => fmtN('nos', 'Teto de nós (vazio = configuração salva)', 100, 1000000, ''),
+  meta: () => fmtN('meta', 'Meta de puzzles validados (vazio = configuração salva)', 1, 200, ''),
+  ids: () => txt('ids', 'Só estes ids (opcional, separados por vírgula)'),
+  duelos: () => fmtN('duelos', 'Duelos', 1, 5000, 100),
+  temporada: () => fmtN('temporada', 'Temporada', 1, 5, 1),
+};
+const num = (n, rot, min, max, v) => el('label', {}, rot, el('input', { name: n, type: 'number', min, max, value: v }));
+const txt = (n, rot) => el('label', {}, rot, el('input', { name: n, type: 'text', autocomplete: 'off' }));
+const chk = (n, rot) => el('label', { className: 'chk' }, el('input', { name: n, type: 'checkbox' }), rot);
+const sel = (n, rot, ops) => el('label', {}, rot, el('select', { name: n }, ...ops.map(([v, t]) => el('option', { value: v }, t))));
+function montaParams() {
+  const t = meta.tarefas[$('tarefa').value];
+  $('desc').textContent = t.desc;
+  $('params').replaceChildren(...t.params.map((p) => CAMPOS[p]()));
+}
+function lerParams() {
+  const o = {};
+  for (const i of $('params').querySelectorAll('input,select')) o[i.name] = i.type === 'checkbox' ? i.checked : i.value;
+  return o;
+}
+async function executar(tarefa, params, texto) {
+  if (!(await confirmar(texto))) return;
+  try { await api('executar', 'POST', { tarefa, params }); } catch (e) { erro(e); }
+}
+$('rodar').onclick = () => { const t = $('tarefa').value; executar(t, lerParams(), `Executar "${meta.tarefas[t].titulo}"?`); };
+$('cancelar').onclick = async () => { if (await confirmar('Cancelar a tarefa em andamento? O processo e os filhos serão encerrados.')) try { await api('cancelar', 'POST', { id: atual.id }); } catch (e) { erro(e); } };
+
+// ---- estado, log e SSE ----
+let atual = null, filaAtual = [];
+const logEl = $('log');
+function barra(p) {
+  const b = $('barra');
+  b.hidden = !atual;
+  b.classList.toggle('indet', !p);
+  const pct = p ? Math.round(p.n / p.m * 100) : 0;
+  b.firstElementChild.style.width = pct + '%';
+  b.setAttribute('aria-valuenow', pct);
+  $('prog').textContent = p ? `${p.n}/${p.m} (${pct}%)` : atual ? 'Sem contagem de progresso nesta tarefa.' : '';
+}
+let ultimoId = null;
+function pintaEstado(s) {
+  if (s.atual && s.atual.id !== ultimoId) { ultimoId = s.atual.id; logEl.textContent = ''; }
+  atual = s.atual; filaAtual = s.fila;
+  $('atual').textContent = atual ? `${atual.titulo} · iniciada ${fmtT(atual.inicio)}` : 'Nada em execução.';
+  $('cancelar').hidden = !atual;
+  $('logtitulo').textContent = atual ? '· ao vivo: ' + atual.linha : '';
+  barra(atual && atual.progresso);
+  $('fila').replaceChildren(...filaAtual.map((j) => el('div', {}, `Na fila: ${j.titulo} `, el('button', { className: 'sec', onclick: () => api('cancelar', 'POST', { id: j.id }).catch(erro) }, 'Remover'))));
+  $('hist').replaceChildren(...s.historico.map((h) => el('tr', { className: 'clic', tabIndex: 0, title: 'Ver o final do log', onclick: () => verLog(h.id), onkeydown: (ev) => ev.key === 'Enter' && verLog(h.id) },
+    el('td', {}, h.titulo), el('td', {}, fmtT(h.inicio)), el('td', {}, fmtD(h.duracaoMs)),
+    el('td', { className: h.codigo === 0 ? 'cod0' : 'codx' }, h.cancelada ? 'cancelada' : h.codigo === 0 ? 'ok (0)' : `erro (${h.codigo ?? h.sinal})`))));
+}
+function acrescenta(linhas) {
+  const fim = logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 30;
+  logEl.append(linhas.join('\n') + '\n');
+  if (logEl.textContent.length > 400000) logEl.textContent = logEl.textContent.slice(-200000);
+  if (fim) logEl.scrollTop = logEl.scrollHeight;
+}
+async function verLog(id) {
+  try { const h = await api('historico?id=' + id); logEl.textContent = ''; $('logtitulo').textContent = `· histórico: ${h.titulo} (últimas ${h.log.length} linhas)`; acrescenta(h.log); } catch (e) { erro(e); }
+}
+async function eventos() { // SSE via fetch (EventSource não manda cabeçalho de token)
+  for (;;) {
+    try {
+      const r = await fetch('/api/eventos', { headers: H });
+      if (!r.ok) throw new Error(r.status);
+      const rd = r.body.pipeThrough(new TextDecoderStream()).getReader();
+      let buf = '';
+      for (;;) {
+        const { value, done } = await rd.read(); if (done) break;
+        buf += value;
+        let i;
+        while ((i = buf.indexOf('\n\n')) >= 0) {
+          const bloco = buf.slice(0, i); buf = buf.slice(i + 2);
+          if (!bloco.startsWith('data: ')) continue;
+          const ev = JSON.parse(bloco.slice(6));
+          if (ev.tipo === 'estado') pintaEstado(ev);
+          else if (ev.tipo === 'log') { logEl.textContent = ''; acrescenta(ev.linhas); if (atual) atual.progresso = ev.progresso, barra(ev.progresso); }
+          else if (ev.tipo === 'linha') { acrescenta([ev.texto]); if (atual) { atual.progresso = ev.progresso; barra(ev.progresso); } }
+          else if (ev.tipo === 'fim') { status(); aviso(ev.cancelada ? 'Tarefa cancelada.' : ev.codigo === 0 ? 'Tarefa concluída.' : `Tarefa terminou com erro (${ev.codigo}).`); }
+        }
+      }
+    } catch (e) { if (String(e.message) === '401') { aviso('Token inválido.'); return; } }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+}
+
+// ---- jogadores (tudo da API entra por textContent/atributos; nada vira HTML) ----
+const NS = 'http://www.w3.org/2000/svg';
+const COLS = [['key', 'Chave'], ['primeiro', 'Primeiro acesso'], ['ultimo', 'Último acesso'], ['acessos', 'Acessos'], ['dias', 'Dias ativos'], ['bytes', 'Tamanho'], ['rev', 'Rev']];
+const jog = { ordem: 'ultimo', dir: 'desc', pagina: 1, busca: '', limite: 15, total: 0 };
+const fmtN = (n) => Number(n || 0).toLocaleString('pt-BR');
+function grafico(svg, serie, campo) {
+  const W = 600, Hh = 120, base = 100, max = Math.max(1, ...serie.map((d) => d[campo])), w = W / serie.length;
+  svg.setAttribute('viewBox', `0 0 ${W} ${Hh}`); svg.setAttribute('preserveAspectRatio', 'none');
+  svg.replaceChildren();
+  serie.forEach((d, i) => {
+    const h = d[campo] ? Math.max(2, d[campo] / max * (base - 14)) : 1.5;
+    const r = document.createElementNS(NS, 'rect');
+    r.setAttribute('x', i * w + 1); r.setAttribute('y', base - h); r.setAttribute('width', Math.max(1, w - 2)); r.setAttribute('height', h);
+    if (!d[campo]) r.setAttribute('class', 'zero');
+    const t = document.createElementNS(NS, 'title'); t.textContent = `${d.dia}: ${d[campo]}`; r.append(t); svg.append(r);
+  });
+  for (const [txt, x, anc] of [[serie[0].dia.slice(5), 0, 'start'], [serie.at(-1).dia.slice(5), W, 'end'], [`máx ${max}`, W / 2, 'middle']]) {
+    const t = document.createElementNS(NS, 'text'); t.setAttribute('x', x); t.setAttribute('y', 115); t.setAttribute('text-anchor', anc); t.textContent = txt; svg.append(t);
+  }
+}
+async function jogResumo() {
+  const r = await api('jogadores/resumo');
+  if (r.configurado === false) {
+    $('jog').hidden = true; $('jogConf').hidden = false;
+    $('jogConf').replaceChildren('Acompanhamento de acessos não configurado. No homelab: defina ', el('code', {}, 'ADMIN_TOKEN'), ' no ', el('code', {}, '.env'), ' do compose, abra o túnel ', el('code', {}, 'ssh -L 4192:127.0.0.1:4192 homelab'),
+      ' e suba este admin com ', el('code', {}, 'SYNC_ADMIN_TOKEN=…'), ' (e ', el('code', {}, 'SYNC_ADMIN_URL'), ' se não for http://127.0.0.1:4192), ou grave ', el('code', {}, 'syncAdminToken'), ' em ', el('code', {}, 'tools/setup/cache/admin/config.json'), '. Detalhes em tools/admin/LEIA-ME.md.');
+    return false;
+  }
+  $('jogConf').hidden = true; $('jog').hidden = false;
+  $('cartoes').replaceChildren(...[['Chaves', r.totalChaves], ['Ativos hoje', r.ativosHoje], ['Ativos 7 dias', r.ativos7d], ['Ativos 30 dias', r.ativos30d]]
+    .map(([nome, v]) => el('div', { className: 'cartao' }, el('b', {}, fmtN(v)), el('span', {}, nome))));
+  grafico($('grafAtivos'), r.ativosPorDia, 'ativos'); grafico($('grafNovas'), r.novasPorDia, 'novas');
+  return true;
+}
+async function jogLista() {
+  const q = new URLSearchParams({ ordem: jog.ordem, dir: jog.dir, pagina: jog.pagina, limite: jog.limite, ...(jog.busca ? { busca: jog.busca } : {}) });
+  const r = await api('jogadores/usuarios?' + q);
+  jog.total = r.total;
+  $('jogCab').replaceChildren(...COLS.map(([k, nome]) => el('th', { className: 'ord', tabIndex: 0, title: 'Ordenar', 'aria-sort': jog.ordem === k ? (jog.dir === 'asc' ? 'ascending' : 'descending') : 'none',
+    onclick: () => ordena(k), onkeydown: (ev) => ev.key === 'Enter' && ordena(k) }, nome + (jog.ordem === k ? (jog.dir === 'asc' ? ' ▲' : ' ▼') : ''))));
+  $('jogLinhas').replaceChildren(...r.usuarios.map((u) => el('tr', { className: 'clic', tabIndex: 0, onclick: () => jogDetalhe(u.key), onkeydown: (ev) => ev.key === 'Enter' && jogDetalhe(u.key) },
+    el('td', { className: 'mono' }, u.key), el('td', {}, fmtT(u.primeiroAcesso)), el('td', {}, fmtT(u.ultimoAcesso)), el('td', {}, fmtN(u.acessos)), el('td', {}, fmtN(u.diasAtivos)), el('td', {}, fmtB(u.bytes)), el('td', {}, String(u.rev)))));
+  if (!r.usuarios.length) $('jogLinhas').replaceChildren(el('tr', {}, el('td', { colSpan: COLS.length }, 'Nenhuma chave.')));
+  const paginas = Math.max(1, Math.ceil(r.total / jog.limite));
+  $('jogPag').textContent = `Página ${jog.pagina} de ${paginas} · ${fmtN(r.total)} chaves`;
+  $('jogAnt').disabled = jog.pagina <= 1; $('jogProx').disabled = jog.pagina >= paginas;
+}
+const ordena = (k) => { jog.dir = jog.ordem === k && jog.dir === 'desc' ? 'asc' : 'desc'; jog.ordem = k; jog.pagina = 1; jogLista().catch(erro); };
+async function jogDetalhe(key) {
+  try {
+    const u = await api('jogadores/usuario/' + encodeURIComponent(key));
+    const p = u.progresso;
+    const campos = [['Primeiro acesso', fmtT(u.primeiroAcesso)], ['Último acesso', fmtT(u.ultimoAcesso)], ['Acessos', fmtN(u.acessos)], ['Dias ativos', fmtN(u.diasAtivos)], ['Tamanho do dado', fmtB(u.bytes)], ['Rev', String(u.rev)],
+      ['Vitórias / derrotas', `${p.vitorias} / ${p.derrotas}`], ['Sequência atual', `${p.sequencia} dia(s)`], ['Cartas distintas (clássico)', fmtN(p.cartas)], ['Decks', fmtN(p.decks)], ['Duelos PvP', fmtN(p.pvp)], ['Peças do Enigma (mês)', fmtN(p.pecasEnigma)], ['Boosters abertos', fmtN(p.boosters)], ['Chave criada', fmtT(u.criadaEm)]];
+    $('jogDet').replaceChildren(el('h2', { className: 'mono' }, `Chave ${u.key}`), el('dl', {}, ...campos.flatMap(([k, v]) => [el('dt', {}, k), el('dd', {}, v)])),
+      el('p', { className: 'tag' }, `Dias ativos (${u.dias.length}): ${u.dias.slice(0, 120).join(', ') || 'nenhum registrado'}${u.dias.length > 120 ? '…' : ''}`),
+      el('button', { className: 'sec', onclick: () => { $('jogDet').hidden = true; } }, 'Fechar'));
+    $('jogDet').hidden = false; $('jogDet').scrollIntoView({ block: 'nearest' });
+  } catch (e) { erro(e); }
+}
+async function jogadores() { try { if (await jogResumo()) await jogLista(); } catch (e) { $('jogConf').hidden = false; $('jogConf').textContent = e.message; } }
+let buscaT;
+$('jogBusca').oninput = () => { clearTimeout(buscaT); buscaT = setTimeout(() => { jog.busca = $('jogBusca').value.trim(); jog.pagina = 1; jogLista().catch(erro); }, 300); };
+$('jogAnt').onclick = () => { jog.pagina -= 1; jogLista().catch(erro); };
+$('jogProx').onclick = () => { jog.pagina += 1; jogLista().catch(erro); };
+$('jogAtualizar').onclick = jogadores;
+
+// ---- configuração ----
+async function config() {
+  const c = await api('config');
+  $('nos').value = c.nos; $('meta').value = c.meta;
+  const ativas = c.temporadas.filter((s) => s.enabled).length;
+  $('temps').replaceChildren(...c.temporadas.map((s) => el('option', { value: s.season, selected: s.season === ativas }, `${s.season} · ${s.label} (até ${s.until})`)));
+  $('tempsInfo').textContent = `Ativas agora: 1..${ativas}. Mudar roda o importador (não edita seasons.json à mão).`;
+  $('invInfo').dataset.v = c.cacheVersion;
+}
+$('aplicarTemps').onclick = () => { const n = $('temps').value; executar('classico', { comando: 'build', ate: n }, `Regerar o pool clássico com as temporadas 1..${n}? Roda "import_cards.py build --ate ${n}".`); };
+$('salvarCfg').onclick = async () => {
+  if (!(await confirmar('Salvar teto de nós e meta da busca de puzzles?'))) return;
+  try { await api('config', 'PUT', { nos: $('nos').value, meta: $('meta').value }); aviso('Configuração salva.'); } catch (e) { erro(e); }
+};
+$('invalidar').onclick = () => {
+  const v = $('invInfo').dataset.v;
+  $('invInfo').replaceChildren('Para forçar os navegadores a refazerem o cache das cartas, edite ', el('code', {}, 'src/ui/classic-render.js'), ' e suba ', el('code', {}, 'CACHE_VERSION'), ` de ${v} para ${Number(v) + 1}. Este painel não altera o código; faça a edição e publique.`);
+  $('invInfo').hidden = false;
+};
+
+(async () => {
+  if (!token) { $('etapas').textContent = 'Sem token: abra a URL completa impressa no terminal (com ?t=...).'; return; }
+  try {
+    meta = await api('tarefas'); etapas = meta.etapas;
+    $('tarefa').replaceChildren(...Object.entries(meta.tarefas).map(([k, t]) => el('option', { value: k }, t.titulo)));
+    $('tarefa').onchange = montaParams; montaParams();
+    await config();
+  } catch (e) { erro(e); }
+  jogadores();
+  status(); setInterval(status, 5000);
+  eventos();
+})();
+</script>
+</body>
+</html>
