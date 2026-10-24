@@ -1,5 +1,5 @@
 import { chooseAction } from './ai.mjs';
-import { canAttackNow, canChangePosition, canSet, canSummon, isAttacker, tributesFor, turnKey } from './rules.mjs';
+import { canAttackNow, canChangePosition, canSet, canSummon, isAttacker, tributesFor, turnKey, zoneOf } from './rules.mjs';
 import { canActivate, expireMods, payCost, runSteps, spellValue, trapReady } from './effects.mjs';
 
 const STARTING_LP = 5000;
@@ -162,7 +162,7 @@ export function startTurn(state, owner = state.active) {
 }
 
 /** position: 'attack', 'defense' (de lado), 'set' (virado em Defesa) ou 'set-attack' (virado em Ataque, regra da casa). */
-export function summon(state, owner, uid, { position = 'attack', tributes: preferred = [] } = {}) {
+export function summon(state, owner, uid, { position = 'attack', tributes: preferred = [], zone = null } = {}) {
   assertTurn(state, owner);
   const player = playerFor(state, owner);
   const card = cardInHand(player, uid);
@@ -170,15 +170,21 @@ export function summon(state, owner, uid, { position = 'attack', tributes: prefe
   const tributeCount = tributesFor(card);
   if (player.field.length < tributeCount) throw new Error('NEED_TRIBUTES');
   if (!canSummon(player, card)) throw new Error('FIELD_FULL');
-  // Tributos: os escolhidos (ex.: monstro sob a carta solta) primeiro, depois os mais fracos.
+  // Tributos: os escolhidos primeiro; o que faltar sai dos mais fracos (IA e chamadas sem escolha).
+  const chosen = [...new Set(preferred)].filter((id) => player.field.some((item) => item.uid === id));
+  if (chosen.length > tributeCount) throw new Error('TOO_MANY_TRIBUTES');
   const tributes = [...player.field]
-    .sort((a, b) => (preferred.includes(b.uid) - preferred.includes(a.uid)) || a.atk - b.atk)
+    .sort((a, b) => (chosen.includes(b.uid) - chosen.includes(a.uid)) || a.atk - b.atk)
     .slice(0, tributeCount);
+  // Zona de destino: a pedida se estiver livre (ou liberada pelo tributo); sem pedido, a primeira livre.
+  const free = [0, 1, 2].filter((index) => !player.field.some((item) => !tributes.includes(item) && zoneOf(player, item) === index));
+  if (zone !== null && !free.includes(zone)) throw new Error('ZONE_TAKEN');
+  const target = zone ?? free[0];
   for (const tribute of tributes) destroy(player, tribute, state.events, 'tribute');
   const summoned = moveFromHand(player, uid);
   // 'set' = virado em Defesa (regra Rush); 'set-attack' = virado em Ataque (regra da casa do RushDaily).
   const set = position === 'set' || position === 'set-attack';
-  Object.assign(summoned, { position: position === 'set' || position === 'defense' ? 'defense' : 'attack', faceUp: !set, summonedTurn: turnKey(state), changedTurn: null });
+  Object.assign(summoned, { position: position === 'set' || position === 'defense' ? 'defense' : 'attack', faceUp: !set, summonedTurn: turnKey(state), changedTurn: null, zone: target });
   player.field.push(summoned);
   player.normalSummons += 1;
   const event = { type: set ? 'set_monster' : 'summon', owner, card: summoned.uid, name: set ? null : summoned.name, tributes: tributes.map((tribute) => tribute.uid) };
@@ -356,7 +362,7 @@ export function heartOfTheCards(state, owner) {
 
 /** Executa uma ação da IA (ou de qualquer lado) já decidida. */
 export function applyAction(state, owner, action) {
-  if (action.type === 'summon') return [summon(state, owner, action.uid, { position: action.position })];
+  if (action.type === 'summon') return [summon(state, owner, action.uid, { position: action.position, tributes: action.tributes, zone: action.zone ?? null })];
   if (action.type === 'setCard') return [setCard(state, owner, action.uid)];
   if (action.type === 'changePosition') return [changePosition(state, owner, action.uid, action.to)];
   if (action.type === 'activateSpell') return [activateSpell(state, owner, action.uid)];

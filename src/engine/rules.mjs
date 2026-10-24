@@ -30,6 +30,11 @@ export function turnKey(state) {
   return `${state.turn}:${state.active}`;
 }
 
+/** Zona (0-2) que o monstro ocupa no campo; cartas antigas sem `zone` usam a posição na lista. */
+export function zoneOf(player, card) {
+  return card.zone ?? player.field.indexOf(card);
+}
+
 /** Muda posição uma vez por turno e não depois de atacar. */
 export function canChangePosition(state, player, card) {
   return card.changedTurn !== turnKey(state) && !player.attacks.has(card.uid);

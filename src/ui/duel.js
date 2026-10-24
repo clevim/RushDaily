@@ -1,6 +1,6 @@
 import { RULES, activateSpell, activateTrap, attack, changePosition, createGame, endTurn, heartOfTheCards, serializeGame, setCard, summon, trapsFor } from '../engine/game-engine.mjs';
 import { chooseAction, chooseTrap, recordOutcome } from '../engine/ai.mjs';
-import { canAttackNow, canChangePosition, canSet, canSummon, isAttacker, tributesFor } from '../engine/rules.mjs';
+import { canAttackNow, canChangePosition, canSet, canSummon, isAttacker, tributesFor, zoneOf } from '../engine/rules.mjs';
 import { canActivate } from '../engine/effects.mjs';
 import { ARCHETYPE_LABELS, ARCHETYPES, CARD_POOL, cardBackImage, cardImage } from '../data/cards.mjs';
 import { DIFFICULTY_IDS, generateDailyMatch, getDifficulty } from '../engine/daily-generator.mjs';
@@ -51,6 +51,7 @@ const ERRORS = {
 let game = restore() || fresh();
 game.aiMemory = readJson(memoryKey, {});
 let selection = null; // { kind: 'hand' | 'field', uid }
+let tribute = null; // invocação com tributo à espera da escolha: { action, origin, need, picked: [uid] }
 let busy = false;
 const poses = new Map(); // carta da mão -> { sideways, faceDown }
 const shownLp = { player: game.player.lp, enemy: game.enemy.lp };
@@ -101,12 +102,13 @@ function targetsFor(sel) {
       if (!canSummon(player, card)) return [];
       const tributes = tributesFor(card);
       const position = summonPosition(pose);
-      const targets = [];
-      if (player.field.length < 3 && player.field.length >= tributes) {
-        for (let index = player.field.length; index < 3; index += 1) targets.push({ zone: `player-m-${index}`, action: { type: 'summon', uid: card.uid, position, tributes: [] } });
-      }
-      if (tributes) player.field.forEach((monster) => targets.push({ uid: monster.uid, action: { type: 'summon', uid: card.uid, position, tributes: [monster.uid] } }));
-      return targets;
+      // Cada zona do campo é um alvo: a carta vai para a zona escolhida. Com tributo, a zona (vazia ou ocupada) abre a escolha dos tributos.
+      return [0, 1, 2].flatMap((index) => {
+        const occupant = player.field.find((monster) => zoneOf(player, monster) === index);
+        if (occupant && !tributes) return [];
+        const action = { type: 'summon', uid: card.uid, position, zone: index, tributes: [], askTribute: tributes > 0 };
+        return [occupant ? { uid: occupant.uid, action } : { zone: `player-m-${index}`, action }];
+      });
     }
     if (!canSet(player)) return [];
     const type = card.type === 'spell' && !pose.faceDown ? (canActivate(game, 'player', card) ? 'activateSpell' : null) : 'setCard';
@@ -147,6 +149,7 @@ function cardSlot(card, owner, kind, index) {
   if (own && kind === 'm' && canAttackWith(card)) classes.push('ready');
   if (own && game.player.attacks.has(card.uid)) classes.push('spent');
   if (selection?.uid === card.uid) classes.push('selected');
+  if (tribute && own && kind === 'm') classes.push(tribute.picked.includes(card.uid) ? 'tribute-picked' : 'tributable');
   const label = visible || own
     ? `${card.name}${kind === 'm' ? `, ${card.position === 'defense' ? 'Defesa' : 'Ataque'}${visible ? '' : ', virado'}, ATK ${card.atk}, DEF ${card.def}` : visible ? '' : ', baixada'}`
     : kind === 'm' ? 'Monstro virado em Defesa' : 'Carta baixada';
@@ -158,7 +161,7 @@ function cardSlot(card, owner, kind, index) {
 }
 
 function renderZones(owner, kind) {
-  const cards = kind === 'm' ? game[owner].field : game[owner].backrow;
+  const cards = kind === 'm' ? [0, 1, 2].map((index) => game[owner].field.find((card) => zoneOf(game[owner], card) === index)) : game[owner].backrow;
   $(`#${owner}-${kind === 'm' ? 'field' : 'backrow'}`).innerHTML = [0, 1, 2].map((index) => (cards[index] ? cardSlot(cards[index], owner, kind, index) : `<div class="zone empty ${kind === 'm' ? 'mzone' : 'szone'}" data-zone="${owner}-${kind}-${index}"></div>`)).join('');
 }
 
@@ -205,9 +208,17 @@ function renderDock() {
   const direct = $('#direct');
   $('#end').disabled = !myTurn();
   direct.hidden = true;
-  $('#heart').hidden = !(hasHeart && myTurn() && !game.player.heartUsed && game.player.deck.length);
+  $('#tribute-ok').hidden = $('#tribute-cancel').hidden = !tribute;
+  $('#end').hidden = !!tribute; // os botões do tributo ocupam o lugar dele
+  $('#heart').hidden = !!tribute || !(hasHeart && myTurn() && !game.player.heartUsed && game.player.deck.length);
   if (!myTurn()) {
     hint.textContent = game.gameOver ? '' : 'O rival está jogando.';
+    return;
+  }
+  if (tribute) {
+    const { need, picked } = tribute;
+    $('#tribute-ok').disabled = picked.length !== need;
+    hint.textContent = `Toque ${need > 1 ? `em ${need} monstros` : 'no monstro'} do seu campo para sacrificar (${picked.length}/${need}).`;
     return;
   }
   const picked = selection?.kind === 'hand' ? game.player.hand.find((card) => card.uid === selection.uid) : null;
@@ -215,7 +226,7 @@ function renderDock() {
   if (picked) {
     const tributes = tributesFor(picked);
     hint.textContent = !targetsFor(selection).length ? whyNot(picked)
-      : picked.type === 'monster' && tributes ? `Solte sobre ${tributes > 1 ? 'um dos monstros' : 'o monstro'} que vai virar tributo.` : 'Escolha uma zona acesa.';
+      : picked.type === 'monster' && tributes ? `Escolha a zona acesa; depois você marca ${tributes > 1 ? `os ${tributes} tributos` : 'o tributo'}.` : 'Escolha uma zona acesa.';
   } else if (attacker) {
     if (game.enemy.field.length) hint.textContent = `Escolha o alvo de ${attacker.name}.`;
     else { direct.hidden = false; hint.textContent = `Campo do rival vazio: ${attacker.name} pode atacar direto.`; }
@@ -356,7 +367,7 @@ const who = (owner) => (owner === 'player' ? 'Você' : 'O rival');
 
 async function doSummon(owner, action, origin) {
   const fromRect = origin || (owner === 'player' ? el(action.uid)?.getBoundingClientRect() : $('#enemy-hand img:last-child')?.getBoundingClientRect());
-  const event = summon(game, owner, action.uid, { position: action.position, tributes: action.tributes || [] });
+  const event = summon(game, owner, action.uid, { position: action.position, tributes: action.tributes || [], zone: action.zone ?? null });
   if (event.tributes.length) { shatter(event.tributes); await wait(420); }
   render();
   const node = el(action.uid);
@@ -510,8 +521,53 @@ async function run(owner, action, origin) {
   return endTurn(game, owner);
 }
 
+/* ---------- Escolha dos tributos ---------- */
+
+function beginTribute(action, origin) {
+  const need = tributesFor(game.player.hand.find((card) => card.uid === action.uid));
+  const field = game.player.field;
+  selection = null;
+  markTargets([]);
+  // Sem escolha possível (todos os monstros vão): segue direto.
+  if (field.length <= need) { playerAction({ ...action, askTribute: false, tributes: field.map((card) => card.uid) }, origin); return; }
+  const dropped = field.find((card) => zoneOf(game.player, card) === action.zone);
+  tribute = { action, origin, need, picked: dropped ? [dropped.uid] : [] };
+  render();
+}
+
+function toggleTribute(uid) {
+  const { picked, need } = tribute;
+  if (picked.includes(uid)) picked.splice(picked.indexOf(uid), 1);
+  else if (picked.length < need) picked.push(uid);
+  else if (need === 1) picked.splice(0, 1, uid);
+  else toast(`Só ${need} tributos: toque num escolhido para trocar.`);
+  render();
+}
+
+/** `quiet`: cancelou tocando noutra carta; não refaz a mão para não perder o gesto que começa. */
+function cancelTribute(quiet = false) {
+  tribute = null;
+  selection = null;
+  if (!quiet) { render(); return; }
+  document.querySelectorAll('.hand-card.selected').forEach((node) => node.classList.remove('selected'));
+  renderZones('player', 'm');
+  renderDock();
+}
+
+function confirmTribute() {
+  if (!tribute || tribute.picked.length !== tribute.need) return;
+  const { action, origin, picked } = tribute;
+  const player = game.player;
+  // A carta fica na zona escolhida se ela estiver livre ou for de um tributo; senão ocupa a zona de um tributo.
+  const freed = picked.map((uid) => zoneOf(player, player.field.find((card) => card.uid === uid)));
+  const taken = player.field.some((card) => zoneOf(player, card) === action.zone && !picked.includes(card.uid));
+  tribute = null;
+  playerAction({ ...action, askTribute: false, tributes: picked, zone: taken ? freed[0] : action.zone }, origin);
+}
+
 async function playerAction(action, origin) {
   if (!myTurn()) return;
+  if (action.askTribute) { beginTribute(action, origin); return; }
   busy = true;
   selection = null;
   markTargets([]);
@@ -578,10 +634,13 @@ function startDrag(event) {
   const faceDown = pose.faceDown;
   ghost.className = `drag-ghost card ${faceDown ? 'set' : ''} ${pose.sideways ? 'sideways' : ''}`;
   ghost.innerHTML = `<img src="${faceDown ? cardBackImage() : cardImage(source.card)}" alt="">`;
-  ghost.style.width = `${rect.width}px`;
+  // Deitada, gira o fantasma inteiro (moldura junto); a largura é a da carta em pé, não a do retângulo girado.
+  const width = pose.sideways ? node.offsetWidth : rect.width;
+  ghost.style.width = `${width}px`;
   document.body.append(ghost);
   node.classList.add('lifting');
-  gesture.drag = { ghost, targets, offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top, rect };
+  // O ponto de agarre é medido a partir do centro, que não muda com a rotação.
+  gesture.drag = { ghost, targets, width, sideways: !!pose.sideways, offsetX: rect.left + rect.width / 2 - event.clientX, offsetY: rect.top + rect.height / 2 - event.clientY, rect };
   selection = { kind: source.kind === 'hand' ? 'hand' : 'field', uid: source.uid };
   markTargets(targets);
   renderDock(); // a dica passa a explicar o que fazer com a carta arrastada (ex.: soltar sobre o tributo)
@@ -589,9 +648,11 @@ function startDrag(event) {
   return true;
 }
 
+const ghostPose = (drag, x, y, tilt = 0) => `translate(${x + drag.offsetX - drag.width / 2}px, ${y + drag.offsetY - (drag.width * 614) / 842}px) rotate(${tilt + (drag.sideways ? 90 : 0)}deg)`;
+
 function moveDrag(event) {
-  const { ghost, offsetX, offsetY } = gesture.drag;
-  ghost.style.transform = `translate(${event.clientX - offsetX}px, ${event.clientY - offsetY}px) rotate(${Math.max(-12, Math.min(12, event.movementX * 0.6))}deg) scale(1.08)`;
+  const { ghost } = gesture.drag;
+  ghost.style.transform = `${ghostPose(gesture.drag, event.clientX, event.clientY, Math.max(-12, Math.min(12, event.movementX * 0.6)))} scale(1.08)`;
   document.querySelectorAll('.drop-hover').forEach((node) => node.classList.remove('drop-hover'));
   dropTarget(event)?.node.classList.add('drop-hover');
 }
@@ -610,7 +671,8 @@ async function endDrag(event) {
     ghost.remove();
     await playerAction(drop.target.action, origin);
   } else {
-    if (motion) await ghost.animate([{ transform: ghost.style.transform }, { transform: `translate(${rect.left}px, ${rect.top}px)` }], { duration: 260, easing: 'ease-out' }).finished.catch(() => {});
+    const back = ghostPose({ ...gesture.drag, offsetX: 0, offsetY: 0 }, rect.left + rect.width / 2, rect.top + rect.height / 2);
+    if (motion) await ghost.animate([{ transform: ghost.style.transform }, { transform: back }], { duration: 260, easing: 'ease-out' }).finished.catch(() => {});
     ghost.remove();
     selection = null;
     render();
@@ -678,6 +740,12 @@ document.addEventListener('pointerdown', (event) => {
   if (!$('#help').hidden && !event.target.closest('#help, #help-toggle')) $('#help-toggle').click();
   if (event.button > 0 || gesture) return;
   if ($('#zoom').classList.contains('show')) { hideZoom(); return; }
+  if (tribute) {
+    // Marcando tributos: tocar num monstro seu liga/desliga; fora do painel de botões, cancela.
+    const slot = event.target.closest('#player-field .zone.filled');
+    if (slot) { event.preventDefault(); toggleTribute(uidOf(slot.querySelector('[data-token]').dataset.token)); return; }
+    if (!event.target.closest('.dock')) cancelTribute(true);
+  }
   const node = event.target.closest('[data-gesture]');
   const zone = event.target.closest('[data-target]');
   if (!node) {
@@ -738,6 +806,8 @@ document.addEventListener('click', (event) => {
   if (event.detail !== 0) return;
   const node = event.target.closest('[data-gesture]');
   const zone = event.target.closest('[data-target]');
+  const slot = tribute && event.target.closest('#player-field .zone.filled');
+  if (slot) { toggleTribute(uidOf(slot.querySelector('[data-token]').dataset.token)); return; }
   if (zone && selection) { const target = targetsFor(selection)[Number(zone.dataset.target)]; if (target) { playerAction(target.action); return; } }
   if (node) keySelect(node);
 });
@@ -813,12 +883,15 @@ $('#heart').addEventListener('click', () => playerAction(async () => {
   log(`O Coração das Cartas trouxe ${event.name}.`);
 }));
 
+$('#tribute-ok').addEventListener('click', confirmTribute);
+$('#tribute-cancel').addEventListener('click', () => cancelTribute());
 $('#direct').addEventListener('click', () => {
   if (selection?.kind === 'field') playerAction({ type: 'attack', uid: selection.uid, target: null });
 });
 $('#end').addEventListener('click', async () => {
   if (!myTurn()) return;
   selection = null;
+  tribute = null;
   endTurn(game, 'player');
   save();
   if (finishIfNeeded()) return;
