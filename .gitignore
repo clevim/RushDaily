@@ -22,6 +22,9 @@ src/assets/classic-art/
 src/assets/classic-cards/
 src/assets/cards-sm/
 src/assets/classic-cards-sm/
+src/assets/rush-art/
+src/assets/rush-cards/
+src/assets/rush-cards-sm/
 
 # Modelo 3D do Enigma (Printables 517699, CC BY-NC-SA): baixado e convertido pelo setup
 src/assets/puzzle/

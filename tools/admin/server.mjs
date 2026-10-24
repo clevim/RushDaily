@@ -74,6 +74,10 @@ const TAREFAS = {
       if (!RUSH.includes(q.comandoRush)) throw new Error(`comando: ${RUSH.join(', ')}`);
       return { cmd: 'python3', args: ['-I', 'tools/rush/import_rush.py', q.comandoRush] };
     } },
+  'artes-rush': { titulo: 'Artes Rush', desc: 'import_rush.py art: baixa do Yugipedia as artes das cartas Rush do motor (todas as que faltam, ou só os ids) -> src/assets/rush-art/.', params: ['force', 'ids'],
+    montar: (q) => ({ cmd: 'python3', args: ['-I', 'tools/rush/import_rush.py', 'art', ...(q.force ? ['--force'] : []), ...ids(q.ids)] }) },
+  'montar-rush': { titulo: 'Montar cartas Rush', desc: 'tools/rush/render.mjs: desenha as cartas Rush do motor com moldura e arte (as que faltam, as com arte nova, ou só os ids) -> src/assets/rush-cards/.', params: ['force', 'ids'],
+    montar: (q) => ({ cmd: 'node', args: ['tools/rush/render.mjs', ...(q.force ? ['--force'] : []), ...ids(q.ids)] }) },
   'simulacao-rush': { titulo: 'Simulação Rush', desc: 'tools/rush/simulate.mjs N modo: IA x IA com decks gerados e/ou bot aleatório com decks sorteados; conta erros de script e travamentos.', params: ['duelos', 'modoRush'],
     montar: (q) => {
       const modo = q.modoRush || 'todos';
@@ -169,11 +173,13 @@ async function status() {
   const rushOcg = jsonDe('src/data/rush/cards.json') ?? [];
   const luasRush = arquivos(p('src/vendor/card-scripts/rush'), /^c\d+\.lua$/);
   const rushPt = rushOcg.filter((c) => c.pt).length;
+  const rushArte = arquivos(p('src/assets/rush-art'), /^\d+\.webp$/);
+  const rushCartas = arquivos(p('src/assets/rush-cards'), /^\d+\.webp$/);
   const seasonsOk = ts.length > 0 && ts.every((s) => ex(`src/data/classic/s${s.season}.json`));
   const E = {
     three: { pronto: ex('src/vendor/three.module.js'), caminhos: ['src/vendor/three.module.js'] },
     ocgcore: { pronto: ex('src/vendor/ocgcore/index.js') && ex('src/vendor/ocgcore/ocgcore.wasm') && ex('src/vendor/ocgcore/LICENSE.md'), caminhos: ['src/vendor/ocgcore'] },
-    yugioh: { pronto: ex('src/vendor/yugioh-card/yugioh-card.js') && ex('src/vendor/yugioh-card/assets/yugioh/font/font-list.json'), caminhos: ['src/vendor/yugioh-card'] },
+    yugioh: { pronto: ex('src/vendor/yugioh-card/yugioh-card.js') && ex('src/vendor/yugioh-card/assets/yugioh/font/font-list.json') && ex('src/vendor/yugioh-card/assets/rush-duel/font/font-list.json'), caminhos: ['src/vendor/yugioh-card'] },
     rush: { pronto: ex('src/data/cards.mjs'), contagem: `${rushTotal} cartas Rush no pool`, caminhos: ['src/data/cards.mjs'] },
     'rush-render': { pronto: rushTotal > 0 && rushImg >= rushTotal, parcial: rushImg > 0, contagem: `${rushImg}/${rushTotal} cartas Rush desenhadas`, caminhos: ['src/assets/cards'] },
     classico: { pronto: seasonsOk && ex('src/data/classic/puzzles.json') && luas > 0 && artes >= totalClassicas && totalClassicas > 0, parcial: seasonsOk || artes > 0,
@@ -182,6 +188,8 @@ async function status() {
     'rush-ocg': { pronto: rushOcg.length > 0 && luasRush > 0 && ex('src/vendor/card-scripts/rush/index.json') && ex('src/vendor/card-scripts/constant.lua'), parcial: rushOcg.length > 0 || luasRush > 0 || ex('tools/rush/cache/cards-rush.cdb'),
       contagem: `${rushOcg.length} cartas (${rushPt} em PT · ${rushOcg.filter((c) => c.legend).length} Lenda) · scripts Lua ${luasRush} · cache ${(tamanho(p('tools/rush/cache')) / 1048576).toFixed(1)} MB`,
       caminhos: ['src/data/rush', 'src/vendor/card-scripts/rush', 'tools/rush/cache'] },
+    'rush-art': { pronto: rushOcg.length > 0 && rushArte >= rushOcg.length, parcial: rushArte > 0, contagem: `${rushArte}/${rushOcg.length} artes Rush (sem arte: quadro no tom do atributo)`, caminhos: ['src/assets/rush-art'] },
+    'rush-cartas': { pronto: rushOcg.length > 0 && rushCartas >= rushOcg.length, parcial: rushCartas > 0, contagem: `${rushCartas}/${rushOcg.length} cartas Rush montadas (${rushArte} com arte)`, caminhos: ['src/assets/rush-cards', 'src/assets/rush-cards-sm'] },
     'classico-render': { pronto: cartasCl > 0 && cartasCl >= artes, parcial: cartasCl > 0, contagem: `${cartasCl} cartas pré-desenhadas (${artes} artes)`, caminhos: ['src/assets/classic-cards'] },
     miniaturas: { pronto: rushSm > 0 && rushSm >= rushImg && clSm >= cartasCl, parcial: rushSm > 0 || clSm > 0, contagem: `Rush ${rushSm}/${rushImg} · clássicas ${clSm}/${cartasCl}`, caminhos: ['src/assets/cards-sm', 'src/assets/classic-cards-sm'] },
     enigma: { pronto: ex('src/assets/puzzle/puzzle.bin') && ex('src/assets/puzzle/puzzle.json'), caminhos: ['src/assets/puzzle', 'tools/setup/cache/enigma'] },

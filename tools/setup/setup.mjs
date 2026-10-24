@@ -168,6 +168,24 @@ const ETAPAS = [
     },
   },
   {
+    nome: 'rush-art', desc: 'Artes das cartas Rush do motor: yaml-yugi (nomes dos arquivos) e Yugipedia -> src/assets/rush-art/ (webp 400 px)',
+    pronto: () => false, // o comando pula as artes que já existem
+    run() {
+      // Sem o Yugipedia (fora do ar ou bloqueando) o jogo segue: as cartas saem com o quadro provisório; rode de novo depois.
+      rodar('python3', ['-I', 'tools/rush/import_rush.py', 'art', ...(force ? ['--force'] : [])], { ok: [0, 3] });
+    },
+  },
+  {
+    nome: 'rush-cartas', desc: 'Monta as cartas Rush do motor (moldura do yugioh-card + arte) -> src/assets/rush-cards/, rush-cards-sm/',
+    render: true,
+    pronto: () => false, // render.mjs pula as prontas (refaz as que ganharam arte depois)
+    run() {
+      baixarMolduras();
+      npmRender(true);
+      rodar('node', ['tools/rush/render.mjs', ...(force ? ['--force'] : [])]);
+    },
+  },
+  {
     nome: 'classico-render', desc: 'Desenha as cartas clássicas pré-desenhadas (miniaturas) -> src/assets/classic-cards/',
     render: true,
     pronto: () => false,

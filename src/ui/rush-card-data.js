@@ -3,8 +3,8 @@
 import { RACES as CLASSIC_RACES } from '../data/classic/strings-pt.mjs';
 
 export const SCALE = 0.3; // 1394x2031 -> 418x609
-// Tipos do Rush depois de Ilusão (bits 26 a 31 do EDOPro).
-export const RACES = [...CLASSIC_RACES, 'Ciborgue', 'Cavaleiro Mágico', 'Grão-Dragão', 'Psíquico Ômega', 'Guerreiro Celestial', 'Galáxia'];
+// Tipos do Rush depois de Ilusão (bits 26 a 31 do EDOPro); os 26 primeiros vêm do clássico.
+export const RACES = [...CLASSIC_RACES.slice(0, 26), 'Ciborgue', 'Cavaleiro Mágico', 'Dragão Supremo', 'Psíquico Ômega', 'Guerreiro Celestial', 'Galáxia'];
 const ATTRIBUTE = { 1: 'earth', 2: 'water', 4: 'fire', 8: 'wind', 16: 'light', 32: 'dark', 64: 'divine' };
 const T = { MONSTER: 0x1, SPELL: 0x2, TRAP: 0x4, NORMAL: 0x10, EFFECT: 0x20, FUSION: 0x40, RITUAL: 0x80, MAXIMUM: 0x8000, QUICK: 0x10000, CONTINUOUS: 0x20000, EQUIP: 0x40000, FIELD: 0x80000, COUNTER: 0x100000 };
 const ICONS = [[T.QUICK, 'quick-play', 'Rápida'], [T.CONTINUOUS, 'continuous', 'Contínua'], [T.EQUIP, 'equip', 'Equipamento'], [T.FIELD, 'field', 'Campo'], [T.COUNTER, 'counter', 'Resposta'], [T.RITUAL, 'ritual', 'Ritual']];
@@ -109,7 +109,7 @@ export function placeholderArt(card) {
     + '<path d="M200 112 288 200 200 288 112 200Z" fill="none" stroke="url(#g)" stroke-width="5"/>'
     + '<path d="M200 140 260 200 200 260 140 200Z" fill="url(#g)" fill-opacity=".28"/>'
     + '<path d="M200 168 232 200 200 232 168 200Z" fill="url(#g)" fill-opacity=".75"/></svg>';
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  return `data:image/svg+xml;base64,${btoa(svg)}`; // base64: o skia-canvas (Node) não aceita o formato com %XX
 }
 
 // image: URL ou data URL da arte (sem arte: placeholderArt).

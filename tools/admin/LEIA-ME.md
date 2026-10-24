@@ -18,6 +18,8 @@ Sem dependências (só Node). Histórico e configuração ficam em `tools/setup/
 - Setup de uma etapa (lista vinda de `setup.mjs --lista`), com "refazer" (`--force` só nela)
 - Importar clássico: `fetch`, `decks`, `build --ate N`, `art`, `puzzles`
 - Importar Rush (`tools/rush/import_rush.py`): `fetch` (baixa o `cards-rush.cdb` do BabelCDB e os scripts `rush/` do CardScripts para `tools/rush/cache/`) e `build` (gera `src/data/rush/cards.json` e copia os scripts para `src/vendor/card-scripts/rush/`)
+- Artes Rush (`import_rush.py art`): baixa do Yugipedia as artes das cartas Rush do motor para `src/assets/rush-art/` (todas as que faltam, ou só os ids; "refazer" = `--force`)
+- Montar cartas Rush (`tools/rush/render.mjs`): desenha as cartas Rush do motor com moldura e arte para `src/assets/rush-cards/` e `rush-cards-sm/` (as que faltam e as que ganharam arte depois, ou só os ids). Rode depois de "Artes Rush"
 - Buscar puzzles (`puzzles --buscar --nos --meta`; padrão vem da configuração salva)
 - Render das clássicas e das Rush (todas as que faltam, ou só os ids)
 - Testes (`npm test`) e simulação (`simulate.mjs N T`)
@@ -27,7 +29,7 @@ O log aparece em tempo real (SSE); a barra de progresso lê as linhas `N/M` dos 
 
 ## Status e configuração
 
-Por etapa: pronta/parcial/faltando, tamanho, data da última geração e contagens (artes, pré-desenhadas, Rush, puzzles, scripts Lua; na `rush-ocg`, cartas, quantas em PT e Lenda, scripts Rush e o tamanho de `tools/rush/cache`), mais o espaço dos `tools/*/cache`. Temporadas ativas mudam rodando `build --ate N` (com confirmação). "Invalidar cache no navegador" só mostra a instrução: subir `CACHE_VERSION` em `src/ui/classic-render.js`.
+Por etapa: pronta/parcial/faltando, tamanho, data da última geração e contagens (artes, pré-desenhadas, Rush, puzzles, scripts Lua; na `rush-ocg`, cartas, quantas em PT e Lenda, scripts Rush e o tamanho de `tools/rush/cache`; na `rush-art`, artes/total; na `rush-cartas`, cartas montadas/total), mais o espaço dos `tools/*/cache`. Temporadas ativas mudam rodando `build --ate N` (com confirmação). "Invalidar cache no navegador" só mostra a instrução: subir `CACHE_VERSION` em `src/ui/classic-render.js` (cartas Rush: `src/ui/rush-render.js`).
 
 ## Segurança
 
