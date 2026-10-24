@@ -875,6 +875,7 @@ $('#heart').addEventListener('click', () => playerAction(async () => {
   const event = heartOfTheCards(game, 'player');
   useHeart(playerKey);
   hasHeart = false;
+  save(); // grava já: se a aba fechar na animação, a carga gasta não pode voltar sem o efeito
   await shatterEnigma();
   scene.burst(GOLD);
   render();
