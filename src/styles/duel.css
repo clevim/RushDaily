@@ -320,7 +320,7 @@ html:has(.arena) { overflow: clip; }
 /* Celular: tudo empilhado, sem rolagem */
 @media (max-width: 860px) {
   /* A altura também limita a carta: mesa (~4,7 cartas de altura + placas e faixa do log) cabe acima da bandeja. */
-  .arena { --card: min(23vw, 10.8dvh, (100dvh - 445px) / 4.72); --scard: calc(var(--card) * 0.62); --hand: min(21vw, 13.5dvh); --gap: 7px; }
+  .arena { --card: min(23vw, 10.8dvh, (100dvh - 478px) / 4.72); --scard: calc(var(--card) * 0.62); --hand: min(21vw, 13.5dvh); --gap: 7px; }
   .arena-top { grid-template-columns: auto 1fr auto; padding: 6px 10px; }
   .leave span { display: none; }
   .turn-chip { justify-self: center; padding: 5px 14px; }
@@ -346,11 +346,11 @@ html:has(.arena) { overflow: clip; }
   .log span:first-child { font-size: 0.76rem; line-height: 1.15; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .tray { grid-template-columns: 1fr; grid-template-areas: 'dock' 'hand'; gap: 0; padding: 0 8px max(6px, env(safe-area-inset-bottom)); }
   .dock { gap: 4px; padding: 0; }
-  .hint { min-height: 0; font-size: 0.78rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .hint { min-height: 0; margin-top: 4px; font-size: 0.78rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .dock-actions { gap: 8px; flex-wrap: nowrap; }
   .dock .btn { flex: 1; min-height: 38px; padding: 0 10px; font-size: 0.8rem; }
-  .hand { padding-top: 14px; min-height: calc(var(--hand) * 1.46 * 0.78); }
-  .hand-card { margin-left: calc(var(--hand) * -0.32); transform: translateY(calc(var(--o) * var(--o) * 2px)) rotate(calc(var(--o) * 3deg)); }
+  .hand { box-sizing: border-box; height: calc(var(--hand) * 1.46 + 24px); min-height: 0; padding: 12px 0 8px; }
+  .hand-card { margin-left: calc(var(--hand) * -0.32); transform-origin: 50% 100%; transform: translateY(calc(var(--o) * var(--o) * 2px)) rotate(calc(var(--o) * 3deg)); }
   .hand-card:hover, .hand-card:focus-visible { transform: translateY(-6px) scale(1.06) rotate(0); }
   .hand-card.selected { transform: translateY(-18px) scale(1.1) rotate(0); }
   .hand-card.sideways { transform: translateY(calc(var(--hand) * 0.05)) rotate(90deg) scale(0.74); }
