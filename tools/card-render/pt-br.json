@@ -1,0 +1,1690 @@
+{
+"15184": {
+"name": "Dragão Branco de Olhos Azuis",
+"desc": "Este dragão lendário é uma poderosa máquina de destruição. Praticamente invencível, poucos o enfrentaram e viveram para contar a história."
+},
+"15199": {
+"name": "Saqueador Máximo",
+"desc": "Um guerreiro de dois machados que levou o corpo ao limite. Os golpes das suas lâminas são devastadores."
+},
+"15213": {
+"name": "Dragão Rastejante",
+"desc": "Enfraquecido, este dragão já não voa, mas continua sendo uma força mortal."
+},
+"15215": {
+"name": "LaMoon",
+"desc": "Uma feiticeira que tira seus poderes da paisagem lunar."
+},
+"15218": {
+"name": "Dragão Menor",
+"desc": "Um dragão menor, incapaz de cuspir fogo."
+},
+"15328": {
+"name": "Gaia, o Cavaleiro Feroz",
+"desc": "Um cavaleiro cujo corcel corre mais rápido que o vento. Sua investida é uma força a ser temida."
+},
+"15351": {
+"name": "Dragão Negro de Olhos Vermelhos",
+"desc": "Um dragão feroz com um ataque mortal."
+},
+"15410": {
+"name": "Mago Negro",
+"desc": "O mago definitivo em ataque e defesa."
+},
+"15595": {
+"name": "Feiticeiro da Luz",
+"desc": "Um mago devotado aos céus. Envolto em bênçãos divinas, mas que destino o aguarda?"
+},
+"15655": {
+"name": "Masaki, o Samurai Lendário",
+"desc": "Este samurai lendário é veterano de mais de cem batalhas."
+},
+"15786": {
+"name": "Dragão Bebê",
+"desc": "Muito mais que um filhote, este dragão possui um poder ainda adormecido."
+},
+"15788": {
+"name": "Doriado",
+"desc": "Um espírito da floresta, fortalecido pelas árvores e pelos animais ao seu redor."
+},
+"16308": {
+"name": "O Dragão de Fogo",
+"desc": "Um dragão esplêndido coberto de chamas. Não gosta de lutar, mas tem um poder de ataque altíssimo."
+},
+"16894": {
+"name": "Dançarino da Espada",
+"desc": "Um espadachim habilidoso que já serviu a uma nação poderosa. Sua lâmina voa com precisão incomparável enquanto a plateia prende a respiração."
+},
+"16895": {
+"name": "Malabarista Mágico",
+"desc": "Um homem enigmático que nunca fala do passado. Seu bastão enlouquece a plateia, como se fosse mágica."
+},
+"16905": {
+"name": "Espadachim da Estrada Estelar",
+"desc": "Um espadachim meteórico de poderes desconhecidos, que abre caminho para um destino milagroso."
+},
+"17497": {
+"name": "Protetora do Trono",
+"desc": "Enquanto o rei está fora, esta rainha protege o trono com uma defesa poderosa."
+},
+"18238": {
+"name": "Soljersey do Brilho Negro",
+"desc": "Um Super Soldado que surge pelo Ritual do Brilho Negro. Corta os inimigos com seu mortal Golpe Elástico do Caos."
+},
+"18398": {
+"name": "Buraco Negro",
+"desc": "Destrua todos os monstros no campo."
+},
+"18584": {
+"name": "Dragão Gélido",
+"desc": "Um dragão que vive em terras geladas e cruza trilhas de neve em alta velocidade."
+},
+"18704": {
+"name": "Catástrofe Malévola",
+"desc": "Destrua todos os Cartas Mágicas e de Armadilha no campo."
+},
+"18705": {
+"name": "Dragão Meteoro",
+"desc": "Este dragão surgiu do céu e se chocou contra a terra."
+},
+"18787": {
+"name": "Força Espelho Radiante",
+"desc": "Destrua todos os monstros em Posição de Ataque no campo do seu oponente."
+},
+"18930": {
+"name": "Feiticeiro da Terra",
+"desc": "Mesmo tendo fugido de sua terra natal, este feiticeiro ainda guarda um orgulho inabalável do seu clã."
+},
+"18931": {
+"name": "Feiticeiro do Vento",
+"desc": "Inspirado pelo vento, ele preza a liberdade acima de tudo. Mas seu jeito teimoso vai levá-lo a um caminho que limita essa liberdade."
+},
+"19770": {
+"name": "Elfas Gêmeas",
+"desc": "Elfas gêmeas que alternam seus ataques."
+},
+"19785": {
+"name": "Golpe de Martelo",
+"desc": "Destrua 1 monstro em Posição de Ataque com o maior ATK no campo."
+},
+"21116": {
+"name": "Vórtice Relâmpago",
+"desc": "Destrua todos os monstros com a face para cima no campo do seu oponente."
+},
+"21850": {
+"name": "Guerreiro de Zera",
+"desc": "Um guerreiro errante em busca do santuário onde poderá obter o poder dos Arquilordes. Para escapar da tentação dos demônios, luta sozinho dia após dia."
+},
+"16892": {
+"name": "Glaciassauro",
+"desc": "Um dinossauro gentil que não liga para conflitos. Sempre sorrindo para a plateia."
+},
+"15653": {
+"name": "Tengu Falcão Azul",
+"desc": "Um tengu implacável que deixa os oponentes atordoados ao atacar sem piedade."
+},
+"15225": {
+"name": "Servo Caveira",
+"desc": "Um fantasma esquelético que não é forte, mas em grande número pode dar trabalho."
+},
+"16132": {
+"name": "Formigas Atarefadas",
+"desc": "Embora sempre sofram em silêncio, juraram que um dia vão se revoltar."
+},
+"15217": {
+"name": "Diabrete Feroz",
+"desc": "Um pequeno demônio brincalhão que espreita no escuro, esperando atacar um inimigo distraído."
+},
+"17489": {
+"name": "Mouton Terrestre da Terra da Lã",
+"desc": "O novato do rebanho da Terra da Lã. Um preguiçoso legítimo."
+},
+"16660": {
+"name": "Guerreiro Operário - Chefe Ruim",
+"desc": "Um drone de nível médio que gasta quase toda a memória brigando por promoções. Seus relatórios são uma tempestade de fofoca entre colegas."
+},
+"18677": {
+"name": "Corte Impiedoso - Megasaque",
+"desc": "Um saqueador feroz que caça sob a luz da lua. Suas garras afiadas cortam os inimigos!"
+},
+"15424": {
+"name": "Garota Harpia",
+"desc": "Uma filhote de Harpia que sonha em voar com graça e beleza, mas ataca com precisão."
+},
+"16950": {
+"name": "Donpen & Donko",
+"desc": "Donpen nasceu na Antártida e foi criado em Tóquio. Começou há pouco a jogar Rush Duel com Donko."
+},
+"19267": {
+"name": "Fogaréu",
+"desc": "Uma criatura maligna envolta em chamas que ataca os inimigos com fogo intenso."
+},
+"15787": {
+"name": "Gigante Hitotsu-Me",
+"desc": "Um colosso de um olho só, com braços grossos e fortes feitos para golpes devastadores."
+},
+"15416": {
+"name": "Elfa Borbulhante",
+"desc": "Esta garota não é mais delicada. Elegante e serena, está sempre pronta para a festa. Amiga de bipe de LaMoon, a Princesa da Festa."
+},
+"15680": {
+"name": "Segurança do Palco Psi",
+"desc": "A ameaça psíquica cresce a cada ano, e uma equipe de elite de guarda-costas foi encarregada de proteger a Diva Psíquica, a chave para resolver tudo."
+},
+"17940": {
+"name": "Carpendra",
+"desc": "Um desmontador móvel fabricado em série, equipado com ferramentas multiuso. Os membros e as asas ficam meio soltos, então ele vive perdendo peças."
+},
+"20458": {
+"name": "HERÓI do Elemento Homem de Argila",
+"desc": "Um HERÓI do Elemento com corpo de argila feito para durar. Protege seus colegas a qualquer custo."
+},
+"17719": {
+"name": "Fantasma Mágico",
+"desc": "Esta criatura lança um feitiço de terror e confusão logo antes de atacar os inimigos."
+},
+"16597": {
+"name": "Demolidor Construtor Wyrm Draco Esmaga",
+"desc": "Um Wyrm Construtor envolto em equipamento de obra. Dizem que, não importa o tamanho do projeto, ele demole o canteiro com um só golpe."
+},
+"19637": {
+"name": "Yoshimitsu Tubarão-Duende da Espada Hídrica",
+"desc": "Um lendário samurai tritão que recebeu a bênção divina da Espada Hídrica. Ninguém consegue ver os duelos de espada travados nas profundezas do oceano."
+},
+"19278": {
+"name": "Draco Verme",
+"desc": "Depois que este monstro se enrola em uma vítima, não há escapatória."
+},
+"22406": {
+"name": "Gradius",
+"desc": "Um caça a jato de alto desempenho com cápsulas de energia para ataques variáveis."
+},
+"17483": {
+"name": "Transam Linac",
+"desc": "Lute pela Luz! Acabamento Puro!"
+},
+"20042": {
+"name": "Seiyaryu",
+"desc": "Um dragão místico que queima os indignos com suas chamas místicas."
+},
+"17942": {
+"name": "Craftroll",
+"desc": "Um robô artesão popular entre as crianças, que também é mascote de um parque de diversões. Gire a manivela central e ele se transforma."
+},
+"15156": {
+"name": "Fera Mágica Wolfang",
+"desc": "O antigo familiar de um mago famoso. Em algum momento seu poder mágico superou o do mestre, e agora ele brinca com os inimigos manipulando chamas à vontade."
+},
+"18900": {
+"name": "Cocosh, a Maga da Felicidade",
+"desc": "Uma maga de coração caloroso que faz o mundo sorrir com sua magia lendária, \"Danish\", que combina muitas artes e técnicas. Por suas conquistas recebeu o título de \"Coco\". Tem um lado brincalhão e adora mimar sua companheira \"Maple\"."
+},
+"17270": {
+"name": "Mechaleão",
+"desc": "Este monstro se esconde em quase qualquer lugar adotando as cores do ambiente."
+},
+"16118": {
+"name": "Gokibore",
+"desc": "Uma barata grande e esférica que ataca rolando por cima dos inimigos."
+},
+"16580": {
+"name": "Uraby",
+"desc": "Rápido nos pés, este dinossauro despedaça os inimigos com suas garras afiadas."
+},
+"17968": {
+"name": "Voidvelg, o Cavaleiro Pálido",
+"desc": "Encarnação do soberano do submundo, toma as almas dos vivos e as leva para seu reino. Ninguém escapa de sua lâmina violeta."
+},
+"20111": {
+"name": "Beta, o Guerreiro Magnético",
+"desc": "Alfa, Beta e Gama se fundem em um só para formar um monstro poderoso."
+},
+"16668": {
+"name": "Dumplina do Norte",
+"desc": "Garota-propaganda de um restaurante do Norte, defensora do equilíbrio entre trabalho e vida. Vários soldados corporativos saem no horário para passar lá, mas ela também já saiu no horário."
+},
+"15785": {
+"name": "Chu-Ske, o Rato Lutador",
+"desc": "Um rato esquentado que viaja pelo mundo para se tornar o lutador mais forte entre os ratos. Cuidado para não encostar nele, ou vai se queimar."
+},
+"15224": {
+"name": "Mariposa Petit",
+"desc": "Esta criatura pequena, mas mortal, é melhor evitar."
+},
+"16293": {
+"name": "Tyhone nº 2",
+"desc": "Um dragão carmesim que cospe bolas de fogo e cria um mar de chamas."
+},
+"18775": {
+"name": "Grão-Mestre Bathynomus",
+"desc": "Uma forma de vida misteriosa do fundo do oceano. Dizem que serpentes marinhas lendárias habitam o mesmo lugar."
+},
+"15219": {
+"name": "Cavaleiro Arma",
+"desc": "Um guerreiro amonite que protege os mares ao longo da história."
+},
+"16765": {
+"name": "Saqueador Vorse",
+"desc": "Este Besta-Guerreiro perverso faz todas as maldades imagináveis, e adora! Seu machado carrega as marcas de incontáveis vítimas."
+},
+"21851": {
+"name": "Ryu-Kishin Turbinado",
+"desc": "Uma gárgula fortalecida pelos poderes das trevas. Garras muito afiadas fazem dela um oponente à altura."
+},
+"23677": {
+"name": "Saggi, o Palhaço Sombrio",
+"desc": "Este palhaço surge do nada e faz movimentos muito estranhos para escapar dos ataques inimigos."
+},
+"15159": {
+"name": "Gato Estranho",
+"desc": "Um familiar que dizem ter grandes poderes. Não gosta de ficar sozinho e anda muito solitário desde que se separou dos amigos."
+},
+"17495": {
+"name": "Lâmina de Madeira Centenária",
+"desc": "Uma espada de madeira com alma. Passou pelas mãos de várias almas e testemunhou a ascensão e a queda de um século."
+},
+"19441": {
+"name": "Golem Destruidor",
+"desc": "Um golem com uma enorme mão direita para esmagar as vítimas."
+},
+"16314": {
+"name": "Lindo, a Guerreira da Flor Sombria",
+"desc": "Espreita nas sombras para apoiar sua mestra do clã da grama em batalha. Sua dedicação é indiscutível."
+},
+"16798": {
+"name": "Tatu Barreira",
+"desc": "Um tatu surpreendentemente forte que rebate tudo o que se aproxima. Cava com destreza usando sua esteira."
+},
+"15932": {
+"name": "Cadeira Assustadora Engrenagem",
+"desc": "Uma cadeira mecânica fácil de produzir em série. Não é tão confortável quanto as cadeiras orgânicas de antigamente."
+},
+"17843": {
+"name": "Kappa Psíquico",
+"desc": "Um anfíbio com uma infinidade de poderes que o protegem dos ataques inimigos."
+},
+"17273": {
+"name": "Imperador da Terra e do Mar",
+"desc": "Um monstro reptiliano que cospe fogo para todos os lados."
+},
+"17573": {
+"name": "Sentinela das Sombras",
+"desc": "Um guerreiro galáctico sem tolerância para vilões. Seus golpes rasgam até a escuridão mais profunda. Hideunri Va Yamerdei!"
+},
+"20459": {
+"name": "HERÓI do Elemento Burstinatrix",
+"desc": "Uma manipuladora de chamas, a primeira mulher HERÓI do Elemento. Seu Fogo Explosivo queima a vilania."
+},
+"16312": {
+"name": "Kanan, a Guarda de Segurança",
+"desc": "Uma guerreira que faz de uma ilha-prisão seu principal campo de batalha. Dá bronca com espada e escudo nas mãos. Os reincidentes deixam boas avaliações sobre o próprio despertar."
+},
+"17963": {
+"name": "Ember, a Superassistente",
+"desc": "Meu experimento favorito é o teste de chama! Hoje vou dar tudo de novo, movida pelo meu espírito ardente!"
+},
+"18577": {
+"name": "Garnecia Elefantis",
+"desc": "Um monstro tão pesado que cada passo faz a terra tremer."
+},
+"16111": {
+"name": "Guardião Celta",
+"desc": "Um elfo que aprendeu a manejar a espada e confunde os inimigos com ataques rápidos como relâmpago."
+},
+"17693": {
+"name": "Mudança de Sobremesa",
+"desc": "Uma garçonete agridoce. Vive na dúvida se entrega o seu pedido ou não."
+},
+"20152": {
+"name": "Muralha do Labirinto",
+"desc": "Estas muralhas formam um labirinto sem saída para os inimigos."
+},
+"17286": {
+"name": "Formigas Gratas",
+"desc": "Formigas agradecendo umas às outras pelo apoio. Estão decididas a se reproduzir para ter mais soldados a quem agradecer."
+},
+"17558": {
+"name": "Herói do Oriente",
+"desc": "Sente a força desse samurai brandidor de espada lá do Extremo Oriente."
+},
+"17956": {
+"name": "Cérbero Flamejante",
+"desc": "Conhecido por muitos como o \"Carrasco Ardente\", este monstro reduz os inimigos a cinzas."
+},
+"16657": {
+"name": "Jacaré Ciber-Tech",
+"desc": "Originalmente um pterodáctilo, foi atacado com violência por um dragão. Com as tecnologias mais novas, seu tratador o salvou de ferimentos quase fatais e o trouxe de volta como um Ciborgue poderoso."
+},
+"17217": {
+"name": "Espada do Jacaré",
+"desc": "Ô, esse lagarto poderoso balança a espada tão rápido que passa da velocidade do som!"
+},
+"16975": {
+"name": "Medley, o Ninja de Elite do Macarrão",
+"desc": "Superando todas as frentes de macarrão e evoluindo sem parar, o líder do Clã Ninja do Macarrão. Sem se prender a status ou identidade de macarrão, estende a mão até a quem não tem consciência de macarrão."
+},
+"16665": {
+"name": "Dogulce Jomont Blanc",
+"desc": "Quem diria que pôr bolos Mont Blanc num pote de barro lhe daria uma alma. Vê-los andando pelas palafitas arranca gritos de espanto."
+},
+"15419": {
+"name": "Engrenagem Fera Chacal Giro",
+"desc": "Uma fera que dirige feito louca, sempre atrás de diversão. É mesquinho e só compra briga que acha que ganha, por isso vive caindo em contra-ataques inesperados. Fica sem freio quando os amigos estão por perto e ainda não percebeu que sozinho não faz nada."
+},
+"17849": {
+"name": "Ovelha Aquática da Terra da Lã",
+"desc": "A mais flutuante do rebanho da Terra da Lã. Sempre serena e tranquiiiila."
+},
+"17590": {
+"name": "Feiticeiro Flamejante",
+"desc": "Um mago de paixão ardente. Uma paixão que um dia vai transformar seu coração em cinzas."
+},
+"18301": {
+"name": "Begônia, a Flor Sombria Apoiadora",
+"desc": "Um espírito de flor que nunca abandona quem ama. Está sempre feliz."
+},
+"15173": {
+"name": "Draco, o Pequenino",
+"desc": "Um dragãozinho pacífico que se aproxima com carinho se você lhe der nozes. Dizem que o anel do seu colar guarda um grande segredo."
+},
+"17492": {
+"name": "Princesa do Rebanho - Senhorita Mutton",
+"desc": "Bé-dum, bé-dum, bé-dum, béééé-dum! A ovelha no pasto, a vaca no milho! Pode me chamar de senhorita, mas sou da realeza da Terra da Lã. Nunca tenho vergonha de mastigar papel (mesmo que seja uma carta importante)."
+},
+"17852": {
+"name": "Hyosube",
+"desc": "Este anfíbio é forte no ataque, mas deixa muito a desejar na defesa."
+},
+"15596": {
+"name": "Echeclus, o Cavaleiro Estelar",
+"desc": "Um homem que carrega o poder de uma estrela maligna. Avança pelo campo de batalha todos os dias, cheio de fé no próprio senso de justiça."
+},
+"15166": {
+"name": "Guardião do Fogo",
+"desc": "O porteiro que vigia o caminho para o Reino do Dragão de Fogo. Quem não aguenta seu sopro não tem o direito de passar."
+},
+"15171": {
+"name": "Morcego Dragão",
+"desc": "Até os estudiosos discutem se esta criatura misteriosa é ave ou fera. Em bando, lembra um pouco dragões, então talvez seja isso mesmo."
+},
+"17575": {
+"name": "Executor Galáctico",
+"desc": "Uma arma espacial com estrutura parecida com uma galáxia espiral. Ataca com apêndices de alta manobrabilidade. Wuhjah!"
+},
+"15216": {
+"name": "Ave da Fé",
+"desc": "Esta ave de cauda longa cega os inimigos com uma luz mística."
+},
+"17494": {
+"name": "Espada Mística da Década",
+"desc": "Uma espada com alma. Dizem que quem a empunhou começou a treinar para uma batalha inevitável."
+},
+"17692": {
+"name": "Panda Cotta Frenético",
+"desc": "Um panda cozinheiro feroz. Fica bem irritado quando você pede Panna Cotta."
+},
+"15421": {
+"name": "Engrenagem Fera Lobo Moto",
+"desc": "Uma fera que vive saqueando comida e gasolina dos cidadãos. Parece um lobo solitário, mas acredita que o mal é o certo e faz tudo pela sua gangue. Para um criminoso tão perverso, é curioso como seus uivos distantes tocam tão fundo no coração."
+},
+"17844": {
+"name": "Kappa Rapper",
+"desc": "Um rimador que representa a beira do rio. Agita quem passa perto da água."
+},
+"15671": {
+"name": "Fanática do Rebelde Real",
+"desc": "Uma garota que tem dificuldade de olhar nos olhos ao conversar. Procura amigos e o amor verdadeiro."
+},
+"21759": {
+"name": "Homem Juiz",
+"desc": "Este guerreiro de clava luta até o fim e nunca se rende."
+},
+"19442": {
+"name": "A Cabeleira de Serpentes",
+"desc": "Um monstro com cabeça de cobras venenosas. Um olhar dele transforma o oponente em pedra."
+},
+"15221": {
+"name": "Soldado Lagarto",
+"desc": "Um soldado-fera descendente dos dragões, pequeno para o Tipo Dragão. Muito rápido, é um excelente estrategista."
+},
+"17555": {
+"name": "Joaninha Chique Pastel",
+"desc": "O coração nas costas é a marca registrada desta joaninha carinhosa. Dizem que um toque faz o amor acontecer."
+},
+"17272": {
+"name": "Yormungarde",
+"desc": "Uma serpente extremamente longa que habita o mundo dos mitos."
+},
+"17838": {
+"name": "Maldição do Dragão",
+"desc": "Um dragão perverso que usa forças sombrias para um ataque poderoso."
+},
+"17285": {
+"name": "Germalewe",
+"desc": "Um ser feroz de um mundo de fogo. A presa devorada não deixa nem um osso."
+},
+"16309": {
+"name": "CAN:D",
+"desc": "Dona de um potencial infinito. Persegue seus sonhos com um sorriso que ofusca."
+},
+"17847": {
+"name": "Dragão Lustroso",
+"desc": "Um dragão belíssimo coberto de safiras. Não gosta de lutas, mas tem um ataque altíssimo."
+},
+"17567": {
+"name": "Ganzel Celestial",
+"desc": "Este dragão etéreo carrega as esperanças de muitas estrelas inocentes. Seus ataques ganham força ao ressoar com os puros de coração. Ungoldo Guwahi!"
+},
+"17581": {
+"name": "Astroeva",
+"desc": "Uma criatura cósmica que pilota um OVNI parecido com um asteroide pelo espaço. Jubidogew Higewmei!"
+},
+"17952": {
+"name": "Draco Queima Alfa",
+"desc": "Um filhote de dragão com potencial escondido. Sonha com aqueles óculos que mostram um vasto mundo virtual."
+},
+"20443": {
+"name": "Dragão Lustroso nº 2",
+"desc": "Este dragão se alimenta de esmeraldas. Encantados por ele mesmo durante o ataque, poucos vivem para contar sua beleza."
+},
+"21096": {
+"name": "Rei Rex de Duas Cabeças",
+"desc": "Um monstro poderoso cujas duas cabeças atacam como uma só."
+},
+"17851": {
+"name": "Áries Aéreo da Terra da Lã",
+"desc": "O andarilho do rebanho da Terra da Lã. Continua indiferente mesmo quando todos à volta estão desabafando."
+},
+"15682": {
+"name": "Garota do Keytar",
+"desc": "A caçula da banda, vive sendo provocada por Romic n' Roller, mas todos reconhecem seu talento. Sonha com o dia em que vai tocar no palco com a banda como um quinteto."
+},
+"17701": {
+"name": "Garota Fantasmagórica",
+"desc": "Uma presença passa às suas costas no porão do banheiro masculino. Mas você não pode se virar até terminar. Não há volta para quem espia antes..."
+},
+"16971": {
+"name": "Apanhador Achacha",
+"desc": "Um guerreiro do beisebol com ótima leitura de jogo e lançamentos certeiros como flecha. Conhecido como a rocha do time, lidera os colegas com seu jogo apaixonado."
+},
+"16581": {
+"name": "Celebrontossauro",
+"desc": "Um dinossauro agora \"rico\", que trocou de nome em troca de sorte. Antes morava num buraco."
+},
+"16967": {
+"name": "Needlkyrie, a Costureira Celestial",
+"desc": "Uma mensageira que ilumina o caminho para o reino superior. A escuridão foge diante da luz dos escolhidos."
+},
+"18234": {
+"name": "Anjo da Arte Guardião Sônico",
+"desc": "Uma anjo novata que lê cartas num rádio voador. A primeira é do ouvinte: Sr. Eremita Corrupto."
+},
+"15670": {
+"name": "Cabra Babá",
+"desc": "Companheira de brincadeiras das crianças do submundo. Muito trabalhadora, mas come todo papel que vê. Conforme a criança cresce, seu poder mágico também cresce."
+},
+"17862": {
+"name": "Conde da Anã Branca, São Tremain",
+"desc": "Um conde que, dizem, vive há mais de 300 anos. Logo depois de cortar o cabelo, não consegue disparar seus lasers."
+},
+"20384": {
+"name": "Os Dragões Gêmeos dos Céus",
+"desc": "Luzes nobres e majestosas que permeiam céu e terra por toda a eternidade. Movem-se pela lógica do divino, exercendo majestade e autoridade com calma."
+},
+"15933": {
+"name": "Cadeira Assustadora Osso",
+"desc": "Uma das primeiras cadeiras orgânicas, que dizem ter sido feita por uma família de artesãos. Tem uma sensação peculiar ao sentar."
+},
+"20457": {
+"name": "HERÓI do Elemento Sparkman",
+"desc": "Um HERÓI do Elemento e guerreiro da luz que maneja com destreza muitos tipos de armas. Sua Onda de Choque Estática corta o caminho da vilania."
+},
+"18239": {
+"name": "Blanc, a Flor Sombria da Neve",
+"desc": "Um espírito de flor puro e inocente. Responde com delicadeza aos desejos do Senhor que acredita nele."
+},
+"16119": {
+"name": "Dragão do Céu",
+"desc": "Um dragão voador com quatro asas que escondem lâminas muito perigosas."
+},
+"16319": {
+"name": "Formiga Blindada de Metal",
+"desc": "Uma formiga gigante coberta por armadura grossa. Esmaga quem abandonou a floresta."
+},
+"15197": {
+"name": "Tang, o Ninja do Macarrão",
+"desc": "Um ninja orgulhoso do seu macarrão al dente e da textura única. Quem é preso pelo seu macarrão com caldo não escapa."
+},
+"19636": {
+"name": "Draco das Trevas",
+"desc": "A encarnação das trevas que engana e corrompe a mente. Corrói tudo o que toca."
+},
+"18303": {
+"name": "Kudzu, a Flor Sombria Tímida",
+"desc": "Um espírito de flor extremamente tímido. Seu suspiro doce é revigorante."
+},
+"16663": {
+"name": "Marmota Arquidemônio da Delícia",
+"desc": "Um castor com molho e prato do demônio. Ataca empurrando a lista das melhores carnes goela abaixo."
+},
+"15418": {
+"name": "Kanan, a Diva da Espada",
+"desc": "Uma espadachim que lidera a vanguarda no distrito do entretenimento. Mesmo toda maquiada, sempre leva espada e escudo. Amiga da Elfa Borbulhante."
+},
+"16134": {
+"name": "Sereia Encantadora",
+"desc": "Uma bela sereia que atrai os viajantes para um túmulo aquático."
+},
+"20298": {
+"name": "Tanque de Rocha Jariot",
+"desc": "Um tanque antigo que anda com um equilíbrio incrível. Desequilibra as forças inimigas perfurando um único ponto."
+},
+"15782": {
+"name": "Lambreta Furo",
+"desc": "Entrega a edição da manhã antes do café! Também entrega a edição da tarde antes do café!"
+},
+"17493": {
+"name": "Vassoura de Um Ano",
+"desc": "Uma vassoura com alma. Dizem que quem a usa começa a se esforçar mais pelos seus objetivos."
+},
+"16666": {
+"name": "Pangochama",
+"desc": "Uma criatura de espírito livre que vive numa cratera em erupção. As chamas do corpo incendeiam um mar de fogo, mas paredes infernais não a incomodam."
+},
+"18233": {
+"name": "Policavadeira",
+"desc": "Equipado com uma pá multiuso, este robô policial faz trabalho de campo e segurança ao mesmo tempo."
+},
+"18236": {
+"name": "Anjo da Arte Fender CD",
+"desc": "Uma valquíria do hino de batalha que já brilhou no Céu. Seu escudo de arco-íris lê e reflete qualquer ataque."
+},
+"17861": {
+"name": "Três Bruxas da Dobra",
+"desc": "Irmãs conhecidas pela habilidade de dobrar o espaço e pela postura estranha. As três adoram voar ao lado de naves e assustar os pilotos."
+},
+"18587": {
+"name": "Gata Estelar de Olhos Dourados",
+"desc": "Uma gata estelar de olhos dourados. Cheios de charme."
+},
+"17839": {
+"name": "Caixa de Areia Mística",
+"desc": "Ela dobra a água à sua vontade e endurece areia em pedra. Com as mãos sujas de barro, dá vida a todo tipo de criação."
+},
+"17974": {
+"name": "Voidvelg, o Peltasta",
+"desc": "Imbuído da energia da lua crescente, este guerreiro repele qualquer ataque com um escudo monumental. Seu poder interior desperta com a chegada da lua cheia."
+},
+"17927": {
+"name": "Soldado Arquidemônio",
+"desc": "Um especialista em combate de uma unidade diabólica de elite. É famoso por sempre cumprir a missão."
+},
+"17841": {
+"name": "Espírito da Minharpa",
+"desc": "Um espírito gentil que toca harpa em recitais. Sua melodia acalma todas as almas."
+},
+"16959": {
+"name": "Haniwaffle",
+"desc": "Um produto criado para aliviar a falta de comida. A aparência e o sabor doces arrancam aplausos animados."
+},
+"16926": {
+"name": "Lobo Giga-Tech",
+"desc": "Um lobo de ferro com presas afiadas que perfuram qualquer armadura."
+},
+"16313": {
+"name": "Kurobana, o Lobo da Flor Sombria",
+"desc": "Espreita nas sombras para salvar seu mestre do clã da grama do perigo. Mesmo derrotado, volta de trás do morro gramado."
+},
+"16662": {
+"name": "Assador Místico",
+"desc": "Um tipo de homem-cavalo. Ninguém acompanha a velocidade com que ele come."
+},
+"16664": {
+"name": "Hipopótamo Atrapalhador",
+"desc": "Um hipopótamo surpreendentemente rápido que tenta empurrar de volta qualquer hostilidade. Nada com destreza usando sua esteira."
+},
+"17559": {
+"name": "Panda Frenético",
+"desc": "Uma fera selvagem que carrega um grande bastão de bambu para surrar os inimigos."
+},
+"15924": {
+"name": "Besouro-Trovão Bumbo",
+"desc": "Uma criatura gentil, mas poderosa e confiável, que fica no fundo do palco. Solta seu som todos os dias acreditando que vai achar amigos com quem ressoar."
+},
+"16766": {
+"name": "Elfa Mística",
+"desc": "Uma elfa delicada sem força de ataque, mas com uma defesa incrível sustentada por poder místico."
+},
+"16962": {
+"name": "Masaki, o Espadachim Lendário",
+"desc": "O lendário mestre espadachim Masaki é veterano de mais de 100 batalhas."
+},
+"16961": {
+"name": "O Tigre Branco que Tudo Vê",
+"desc": "Um orgulhoso soberano da selva, temido por uns e respeitado por outros."
+},
+"15681": {
+"name": "Criadora de Figurinos de Show",
+"desc": "Uma estilista que usa seus talentos psíquicos para criar figurinos de espetáculos. É teimosa e não aceita trabalho de artistas de quem não gosta."
+},
+"15417": {
+"name": "LaMoon, a Princesa da Festa",
+"desc": "Uma feiticeira que fugiu da rotina sem graça. Usa magia lunar para encantar homens ricos. Melhor amiga de Kanan, a Diva da Espada."
+},
+"15425": {
+"name": "Vishwar Randi",
+"desc": "Esta guerreira de sede de sangue insaciável serve às forças das trevas."
+},
+"19130": {
+"name": "Soldado Destruidor Encanador",
+"desc": "Demolir, construir, demolir, construir... Em busca do caminho para uma utopia, este soldado avança sem descanso."
+},
+"20699": {
+"name": "Cocopudim, a Princesa da Felicidade",
+"desc": "É a princesa de \"Coco\", um reino transbordando de felicidade, adorada por todos pela gentileza. Traz sorrisos a quem chega e abençoa quem parte. Tem um laço forte com seus atendentes \"Caramelo\" e \"Chantili\"."
+},
+"18895": {
+"name": "Ave Dragão",
+"desc": "Muitas vezes vista como parente das aves, esta criatura misteriosa é outra coisa. Sua força lembra mais a de um dragão que a de uma ave, então talvez seja isso mesmo."
+},
+"23448": {
+"name": "Estrela Repleta",
+"desc": "O pequeno dragão estelar cresceu e ganhou nova forma. Alimentado pelos laços com as pessoas e pelo poder das estrelas, guarda um poder misterioso no corpo. Quando chegar a hora destinada, seu nome será gravado no santuário das estrelas."
+},
+"16601": {
+"name": "Clubinet, a Princesa Musical",
+"desc": "A faz-tudo da banda. A melodia suave ganha peso a cada swing. O topo da cabeça brilha quando ela se empolga."
+},
+"19116": {
+"name": "Boton, a Princesa Musical",
+"desc": "O pilar da banda. Comanda os colegas cheios de personalidade com movimentos precisos da batuta. Fale qualquer coisa dos óculos dela e ela arma uma tempestade."
+},
+"16891": {
+"name": "Ator Imaginário",
+"desc": "Uma boneca mecânica sem outra expressão além do sorriso. A emoção da plateia é sua principal fonte de energia."
+},
+"21863": {
+"name": "Princesa Graça Mai",
+"desc": "A irmã mais velha das Princesas Graça. Adora Kana."
+},
+"17845": {
+"name": "Kappa Vingador",
+"desc": "Um anfíbio que vendeu a alma por poder ilimitado para vingar o amigo falecido."
+},
+"19236": {
+"name": "Yaranzo",
+"desc": "Um baú de tesouro com um monstro que ataca qualquer ladrão desatento."
+},
+"16292": {
+"name": "Soldado Feijão",
+"desc": "Um guerreiro-planta que ataca com sementes e espada."
+},
+"17857": {
+"name": "Vira-Lata Bravo Chow Chow Explosivo",
+"desc": "Normalmente calmo, este é um vira-lata que você não quer contrariar. A motivação dele? Mais ou menos."
+},
+"17496": {
+"name": "Besouro de Combate Atlas",
+"desc": "Uma espécie de besouro de força inacreditável. Vive travando chifres com os outros, disputando seiva escura."
+},
+"15791": {
+"name": "Ojisan",
+"desc": "Um peixe velho e cansado que não consegue se livrar das dores."
+},
+"15154": {
+"name": "Feiticeiro das Trevas",
+"desc": "Um feiticeiro cujas mãos foram manchadas pelas artes proibidas. Ainda não sabe o preço do poder que desejou."
+},
+"17219": {
+"name": "Guerreiro Castor",
+"desc": "O que falta em tamanho a esta criatura sobra em defesa nas batalhas da pradaria."
+},
+"16789": {
+"name": "Nessus, o Cavaleiro Estelar",
+"desc": "Um indivíduo imbuído do poder de um ser celestial maligno. Admira Echeclus, o Cavaleiro Estelar, como a um mentor."
+},
+"18652": {
+"name": "Aitsu",
+"desc": "Parece muito pouco confiável, mas talvez tenha um potencial incrível."
+},
+"18586": {
+"name": "Gata Estelar de Olhos Prateados",
+"desc": "Uma gata estelar de olhos prateados. Cheios de encanto."
+},
+"Doomed by the Blackblight": {
+"name": "Condenado pela Praga Negra",
+"desc": "Um dia, a maldição da Chama da Praga foi libertada. Uns rezam pela ressurreição do rei caído, outros rezam para a própria Chama da Praga. Com tantos desejos, a terra conhecerá a salvação ou o Armagedom?"
+},
+"17858": {
+"name": "Cão Sem Coração Ápice Katana Danbiramatian",
+"desc": "O ápice dos Vira-Latas Bravos, que comanda seus subordinados desajeitados e mais ou menos. Sua habilidade é au-au-incrível."
+},
+"16127": {
+"name": "Brassaxofone, a Princesa Musical",
+"desc": "O coração e a alma da banda. Seus tons dinâmicos fazem dela uma ótima lutadora solo, mas ela precisa de ajuda para equipar a arma do braço esquerdo."
+},
+"18237": {
+"name": "Soljersey Feijão",
+"desc": "Um guerreiro de camisa que ataca com sementes e espada."
+},
+"16970": {
+"name": "Defensor Externo Gagaga",
+"desc": "Um guerreiro do beisebol de defesa corajosa e alcance de rebatida surpreendente. Conhecido como o mágico da cerca, é lembrado mais pelas jogadas do que pelas estatísticas."
+},
+"15908": {
+"name": "Femtron",
+"desc": "A origem da árvore dracônica que guarda o segredo de toda a providência. Quando atacado pelo microcosmo e pelo macrocosmo, o mundo será guiado a um novo domínio."
+},
+"15925": {
+"name": "Besouro-Trovão Chimbal",
+"desc": "O tipo irmão mais velho multifacetado. Solta seu som todos os dias acreditando que vai achar amigos com quem ressoar."
+},
+"16112": {
+"name": "Falcão Cibernético",
+"desc": "Um falcão a jato que voa na velocidade do som."
+},
+"17218": {
+"name": "Atacante Terrestre Bugroth",
+"desc": "Um robô de batalha terrestre que já foi usado na guerra naval."
+},
+"19137": {
+"name": "Dragão Espiral Fantasma",
+"desc": "Uma serpente feroz caçada pelos atlantes. Exausta e ferida, encontrou uma luz antiga e ganhou nova força para lutar. Mais poderosa, lançou uma nova ofensiva contra o território inimigo."
+},
+"21095": {
+"name": "Dragão Rastejante nº 2",
+"desc": "Um dragão poderoso com dentes que moem quase tudo até virar pó."
+},
+"18585": {
+"name": "O Dragias",
+"desc": "Um dragão que fez sete supernovas virarem explosões de raios gama. Seu nome é... O Dragias! O Dragias!!"
+},
+"18706": {
+"name": "Melchid, a Fera de Quatro Faces",
+"desc": "Este monstro tem quatro máscaras diferentes para quatro ataques diferentes."
+},
+"16136": {
+"name": "Princesa Graça Kana",
+"desc": "Diga \"Ahh!\""
+},
+"Alpha Count": {
+"name": "Contagem Alfa",
+"desc": "Um ovo de dragão com incontáveis informações de conta escondidas. Sonha em se conectar a um mundo novinho, em contagem regressiva até despertar."
+},
+"23681": {
+"name": "Perseguidor da Espada",
+"desc": "Um monstro formado pelas almas vingativas dos que morreram em batalha."
+},
+"17498": {
+"name": "Griffore",
+"desc": "O couro resistente deste monstro desvia quase qualquer ataque."
+},
+"17853": {
+"name": "Bruxa Sombria Tutumes",
+"desc": "Uma bailarina angelical que nunca poupa esforços. Mesmo em treinos pesados, segue com determinação inabalável."
+},
+"17587": {
+"name": "Soldado Engenhoca",
+"desc": "Um guerreiro máquina à prova de ferrugem, nascido para a batalha."
+},
+"17860": {
+"name": "Aliyen 33",
+"desc": "Especialista em projeto e manutenção de naves. No momento ajuda num projeto mirabolante em certa instalação."
+},
+"16963": {
+"name": "Seadra Espinhosa",
+"desc": "Com os espinhos que brotam do corpo, esta criatura fura os oponentes e os inunda de eletricidade."
+},
+"15413": {
+"name": "Watangel",
+"desc": "Uma guitarra que desceu ao mundo inferior. Os tons que toca são angelicais."
+},
+"17283": {
+"name": "Peixe-Bobina Pescador",
+"desc": "Um peixe-pescador com órgãos elétricos evoluídos. Ataca com presas afiadas e choques elétricos."
+},
+"19538": {
+"name": "Beginitar do Rebelde Real",
+"desc": "Um demônio guitarrista que se esforça todo dia para que todos ouçam suas músicas."
+},
+"16764": {
+"name": "Escudo do Milênio",
+"desc": "Um escudo famoso que dizem ter pertencido a um Faraó do antigo Egito. As lendas contam que bloqueia qualquer ataque forte."
+},
+"15581": {
+"name": "Dragão de Ataque Vulcânico",
+"desc": "Instrutor de treino das forças de ataque de elite do Reino do Dragão de Fogo. O calor escaldante que solta varre quem ousa ferir o rei."
+},
+"17691": {
+"name": "Bruxa Sombria Tiramisu",
+"desc": "Uma garçonete angelical que arruma mesas e dita tendências. Não se rende a vontades malignas nem às mudanças da última \"moda\"."
+},
+"21641": {
+"name": "Manifestação de Takamikami",
+"desc": "Um sinal da vontade divina que dança e canta a glória. Guie os que se reuniram rumo a um palco sem igual."
+},
+"15420": {
+"name": "Engrenagem Fera Cão Buggy",
+"desc": "Um cão que extorque restos de ração de um velho. É cheio de si e banca o durão, mas não tem convicção nenhuma. Odiava viver na coleira, mas agora sente que era mais feliz só por ter um dono."
+},
+"16311": {
+"name": "Sereia Guardiã",
+"desc": "Uma sereia agressiva que disciplina quem é mandado ao abismo. Os reincidentes deixam boas avaliações sobre o perdão."
+},
+"15195": {
+"name": "Tartaruga Protetora Ancestral",
+"desc": "Uma guardiã das tradições que relembra tempos passados. Aqueles sim eram os bons tempos."
+},
+"17277": {
+"name": "Femtron Sombrio",
+"desc": "A origem da árvore do dragão, ligada a outra curiosidade. Com seus infinitos galhos ocultos, desdobra-se em mundos desconhecidos."
+},
+"16661": {
+"name": "Boi Churrasco",
+"desc": "Um monstro boi de língua fina e intestino robusto. Grelha tudo num espeto só."
+},
+"15168": {
+"name": "Dragorita",
+"desc": "Um dragão nascido de um veio mineral subterrâneo. Usa a energia de um minério desconhecido como fonte de força na batalha. Seus golpes ultraduros são incrivelmente eficazes!"
+},
+"17850": {
+"name": "Rambda Trovão da Terra da Lã",
+"desc": "O mais brilhante do rebanho da Terra da Lã. Conduz as atividades dos outros, sempre com um brilho no olhar."
+},
+"16310": {
+"name": "No Wave do Rebelde Real",
+"desc": "Um demônio deformado a serviço do rei. Engole todo som e desvia todo bombardeio."
+},
+"17488": {
+"name": "Galactica Oblivion",
+"desc": "Lute pela Luz! Boa Noite!"
+},
+"19539": {
+"name": "Babybass do Rebelde Real",
+"desc": "Um demônio baixista que apoia Beginitar e Kidrum com toda a calma."
+},
+"15781": {
+"name": "Caveira Invocada",
+"desc": "Um demônio com poderes sombrios que confundem o inimigo. Entre os monstros do Tipo Demônio, tem força considerável."
+},
+"20110": {
+"name": "Alfa, o Guerreiro Magnético",
+"desc": "Alfa, Beta e Gama se fundem em um só para formar um monstro poderoso."
+},
+"17591": {
+"name": "Cliptera",
+"desc": "Um pterossauro que plana pela sala com asas vibrantes e conquista o coração das crianças."
+},
+"15654": {
+"name": "Yurushima, o Eremita",
+"desc": "Uma bola viva de desejos que critica os outros, mas nunca a si mesmo. É esse tipo de eremita."
+},
+"16670": {
+"name": "Moça Prestativa",
+"desc": "De gatos perdidos a proteção de autoridades, ela resolve de tudo. Ultimamente só entrega marmita, mas do nada recebe uma mensagem de um remetente desconhecido."
+},
+"17490": {
+"name": "Lã Piro da Terra da Lã",
+"desc": "O ancião do rebanho da Terra da Lã. Tenta impor suas decisões, mas os outros se recusam a ser conduzidos."
+},
+"16667": {
+"name": "Kamakiri Voador nº 2",
+"desc": "Um louva-a-deus voador que se alimenta principalmente de insetos."
+},
+"18650": {
+"name": "Princessleão",
+"desc": "Um camaleão fofo que ama tudo que é adorável. Guarda o favorito do momento na boca o dia inteiro."
+},
+"18299": {
+"name": "Inspetor de Explosões",
+"desc": "Especialista em segurança. Pelo trabalho vive olhando para baixo, mas tem um jeito positivo e gentil."
+},
+"17278": {
+"name": "Palhaço Serpente",
+"desc": "Uma serpente charmosa e super sociável. Faz uma dança serpenteante ao som da flauta e transforma caretas em sorrisos."
+},
+"16775": {
+"name": "Sylphidra",
+"desc": "O filhote dos quatro dragões elementais. Protege a terra manipulando a atmosfera à vontade."
+},
+"16609": {
+"name": "Fada do Sushi Rolinho de Macaco",
+"desc": "Comparsa dos seres divinos da Dimensão Celestial do Sushi. Com sagacidade e um arroz docinho, os decretos de rolinhos saem da língua."
+},
+"16133": {
+"name": "Tsuvulcão",
+"desc": "Lá vem uma massagem shiatsu quente como magma! Erupção nos Pontos de Pressão!"
+},
+"15223": {
+"name": "Corrente Aprisionadora",
+"desc": "Os elos místicos desta corrente roubam o poder dos inimigos."
+},
+"23469": {
+"name": "Canhão Cabeça X",
+"desc": "Um monstro com um poderoso cano de canhão, capaz de integrar ataques. Ataca de várias formas ao se combinar e se separar de outros monstros."
+},
+"15415": {
+"name": "Megazowler",
+"desc": "Nada fica no caminho deste dinossauro coberto de espinhos!"
+},
+"16315": {
+"name": "Ave Bombardeira",
+"desc": "Uma ave que solta bombas. Talvez tenha gente pequenininha lá dentro."
+},
+"16291": {
+"name": "Tyhone",
+"desc": "Capaz de disparar balas de canhão pela boca em ataques de longo alcance, esta criatura é especialmente eficaz em batalhas nas montanhas."
+},
+"17864": {
+"name": "Nekogal nº 2",
+"desc": "Uma criatura rápida e letal com garras muito perigosas."
+},
+"16610": {
+"name": "Fada do Sushi Rolinho de Aranha",
+"desc": "Comparsa dos seres divinos da Dimensão Celestial do Sushi. Com sagacidade e um arroz aromático, os decretos de rolinhos saem da língua."
+},
+"18583": {
+"name": "Cromatografagás",
+"desc": "Este corpo vaporiza e queima. Enquanto meu espírito de luta durar, serei imortal."
+},
+"17840": {
+"name": "Kanan, a Bela Mestra da Espada",
+"desc": "Uma pequena guerreira cujo palco é o clube de teatro. De espada e escudo na mão, flutua leve e dança com graça."
+},
+"20611": {
+"name": "Explorador de Matéria Escura do Contato",
+"desc": "Um satélite de exploração que veio dos confins da escuridão. Abriga um poder sombrio que transcende a causalidade."
+},
+"16131": {
+"name": "Formigas Unidas",
+"desc": "Formigas que se reúnem para jurar luta contra seus opressores. A revolução está chegando."
+},
+"18893": {
+"name": "Nêutron Rachado",
+"desc": "Uma forma de vida misteriosa nascida da última faísca. A energia que escapa das rachaduras tem vontade própria. Hyudury Vaza Vizy!"
+},
+"18304": {
+"name": "Quadcóptero GA84",
+"desc": "O 84º modelo de aeronave tipo GA, conhecido como Tagayashi. Tem desempenho aeronáutico superior e muitas funções agrícolas."
+},
+"19440": {
+"name": "Garota Arqueira Vermelha",
+"desc": "Uma sereia arqueira que se esconde numa concha protetora, esperando o momento certo de atacar."
+},
+"17484": {
+"name": "Dragão de Pedra",
+"desc": "Um dragão formado por rochas enormes, que também servem para atacar o inimigo."
+},
+"17271": {
+"name": "Zumbi Prateado de Olhos Azuis",
+"desc": "Dizem que os raios dos olhos desta criatura transformam inimigos em zumbis."
+},
+"17593": {
+"name": "Tamabot",
+"desc": "Mesmo tendo chocado sem plano nenhum, está sempre pronto para rolar."
+},
+"15411": {
+"name": "Goleiro Dragão Esportivo",
+"desc": "O jogador decisivo do time. Não importa o que venha voando, arrisca a vida para defender."
+},
+"18707": {
+"name": "Grande Ancião Tiki",
+"desc": "Um monstro mascarado que domina a mais mortal das maldições."
+},
+"16290": {
+"name": "Tristegatops",
+"desc": "Um dinossauro que vive em paz no bando. Apesar da aparência intimidadora, não é tão forte assim."
+},
+"15939": {
+"name": "Egger do Big Bang",
+"desc": "O que veio primeiro, o espaço ou o ovo? Esta garota tem uma imaginação explosiva."
+},
+"16135": {
+"name": "Descendente dos Titãs",
+"desc": "Um sucessor dos deuses antigos. Mestre em se esconder, poucos sabem que existe."
+},
+"16761": {
+"name": "Mecha Bandeira Suprema Atacante Resistente",
+"desc": "Um punho invencível capaz de partir uma montanha. A bandeira de guerra arde no peito. Não há derrota na batalha suprema."
+},
+"17557": {
+"name": "Joaninha dos Sonhos Arco-Íris",
+"desc": "A estrela nas costas é a marca registrada desta joaninha emotiva. Hoje ela leva alegria e rastros de arco-íris a todos."
+},
+"17970": {
+"name": "Dimensão Azarth",
+"desc": "Depois de muitos anos adormecido, partiu de novo para devorar formas de vida pelo cosmos. Invade domínio após domínio pelos portais interdimensionais à sua volta."
+},
+"16128": {
+"name": "Flutomahawk, a Princesa Musical",
+"desc": "A vanguarda da banda. Cria melodias lindas girando seus machados no ar. Uns acham que a roupa esconde as armas, mas é só porque ela sente frio fácil."
+},
+"15921": {
+"name": "Gato Branco de Olhos Azuis",
+"desc": "Um gato branco de olhos azuis. Dizem que traz boa sorte se for bem tratado."
+},
+"16784": {
+"name": "Guardiã da Paz",
+"desc": "Uma jovem investigadora que protege a paz da cidade. Está com dificuldade de resolver um certo caso de desaparecimento."
+},
+"20050": {
+"name": "Kanan, a Mestra da Espada",
+"desc": "Uma guerreira de espada e escudo que flutua leve e ataca afiada."
+},
+"16669": {
+"name": "Fazuzu, o Rei das Feras Míticas do Vento",
+"desc": "Uma Fera Mítica com dois pares de asas. Protege a Cidade Real em silêncio."
+},
+"15789": {
+"name": "Mago da Água",
+"desc": "Este monstro afoga o oponente com um suprimento de água quase infinito."
+},
+"16130": {
+"name": "Formiga Oprimida",
+"desc": "Uma formiga oprimida que acredita que um dia será livre."
+},
+"17960": {
+"name": "Buscador da Chama",
+"desc": "O sublíder do Max Firepower. Seu amado lança-chamas de altíssima potência, comprado há pouco, custou as economias de uma vida. Que queime!"
+},
+"18300": {
+"name": "Serpe Atualização",
+"desc": "Um dragão voador que se transforma à vontade. Registrando os movimentos do inimigo, faz a atualização mais otimizada para si."
+},
+"16957": {
+"name": "Ciber Soldado do Mundo Sombrio",
+"desc": "Um soldado mecânico que não para de atacar até apagar todos os sinais de vida dos sensores."
+},
+"20460": {
+"name": "HERÓI do Elemento Avian",
+"desc": "Um HERÓI do Elemento alado que gira pelo céu e manipula o vento. Seu golpe característico, Quebra-Penas, acerta a vilania lá do alto."
+},
+"15926": {
+"name": "Besouro-Trovão Caixa",
+"desc": "Popular, único e sempre cheio de energia. Solta seu som todos os dias acreditando que vai achar amigos com quem ressoar."
+},
+"23678": {
+"name": "Jerry, o Homem Feijão",
+"desc": "Jerry, um soldado feijão, acredita ser o guerreiro mais forte do mundo, mas suas habilidades reais ainda não foram testadas."
+},
+"16126": {
+"name": "Batalhador Construtor Rolo Grande",
+"desc": "Um guerreiro veterano. Usa seis tipos de rolo no trabalho, mas leigos não veem diferença entre eles."
+},
+"16771": {
+"name": "Feiticeiro Aqua",
+"desc": "Um mago com uma alma pura e inocente. Diziam que seus olhos claros viam toda a razão, mas com o tempo ele passou a escondê-los atrás de uma máscara."
+},
+"16590": {
+"name": "Cycliptron",
+"desc": "A pedra angular do Imperador do Céu, agraciada com a providência de toda a existência. Ao romper suas amarras, renasce para abrir novos caminhos."
+},
+"19129": {
+"name": "Soldado Destruidor Gesseiro",
+"desc": "Demolir, construir, demolir, construir... Empenhado em erguer uma utopia, este soldado encara uma camada por vez."
+},
+"15412": {
+"name": "Wattkiss",
+"desc": "Manda beijos que deixam você formigando. A mensagem chega."
+},
+"17951": {
+"name": "Dragosita",
+"desc": "Um organismo elétrico que vive nos circuitos da rede. Não gosta de conflitos e come bugs para resolvê-los."
+},
+"17589": {
+"name": "Jointech Ás",
+"desc": "Um robô autônomo com talento para construir coisas. Ninguém sabe ainda o poder escondido em suas juntas."
+},
+"15920": {
+"name": "Gato Preto de Olhos Vermelhos",
+"desc": "Um gato preto de olhos vermelhos. Dizem que traz azar para quem está por perto."
+},
+"15783": {
+"name": "Homem Cogumelo",
+"desc": "Encontrado em regiões úmidas, ataca os inimigos com uma chuva letal de esporos venenosos."
+},
+"16973": {
+"name": "Trem ExPresso",
+"desc": "Um trem movido a dicas para pegar o furo mais cedo. Checagem de fatos e prazos no café da manhã!"
+},
+"16318": {
+"name": "Soldado Feijão Assado",
+"desc": "Um guerreiro-planta que ataca com sementes e espada. Surpreendentemente assado."
+},
+"16125": {
+"name": "Guerreiro Construtor Pazão",
+"desc": "Um jovem guerreiro. Todo dia usa sua pá com paixão para cavar os canteiros de obra."
+},
+"15610": {
+"name": "Stock, o Ninja do Macarrão",
+"desc": "Um ninja que se orgulha de ser al dente. Treina sem parar para chegar à dureza de arame de aço. Não é bom com técnicas de água."
+},
+"17855": {
+"name": "Vira-Lata Bravo Lâmina-Touro",
+"desc": "Um Vira-Lata Bravo que ameaça com uma voz grave e rouca. A capacidade de intimidar... mais ou menos."
+},
+"17588": {
+"name": "Bobifante",
+"desc": "Avisa sua posição emitindo ondas eletromagnéticas. O público vem de toda parte para ver seus truques fantásticos com a tromba."
+},
+"17560": {
+"name": "Tropa de Choque Alien",
+"desc": "Os Aliens usaram uma substância biológica misteriosa para criar uma raça suprema de soldados. Não têm os poderes naturais dos outros Aliens, mas dão golpes físicos impressionantes."
+},
+"16373": {
+"name": "Kumamon",
+"desc": "O Gerente de Vendas e Felicidade da Província de Kumamoto. Seu trabalho é ajudar pessoas do país inteiro a encontrar surpresas e felicidade por toda parte."
+},
+"23680": {
+"name": "Cavaleiro Robótico",
+"desc": "O Comandante do Tipo Máquina, a serviço do Rei Máquina. É famoso pela forma como comanda suas tropas."
+},
+"21645": {
+"name": "Himawari, a Apagadora da Flor Sombria",
+"desc": "Membro da facção dos ninjas da grama que agem nas sombras, sempre de olho em seu senhor. Cumpre as missões ninja com velocidade relâmpago e some como fumaça."
+},
+"15790": {
+"name": "Gazela, o Rei das Feras Míticas",
+"desc": "Este monstro se move tão rápido que parece uma ilusão aos olhos mortais."
+},
+"17281": {
+"name": "Turbotartaruga",
+"desc": "Uma tartaruga nascida de uma proposta de projeto maluca. Uns acharam que ela manobra pelo espaço com seus propulsores."
+},
+"19115": {
+"name": "Ophiclaymore, a Princesa Musical",
+"desc": "A veterana da banda. Dá aos aliados um apoio retumbante. O progresso impressionante da jovem Tubardiche lhe dá esperança no futuro."
+},
+"15668": {
+"name": "Followl da Sabedoria Sombria",
+"desc": "Um pesquisador da natureza das trevas. Serve a um rei que quer conquistar o continente, mas seus verdadeiros objetivos são desconhecidos."
+},
+"17842": {
+"name": "Vira-Lata Bravo Guerreiro Chihuahua",
+"desc": "Com olhos inocentes que derretem corações, este fofo passa direto pela defesa inimiga. A lealdade dele? Mais ou menos."
+},
+"23679": {
+"name": "Amizade Brilhante",
+"desc": "O pacificador entre os monstros."
+},
+"16659": {
+"name": "Guerreiro Operário - Novato",
+"desc": "Um drone iniciante que segue se atualizando na base da tentativa e erro. Correndo contra o relógio."
+},
+"16960": {
+"name": "Manipulador das Chamas",
+"desc": "Este Mago ataca os inimigos com feitiços de fogo como \"Mar de Chamas\" e \"Muralha de Fogo\"."
+},
+"15222": {
+"name": "Pequeno D",
+"desc": "Ô, esse tiranossaurinho tem um gênio terrível."
+},
+"16289": {
+"name": "Rato Vulcânico",
+"desc": "Este rato mutante vive no núcleo de vulcões ativos. Nenhum calor é demais para ele."
+},
+"17216": {
+"name": "Gyakutenno Megami",
+"desc": "Esta fada usa seu poder místico para proteger os fracos e dar apoio espiritual."
+},
+"17342": {
+"name": "Lady Harpia",
+"desc": "Este animal de forma humana e com asas é lindo de ver, mas mortal na batalha."
+},
+"16762": {
+"name": "Fera Bandeira Suprema Lobo Avant",
+"desc": "Uma fera de engrenagem feita para o combate. Sua teimosia desperta a bravura suprema de luta."
+},
+"20299": {
+"name": "Dragão Sepulcro de Bronze",
+"desc": "Um dragão gigante com um brilho imponente. Dizem que suas escamas realizam os desejos de quem as obtém."
+},
+"17959": {
+"name": "Dr. Manto Vermelho",
+"desc": "Uma referência na pesquisa de combustão. Tem enorme orgulho de suas luvas, úteis sempre que algo precisa virar cinza."
+},
+"17568": {
+"name": "Seyfert Prateado",
+"desc": "Um cavaleiro que vaga pelo cosmos atrás de oponentes à altura. Quindoragewomai Guindulijimai!"
+},
+"18894": {
+"name": "Soitsu",
+"desc": "Pelo visto totalmente não confiável, ele se pergunta se tem um potencial incrível."
+},
+"19012": {
+"name": "Explosão Mestra Majestosa",
+"desc": "O brilho cintilante do rei conquistador que governa dezenas de milhares de estrelas. Quando se chega ao topo, sua verdadeira forma se revela."
+},
+"19540": {
+"name": "Kidrum do Rebelde Real",
+"desc": "Um demônio baterista que montou uma banda por admirar os grandes Rebeldes Reais."
+},
+"17702": {
+"name": "A Coisa no Espelho Roxo",
+"desc": "Pessoal... vocês conhecem a expressão \"espelho roxo\"? Se conhecem, cuidado. Se ainda se lembrarem dela depois dos 20 anos, então vocês..."
+},
+"17684": {
+"name": "Ama Lilith",
+"desc": "Uma garota que canta seus sentimentos livremente. O amor nunca vai se apagar."
+},
+"17577": {
+"name": "Patinador de Órbita",
+"desc": "Este desafiador da gravidade cruza as estrelas sem freio. Hoje em dia ele costura entre os adultos na rua interplanetária. Izundewmo Idohshowar!"
+},
+"21252": {
+"name": "Cavaleiro Inseto",
+"desc": "De todos os lutadores Inseto, é o exemplo dos Invasores Insetos Indestrutíveis, onde só entra a elite da elite. Não dá mais para ignorar sua habilidade de combate sem igual."
+},
+"15220": {
+"name": "Presa Prateada",
+"desc": "Um lobo da neve lindo de ver, mas absolutamente cruel na batalha."
+},
+"15423": {
+"name": "Peixe-Dardo Térmico",
+"desc": "Um peixe com uma tromba que esquenta ao atacar. Seu sabor suave faz dele uma verdadeira iguaria."
+},
+"23152": {
+"name": "Gladiness, o Porta-Bandeira da Vitória",
+"desc": "Gloria in Luce. Ao som de cascos majestosos, ele cruza o crepúsculo para mostrar o caminho da supremacia."
+},
+"15683": {
+"name": "Ave Uivante",
+"desc": "Uma ave que emite som sem parar enquanto voa com o vento. Dizem que o ruído das asas reflete o coração de quem ouve: para uns, uma linda canção; para outros, um zumbido sinistro."
+},
+"15414": {
+"name": "Cemitério de Mamute",
+"desc": "Um mamute que protege os túmulos de sua manada e é implacável com ladrões de túmulos."
+},
+"16972": {
+"name": "Rebatedor Zubaba",
+"desc": "Um guerreiro do beisebol com peso no taco. Conhecido como o capitão saqueador, rebate com agressividade desde o primeiro arremesso."
+},
+"15153": {
+"name": "Mago Hídrico",
+"desc": "Um jovem mago que se comunica telepaticamente com a água. Sua brilhante dança azul deixa os inimigos boquiabertos."
+},
+"16317": {
+"name": "Lagarto Descarga Elétrica",
+"desc": "Materializa-se junto com um relâmpago. Esta criatura elétrica atravessa máquinas e provoca curto-circuito."
+},
+"17703": {
+"name": "Boneca do Pavor",
+"desc": "Sempre tenho paralisia do sono quando durmo no camarim... E dentro daquela escuridão, quando olho para o travesseiro..."
+},
+"17854": {
+"name": "Vira-Lata Bravo Au-Au Explosivo",
+"desc": "Revida qualquer inimigo com pistolas de água. A confiança dos aliados? Mais ou menos."
+},
+"16910": {
+"name": "O Dragão",
+"desc": "Um dragão da justiça que faz você imaginar um choque de supernovas! O nome é: O Dragão!"
+},
+"16129": {
+"name": "Quebra-Touro",
+"desc": "Utilíssimo na obra, mas o aluguel é absurdo. Planejar é a maior parte do trabalho."
+},
+"18240": {
+"name": "Robbolin",
+"desc": "Uma exploradora curiosa e aprendiz de aventureira. Vive andando com a Frase da Profecia, que procura os tesouros ancestrais."
+},
+"17491": {
+"name": "Mouton Noturno da Terra da Lã",
+"desc": "O mais pensativo do rebanho da Terra da Lã. Meio ovelha negra, prefere cuidar do próprio tricô."
+},
+"16969": {
+"name": "Rei Golfinho Iruqua",
+"desc": "Um golfinho que enfrentou mares revoltos e as dificuldades do mundo, mergulhando de cabeça no aprendizado da realeza."
+},
+"22619": {
+"name": "Conector de Dimensão",
+"desc": "Sistema de Dimensão de Duelo ativado. Nascida no Mar de Neurônios, uma espadachim orgulhosa que viajou por nove dimensões. Sua lâmina, empunhada ao lado de incontáveis Duelistas, não serve para cortar, mas para unir. A esperança das pessoas se conecta além do tempo e do espaço."
+},
+"20952": {
+"name": "Voadora Formosa",
+"desc": "Uma acrobata que voa livre pelo ar. Dá um toque de charme ao show junto com a irmã mais nova, Lançadora Maligna."
+},
+"18649": {
+"name": "Capitão Escavador",
+"desc": "Uma máquina de engenharia civil especializada em escavação. Pula para cima e para baixo enquanto ara a terra."
+},
+"15934": {
+"name": "Cadeira Assustadora Sabre",
+"desc": "A obra-prima das cadeiras orgânicas, feita por uma família de artesãos no auge do ofício. Extremamente confortável."
+},
+"17280": {
+"name": "Lagarto Blindado",
+"desc": "Um lagarto de couro muito resistente e mordida cruel."
+},
+"16316": {
+"name": "Grama",
+"desc": "^^"
+},
+"16968": {
+"name": "Takriminos",
+"desc": "Um membro de uma raça de Serpentes Marinhas que viaja livre pelo mar."
+},
+"17343": {
+"name": "Dragão Alado, Guardião da Fortaleza nº 1",
+"desc": "Um dragão que costuma guardar fortalezas nas montanhas. Seu ataque característico é um mergulho repentino do céu."
+},
+"17556": {
+"name": "Marmota Arquidemônio da Perversidade",
+"desc": "Uma marmota voadora com chifre e asas perversos. Ataca arremessando bolotas."
+},
+"17969": {
+"name": "Voidvelg, o Hoplita",
+"desc": "Nascido do caos cósmico, este soldado serve a uma divindade maligna. Se o olhar impiedoso dele se fixar em você, saberá o que é medo de verdade."
+},
+"17565": {
+"name": "Titã Cósmico",
+"desc": "Um instrumento de conquista controlado por 5 anéis. Reduz a pó as civilizações em seu caminho. Duguyahi Bu Zuwahi!"
+},
+"15167": {
+"name": "Cavaleiro Dragão das Trevas",
+"desc": "Um cavaleiro dragão que lidera um exército sombrio. Seus ataques impiedosos têm força sem igual, e a espada amaldiçoada devora a alma dos inimigos e o deixa mais forte."
+},
+"16117": {
+"name": "Esmagador de Pás",
+"desc": "Armado com um par de pás, este monstro destrói tudo o que ficar no caminho."
+},
+"17282": {
+"name": "Peixe-Tomada",
+"desc": "Um organismo formado de água-viva e tomadas elétricas. Um enigma ecológico."
+},
+"20112": {
+"name": "Gama, o Guerreiro Magnético",
+"desc": "Alfa, Beta e Gama se fundem em um só para formar um monstro poderoso."
+},
+"17957": {
+"name": "Campeão da Chama",
+"desc": "Um guerreiro protegido por um escudo flamejante que anula qualquer ataque."
+},
+"16780": {
+"name": "Herói do Fermento",
+"desc": "Um samurai que diz vir do extremo oriente. A faca de pão em sua mão corta bem."
+},
+"16976": {
+"name": "Ouriço Misterioso Não Identificado",
+"desc": "Estas criaturas estão em todo o mar. Apesar da pesca excessiva nos últimos anos, o número delas não dá sinal de cair."
+},
+"15938": {
+"name": "Cosmoscallion",
+"desc": "Uma donzela que vaga livre pela Via Láctea como uma estrela cadente. Inúmeras pessoas fazem pedidos a ela, mas ela diz seca que sonho de verdade é o que se realiza sozinho."
+},
+"16974": {
+"name": "Inspetora de Sabor",
+"desc": "Uma profissional que entende que o mundo é doce ou azedo. Qualquer prato que ela cuide sai temperado com perfeição."
+},
+"17571": {
+"name": "Meteorinoceronte",
+"desc": "Uma criatura misteriosa que reforçou o couro delicado com meteoritos para se proteger dos carnívoros cósmicos. Egyahi Du Uvahi!"
+},
+"18695": {
+"name": "Hyozanryu",
+"desc": "Um dragão feito de um diamante gigante que brilha com uma luz ofuscante."
+},
+"20456": {
+"name": "HERÓI do Elemento Neos",
+"desc": "Um novo HERÓI do Elemento chegou do Neo-Espaço! Quando faz uma Fusão de Contato com um Neo-Espacial, seus poderes desconhecidos são liberados."
+},
+"15669": {
+"name": "Garmr, o Lobo Solitário",
+"desc": "Uma fera que recusou a proteção divina, trocando a tranquilidade pela liberdade."
+},
+"17487": {
+"name": "Neo Onda Láctea",
+"desc": "Um jovem guerreiro galáctico nascido da própria Via Láctea. Absorve enormes quantidades de energia das estrelas enquanto luta. Gyanahri Du Zuwahi!"
+},
+"18651": {
+"name": "Dragão Fada",
+"desc": "Este belo espírito de Dragão guarda uma força escondida."
+},
+"16658": {
+"name": "Fada Ensolarada Spinangel",
+"desc": "Um anjo vivendo o presente contínuo. Ninguém segura esse caaara."
+},
+"18235": {
+"name": "Anjo da Arte Equilaser",
+"desc": "Uma arma musical que caiu do céu. As ondas sonoras especiais que solta são afiadas como laser."
+},
+"15422": {
+"name": "Barracuda a Jato",
+"desc": "Esta criatura usa propulsão a jato para investir em velocidade chocante. Há quem duvide que seja um peixe."
+},
+"16116": {
+"name": "Mokey Mokey",
+"desc": "Um anjo excluído. Ninguém faz ideia do que ele pensa. Às vezes fica bravo, e aí é assustador."
+},
+"16793": {
+"name": "Cão Conector",
+"desc": "Uma fera digital que transporta informação pelo mundo da rede. Depois de gerações de modificação, evoluiu para uma criatura direta e honesta."
+},
+"15214": {
+"name": "Atacante Máquina",
+"desc": "Esta máquina, criada para liderar investidas em território inimigo, derruba os inimigos no atropelo."
+},
+"18302": {
+"name": "Dália, a Flor Sombria Brotando",
+"desc": "Um espírito de flor caprichoso. Sua torcida é pequena, mas cheia de sentimento."
+},
+"17856": {
+"name": "Cão Sem Coração Kai Ken Soco Certeiro",
+"desc": "Um jovem Vira-Lata Bravo muito motivado, mas bem imprudente. A força da pegada dele... mais ou menos."
+},
+"15152": {
+"name": "Ansler, o Espadachim Mágico",
+"desc": "Uma espada mágica que usa um boneco de espírito da chama para se empunhar. Dizem que a espada reconhece como verdadeiro dono quem vencer o espírito da chama."
+},
+"17572": {
+"name": "Sentinela Brilhante",
+"desc": "Um guerreiro galáctico que guarda a ordem. Avança em velocidade extrema para salvar aliados, deixando um rastro de luz. Migui Gyaran Gonaidewei!"
+},
+"15170": {
+"name": "Sábia do Dragão",
+"desc": "Uma jovem sacerdotisa de uma linhagem de dragões antigos. Reza todos os dias pela paz do seu povo. Dizem que seus olhos claros mudam o destino de quem se reflete neles."
+},
+"16893": {
+"name": "Serpintor",
+"desc": "Um dragão maravilhoso que vive sob águas cristalinas. Hoje é o mascote popular de um circo."
+},
+"18241": {
+"name": "Acoustiglee",
+"desc": "Uma informante com jeito de irmã mais velha. Ajuda a turma de Bandijo a descobrir os segredos da tribo."
+},
+"17863": {
+"name": "Ictiosterguarda",
+"desc": "Um guerreiro ictiostega surpreendentemente resistente. Mas o peso da armadura o deixa lento."
+},
+"19931": {
+"name": "Draco Zero",
+"desc": "Novos encontros, novas aventuras, um novo mundo. Um novo caminho para o filhote de dragão que transforma zero em um."
+},
+"17580": {
+"name": "Interestelimo",
+"desc": "Um limo formado de matéria gasosa interestelar. Tem um leve cheiro de limão. Iyashgewei!"
+},
+"17220": {
+"name": "Princesa Construtora Cone",
+"desc": "Uma princesa Wyrm de Blisstopia que valoriza muito os laços com os amigos."
+},
+"15157": {
+"name": "Arqueiro Feitiço",
+"desc": "Um jovem arqueiro amado pelo vento. Suas flechas são feitas de magia e voam sem fim."
+},
+"17949": {
+"name": "Applizard",
+"desc": "Um Antropo Dracônico renascido da alma de um Dragão. Mostra muita agilidade e inteligência e usa um tablet como espada ou escudo."
+},
+"16124": {
+"name": "Soldado Construtor Furadragão",
+"desc": "Um humanoide reencarnado de um dragão. Sua estratégia magistral e suas mãos hábeis reduzem muito o tempo de obra."
+},
+"17574": {
+"name": "Atirador Vórtice",
+"desc": "Um guerreiro galáctico que ataca lançando discos. Igyah Du Zuwahi!"
+},
+"17279": {
+"name": "Guerreiro Lagarto Ancestral",
+"desc": "Antes do surgimento do homem, este guerreiro lagarto reinava supremo."
+},
+"19128": {
+"name": "Soldado Destruidor Escalador",
+"desc": "Demolir, construir, demolir, construir... Querendo alcançar uma utopia, este soldado mira cada vez mais alto."
+},
+"17704": {
+"name": "Zumbi do Samba Rio",
+"desc": "Um zumbi que vive balançando sem jeito. Não tem consciência, mas o corpo não esquece o ritmo do samba."
+},
+"16582": {
+"name": "Platnidon",
+"desc": "Um pterodáctilo que adora colecionar coisas brilhantes. A concha no topo da cabeça é a favorita."
+},
+"16137": {
+"name": "Assaltante Silenciosa",
+"desc": "Uma assassina esquiva que aceita missões perigosas enquanto procura o parceiro perdido."
+},
+"23676": {
+"name": "Amante Feliz",
+"desc": "Os inimigos ficam radiantes ao serem atingidos pelo Raio do Coração que sai da testa deste pequeno querubim."
+},
+"15656": {
+"name": "Coelho da Lua Chorona",
+"desc": "Os dias e os meses passaram. Cada dia foi pleno. Aqueles sim eram os bons tempos."
+},
+"15784": {
+"name": "Niwatori",
+"desc": "Engole os inimigos inteiros e usa a essência deles como energia."
+},
+"17859": {
+"name": "Estátua Dourada MK-III",
+"desc": "Funciona com pilhas AA. A rotina é ver vídeos enquanto passeia. Nunca trabalha nem estuda."
+},
+"17284": {
+"name": "Aventureiros Lauan",
+"desc": "Aventureiros em busca de terras desconhecidas. Antes competiam para ver quem voava mais longe, mas logo viraram companheiros de viagem."
+},
+"17563": {
+"name": "Regras Ancestrais",
+"desc": ""
+},
+"15450": {
+"name": "Mil Facas",
+"desc": ""
+},
+"16933": {
+"name": "Caridade Graciosa",
+"desc": ""
+},
+"15918": {
+"name": "Morteiro Alvejante",
+"desc": ""
+},
+"15160": {
+"name": "Proteção do Espírito do Vento",
+"desc": ""
+},
+"16712": {
+"name": "Barragem de Aço",
+"desc": ""
+},
+"17697": {
+"name": "Cura do Mestre",
+"desc": ""
+},
+"16285": {
+"name": "Dian Keto, a Mestra da Cura",
+"desc": ""
+},
+"16591": {
+"name": "Tributo ao Condenado",
+"desc": ""
+},
+"15599": {
+"name": "Foguete de Mil Ataques",
+"desc": ""
+},
+"17012": {
+"name": "Fluxo de Eliminação",
+"desc": ""
+},
+"21524": {
+"name": "Espanador de Penas da Harpia",
+"desc": ""
+},
+"15227": {
+"name": "Faíscas",
+"desc": ""
+},
+"17980": {
+"name": "Tempestade Pesada",
+"desc": ""
+},
+"16356": {
+"name": "Invasão da Natureza",
+"desc": ""
+},
+"17332": {
+"name": "Explosão Trovejante Desbravadora",
+"desc": ""
+},
+"15824": {
+"name": "Tartaruga Gigante da Ganância",
+"desc": ""
+},
+"15208": {
+"name": "Esmagamento de Martelo",
+"desc": ""
+},
+"16699": {
+"name": "Contra-Destruidor",
+"desc": ""
+},
+"16916": {
+"name": "Remédio Vermelho",
+"desc": ""
+},
+"16954": {
+"name": "Força Espelho",
+"desc": ""
+},
+"16768": {
+"name": "Armadura Sakuretsu",
+"desc": ""
+},
+"17582": {
+"name": "Tempestade Universal",
+"desc": ""
+},
+"15451": {
+"name": "Ataque de Magia Negra",
+"desc": ""
+},
+"15582": {
+"name": "Sopro Explosivo da Destruição",
+"desc": ""
+},
+"16794": {
+"name": "Aceleração de Partículas",
+"desc": ""
+},
+"15175": {
+"name": "Inferno do Dragão",
+"desc": ""
+},
+"15161": {
+"name": "Fluxo Mágico",
+"desc": ""
+},
+"15454": {
+"name": "Remédio Azul",
+"desc": ""
+},
+"15176": {
+"name": "Encontro com o Dragão",
+"desc": ""
+},
+"16372": {
+"name": "Pote da Ganância",
+"desc": ""
+}
+}

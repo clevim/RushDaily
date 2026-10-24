@@ -1,0 +1,10 @@
+{
+  "name": "rushdaily-setup-libs",
+  "private": true,
+  "description": "Bibliotecas de terceiros baixadas pelo npm run setup e copiadas para src/vendor/ (versões fixas).",
+  "dependencies": {
+    "ocgcore-wasm": "0.1.6",
+    "qrcode-generator": "2.0.4",
+    "three": "0.170.0"
+  }
+}
