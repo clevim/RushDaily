@@ -150,7 +150,7 @@ O workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) ("Paco
 
 Cada imagem sai com as etiquetas `latest`, o commit curto (`sha-xxxxxxx`) e, quando o disparo é uma tag `v1.2.3`, a versão (`1.2.3`).
 
-1. **Disparar:** em *Actions › Pacote de deploy › Run workflow* (escolha as temporadas, de 1 a 5) ou criando e enviando uma tag `v*`. A primeira execução é longa (baixa tudo e desenha ~3.600 cartas); as seguintes reaproveitam o cache.
+1. **Disparar:** todo push na `master` gera os pacotes de novo (`latest` sempre acompanha a `master`). Também dá para disparar em *Actions › Pacote de deploy › Run workflow* (escolha as temporadas, de 1 a 5) ou criando e enviando uma tag `v*`. A primeira execução é longa (baixa tudo e desenha ~3.600 cartas); as seguintes reaproveitam o cache.
 2. **Deixar os pacotes privados (obrigatório):** as imagens levam artes e cartas de terceiros (Konami). Depois da primeira execução, em *Packages › rushdaily* (e *rushdaily-sync*) › *Package settings › Change visibility › Private*.
 3. **No homelab:**
 

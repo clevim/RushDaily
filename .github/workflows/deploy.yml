@@ -12,7 +12,9 @@ on:
         description: Temporadas clássicas liberadas (1 a 5)
         default: '1'
         required: true
+  # Todo push na master gera os pacotes de novo (latest + sha); tags v* também levam a versão.
   push:
+    branches: [master]
     tags: ['v*']
 
 permissions:
