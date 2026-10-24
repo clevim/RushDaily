@@ -40,8 +40,19 @@ jobs:
         with:
           node-version: 24
 
-      # O setup exige ImageMagick 7 (comando `magick`); o Ubuntu traz o 6.
-      - uses: mfinelli/setup-imagemagick@v6
+      # O setup exige ImageMagick 7 (comando `magick`); o Ubuntu traz o 6. Binário oficial do release do
+      # ImageMagick no GitHub, versão fixa e checksum conferido (para atualizar: baixar, `sha256sum` e trocar os dois).
+      - name: ImageMagick 7
+        env:
+          IM_VERSION: 7.1.2-34
+          IM_SHA256: 6e9edfd35d5f30b57c27533afe003d6085faaf8607b207426f398d11751acf93
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q libfuse2t64
+          curl -sfL --proto '=https' -o /tmp/magick "https://github.com/ImageMagick/ImageMagick/releases/download/${IM_VERSION}/ImageMagick-${IM_VERSION}-gcc-x86_64.AppImage"
+          echo "${IM_SHA256}  /tmp/magick" | sha256sum -c -
+          sudo install -m 755 /tmp/magick /usr/local/bin/magick
+          magick -version
 
       - name: Dependências do Python (Pillow, numpy)
         run: python3 -m pip install --break-system-packages Pillow numpy
