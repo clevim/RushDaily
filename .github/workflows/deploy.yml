@@ -34,9 +34,9 @@ jobs:
     # A primeira execução baixa tudo e desenha ~3.600 cartas; as seguintes reaproveitam o cache.
     timeout-minutes: 300
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
 
@@ -54,12 +54,16 @@ jobs:
           sudo install -m 755 /tmp/magick /usr/local/bin/magick
           magick -version
 
+      # Pelo apt, no site-packages do sistema: o setup roda `python3 -I`, que ignora o site do usuário
+      # (onde um `pip install` sem root cai), e aí o Pillow some no passo das artes.
       - name: Dependências do Python (Pillow, numpy)
-        run: python3 -m pip install --break-system-packages Pillow numpy
+        run: |
+          sudo apt-get install -y -q python3-pil python3-numpy
+          python3 -I -c 'import PIL, numpy, sqlite3'
 
       # Caches das ferramentas (downloads, clones, artes) e os arquivos já gerados em src/: o setup pula o que existe.
       - name: Cache do setup
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             tools/card-render/cache
