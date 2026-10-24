@@ -156,6 +156,7 @@ async function status() {
   const seasonsOk = ts.length > 0 && ts.every((s) => ex(`src/data/classic/s${s.season}.json`));
   const E = {
     three: { pronto: ex('src/vendor/three.module.js'), caminhos: ['src/vendor/three.module.js'] },
+    qrcode: { pronto: ex('src/vendor/qrcode/qrcode.mjs') && ex('src/vendor/qrcode/LICENSE'), caminhos: ['src/vendor/qrcode'] },
     ocgcore: { pronto: ex('src/vendor/ocgcore/index.js') && ex('src/vendor/ocgcore/ocgcore.wasm') && ex('src/vendor/ocgcore/LICENSE.md'), caminhos: ['src/vendor/ocgcore'] },
     yugioh: { pronto: ex('src/vendor/yugioh-card/yugioh-card.js') && ex('src/vendor/yugioh-card/assets/yugioh/font/font-list.json'), caminhos: ['src/vendor/yugioh-card'] },
     rush: { pronto: ex('src/data/cards.mjs'), contagem: `${rushTotal} cartas Rush no pool`, caminhos: ['src/data/cards.mjs'] },
