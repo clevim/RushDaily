@@ -1,0 +1,160 @@
+.hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: center;
+  min-height: calc(100dvh - 71px);
+  padding: clamp(16px, 3vw, 40px) clamp(16px, 4vw, 48px) 32px;
+  gap: 16px;
+}
+
+.challenge { position: relative; z-index: 2; display: grid; justify-items: start; gap: 18px; width: 100%; max-width: 640px; min-width: 0; container-type: inline-size; }
+.wordmark { width: clamp(200px, 22vw, 320px); height: auto; margin: 0 0 4px -10px; filter: drop-shadow(0 10px 24px rgb(var(--ink) / 0.6)); }
+
+.date {
+  margin: 0;
+  color: var(--gold);
+  font-style: italic;
+  font-weight: 700;
+  font-stretch: 72%;
+  font-size: 1.15rem;
+  letter-spacing: 0.01em;
+}
+.date::first-letter { text-transform: uppercase; }
+
+.matchup {
+  margin: 0;
+  display: grid;
+  gap: 2px;
+  font: 400 clamp(1.7rem, calc(88cqi / (var(--len, 12) * 0.62)), 4.6rem)/1 var(--display);
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: break-word;
+  transform: skewX(-8deg);
+  transform-origin: left;
+}
+.side { display: block; width: max-content; max-width: 100%; animation: wipe 0.7s var(--ease-out) both; }
+.side.you {
+  background: var(--foil);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 4px 0 rgb(var(--ink) / 0.55));
+}
+.side.foe { color: var(--ivory); text-shadow: 0 4px 0 rgb(var(--ink) / 0.55); animation-delay: 0.32s; }
+.versus {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font: italic 800 clamp(1rem, 1.6vw, 1.35rem)/1 var(--body);
+  font-stretch: 70%;
+  color: var(--blood);
+  animation: wipe 0.5s var(--ease-out) 0.18s both;
+}
+.versus::before, .versus::after { content: ''; width: 48px; height: 3px; background: currentColor; transform: skewX(-30deg); }
+@keyframes wipe {
+  from { clip-path: polygon(0 0, 0 0, -20% 100%, -20% 100%); transform: translateX(-24px); }
+  to { clip-path: polygon(-20% 0, 130% 0, 130% 100%, -20% 100%); transform: none; }
+}
+
+.brief { margin: 0; max-width: 46ch; color: var(--ivory-dim); font-size: 1.05rem; }
+
+.difficulty { margin: 4px 0 0; padding: 0; border: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 150px)); gap: 10px; }
+.difficulty legend { padding: 0; margin-bottom: 8px; color: var(--ivory-dim); font-size: 0.9rem; font-weight: 600; }
+.tier { position: relative; cursor: pointer; min-width: 0; }
+.tier input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+.tier-face { display: grid; gap: 4px; justify-items: center; padding: 8px 6px 9px; border: 1px solid rgb(244 236 220 / 0.12); background: rgb(var(--ink) / 0.35); opacity: 0.74; transition: opacity 0.2s, border-color 0.2s, transform 0.25s var(--ease-out); }
+.tier .glove { width: 100%; height: auto; filter: grayscale(0.4) brightness(0.8) drop-shadow(0 6px 6px rgb(var(--ink) / 0.6)); }
+.tier-name { font-weight: 700; font-stretch: 78%; color: var(--ivory-dim); font-size: 1rem; line-height: 1.1; }
+.tier:hover .tier-face { opacity: 1; transform: translateY(-2px); }
+.tier input:checked + .tier-face { opacity: 1; border-color: var(--gold); box-shadow: inset 0 3px 0 var(--gold); background: #120e08; }
+.tier input:checked + .tier-face .glove { filter: drop-shadow(0 6px 8px rgb(var(--ink) / 0.6)); }
+.tier input:checked + .tier-face .tier-name { color: var(--gold-hi); }
+.tier input:focus-visible + .tier-face { outline: 3px solid var(--gold-hi); outline-offset: 3px; }
+
+.cta { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 24px; margin-top: 10px; }
+.status { margin: 0; color: var(--ivory-dim); font-size: 0.95rem; max-width: 30ch; }
+.status a { color: var(--gold); font-weight: 700; }
+
+.stage { position: relative; align-self: stretch; min-height: 560px; }
+.stage-canvas { position: fixed; inset: 0; z-index: 1; width: 100%; height: 100dvh; display: block; pointer-events: none; } /* tela inteira: o leque nunca é cortado */
+.hero .challenge, .ledger { position: relative; z-index: 2; }
+.topbar { position: relative; z-index: 35; } /* acima do conteúdo: a barra inferior do celular mora dentro dele */
+.ledger { z-index: 3; }
+
+/* Saída para a arena: o texto some, o leque vai ao centro e voa contra a câmera; o clarão cobre a tela toda */
+body.launching .challenge, body.launching .ledger, body.launching .topbar { opacity: 0; transform: translateY(12px); transition: opacity 0.35s, transform 0.35s; pointer-events: none; }
+body.launching .stage-canvas { z-index: 36; } /* cobre o topo (35) na transição */
+body.launching::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, #fff6d8 0%, var(--gold) 28%, #3a2405 62%, var(--lacquer) 100%);
+  animation: flash 1.3s ease-in both;
+}
+@keyframes flash { 0%, 55% { opacity: 0; } 80% { opacity: 0.85; } 100% { opacity: 1; } }
+
+.ledger {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 300px);
+  gap: 32px;
+  padding: 24px clamp(16px, 4vw, 48px) 64px;
+  border-top: 1px solid var(--rule);
+  background: #07120f;
+}
+.ledger h2 { margin: 0; font: 400 1.5rem/1.1 var(--display); }
+.ledger-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; margin-bottom: 18px; }
+.ledger-head p { margin: 0; color: var(--ivory-dim); }
+
+.deck-rail { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 16px 12px; }
+.deck-card { position: relative; display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; transition: transform 0.3s var(--ease-snap); }
+.deck-card:hover { transform: translateY(-4px); }
+.deck-card .card { will-change: transform; }
+.copies {
+  position: absolute;
+  right: -6px;
+  top: -8px;
+  padding: 3px 9px;
+  background: var(--foil);
+  color: var(--lacquer);
+  font: 400 0.85rem/1 var(--display);
+  transform: skewX(-12deg);
+  box-shadow: 0 4px 10px rgb(var(--ink) / 0.6);
+}
+
+.rival { align-self: start; padding: 24px 22px 22px; display: grid; gap: 14px; }
+.rival-backs { position: relative; height: 150px; }
+.rival-backs img { position: absolute; left: 50%; top: 4px; width: 92px; border-radius: 6px; box-shadow: 0 10px 20px rgb(var(--ink) / 0.7); transform-origin: 50% 120%; }
+.rival-backs img:nth-child(1) { transform: translateX(-50%) rotate(-14deg); }
+.rival-backs img:nth-child(2) { transform: translateX(-50%) translateY(-6px); }
+.rival-backs img:nth-child(3) { transform: translateX(-50%) rotate(14deg); }
+.rival-stats { margin: 0; display: grid; gap: 10px; }
+.rival-stats div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; border-bottom: 1px solid var(--rule); padding-bottom: 8px; }
+.rival-stats dt { color: var(--ivory-dim); }
+.rival-stats dd { margin: 0; font: 400 1.1rem/1 var(--display); color: var(--ivory); }
+.rival-note { margin: 0; color: var(--ivory-dim); font-size: 0.9rem; }
+
+/* PC baixo (ex.: 1280x800): logo menor para o botão e o status do dia caberem sem rolar. */
+@media (min-width: 961px) and (max-height: 860px) {
+  .wordmark { width: clamp(150px, 14vw, 210px); }
+  .challenge { gap: 14px; }
+}
+@media (max-width: 960px) {
+  .hero { grid-template-columns: 1fr; min-height: 0; padding-top: 0; }
+  .stage { order: -1; min-height: 0; height: min(58vh, 520px); margin: 0 -16px; }
+  .wordmark { display: none; }
+  .ledger { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  /* Leque menor: título, dificuldade e "Entrar na arena" aparecem sem rolar. */
+  .stage { height: min(26vh, 220px); }
+  .challenge { gap: 14px; }
+  .brief { order: 1; font-size: 0.95rem; } /* o texto longo vai para depois do botão */
+  .difficulty { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .tier-face { grid-template-columns: minmax(0, 1fr); padding: 6px 6px 7px; }
+  .tier .glove { max-width: 130px; }
+  .deck-rail { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .btn.big { width: 100%; }
+}

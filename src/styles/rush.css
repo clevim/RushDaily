@@ -1,0 +1,371 @@
+/* RushDaily — mesa de duelo laqueada: feltro, laca e folha de ouro. */
+:root {
+  --lacquer: #0a0807;
+  --lacquer-2: #15100c;
+  --felt: #0f2a25;
+  --felt-deep: #06130f;
+  --gold: #f5b21a;
+  --gold-hi: #ffe596;
+  --gold-lo: #9a5b0b;
+  --ivory: #f4ecdc;
+  --ivory-dim: #b8ad97;
+  --blood: #e0303f;
+  --sky: #4fb3e8;
+  --rule: rgb(var(--gold-rgb) / 0.26);
+  --foil: linear-gradient(160deg, var(--gold-hi) 0%, var(--gold) 38%, var(--gold-lo) 62%, #f3b62a 82%, #7a4708 100%);
+  --ink: 0 0 0;
+  --ink-solid: #000;
+  --paper: #fff;
+  --gold-rgb: 245 178 26;
+  --cut: 14px;
+  --display: 'Dela Gothic One', 'Arial Black', sans-serif;
+  --body: 'Archivo', 'Arial Narrow', sans-serif;
+  --ease-snap: cubic-bezier(0.2, 0.9, 0.1, 1.15);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; overflow-x: clip; }
+body {
+  margin: 0;
+  overflow-x: clip;
+  min-height: 100dvh;
+  background: var(--felt-deep);
+  color: var(--ivory);
+  font: 400 1rem/1.5 var(--body);
+  font-stretch: 92%;
+  -webkit-font-smoothing: antialiased;
+}
+img { max-width: 100%; display: block; }
+[hidden] { display: none !important; }
+a { color: inherit; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--gold-hi); outline-offset: 3px; }
+::selection { background: var(--gold); color: var(--lacquer); }
+
+/* Tapete de duelo: feltro liso com fibra, moldura dourada gravada e o selo do triângulo. */
+.felt {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background-color: #0c221d;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.felt::before {
+  content: '';
+  position: absolute;
+  inset: 14px;
+  border: 1px solid rgb(var(--gold-rgb) / 0.32);
+  outline: 1px solid rgb(var(--gold-rgb) / 0.14);
+  outline-offset: 5px;
+}
+.felt.seal::after {
+  content: '';
+  position: absolute;
+  right: -8vmin;
+  bottom: -14vmin;
+  width: 72vmin;
+  aspect-ratio: 1;
+  opacity: 0.09;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' fill='none' stroke='%23f5b21a' stroke-width='1.2'%3E%3Ccircle cx='100' cy='100' r='96'/%3E%3Ccircle cx='100' cy='100' r='88' stroke-dasharray='2 5'/%3E%3Cpath d='M22 60 H178 L100 190 Z'/%3E%3Cpath d='M44 72 H156 L100 166 Z'/%3E%3Cpath d='M70 100 Q100 82 130 100 Q100 118 70 100 Z'/%3E%3Ccircle cx='100' cy='100' r='7'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.scene-canvas { position: fixed; inset: 0; z-index: -1; width: 100%; height: 100%; display: block; }
+
+/* Topo */
+.topbar {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 3vw, 40px);
+  padding: 14px clamp(16px, 4vw, 48px);
+  border-bottom: 1px solid var(--rule);
+  background: linear-gradient(180deg, rgb(10 8 7 / 0.92), rgb(10 8 7 / 0.55));
+  backdrop-filter: blur(6px);
+}
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 400 1.05rem/1 var(--display); letter-spacing: 0.01em; }
+.brand img { width: 40px; height: auto; filter: drop-shadow(0 2px 6px rgb(var(--gold-rgb) / 0.35)); }
+.tabs { display: flex; gap: 4px; margin-right: auto; overflow-x: auto; scrollbar-width: none; }
+.tabs a {
+  position: relative;
+  padding: 8px 14px;
+  text-decoration: none;
+  color: var(--ivory-dim);
+  font-weight: 600;
+  font-stretch: 80%;
+  font-size: 1.02rem;
+  white-space: nowrap;
+  transition: color 0.2s;
+}
+.tabs.more-right { mask-image: linear-gradient(to right, var(--ink-solid) calc(100% - 44px), transparent); }
+.tabs.more-left { mask-image: linear-gradient(to left, var(--ink-solid) calc(100% - 44px), transparent); }
+.tabs.more-left.more-right { mask-image: linear-gradient(to right, transparent, var(--ink-solid) 44px, var(--ink-solid) calc(100% - 44px), transparent); }
+.tabs a:hover { color: var(--ivory); }
+.tabs a[aria-current='page'] { color: var(--gold); }
+.tabs a[aria-current='page']::after {
+  content: '';
+  position: absolute;
+  left: 14px; right: 14px; bottom: -15px;
+  height: 3px;
+  background: var(--foil);
+  transform: skewX(-30deg);
+}
+.key-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 14px;
+  border: 1px solid var(--rule);
+  background: rgb(var(--ink) / 0.35);
+  color: var(--ivory-dim);
+  font-size: 0.85rem;
+  cursor: pointer;
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+.key-chip b { color: var(--gold); font: 400 0.95rem/1 var(--display); }
+.key-chip:hover { color: var(--ivory); border-color: var(--gold); }
+
+/* Placa chanfrada (assinatura visual tirada da faixa do logo) */
+.plate {
+  --c: var(--cut);
+  position: relative;
+  background: linear-gradient(160deg, rgb(26 20 14 / 0.94), rgb(10 8 7 / 0.94));
+  clip-path: polygon(var(--c) 0, 100% 0, 100% calc(100% - var(--c)), calc(100% - var(--c)) 100%, 0 100%, 0 var(--c));
+}
+.plate::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1.5px;
+  background: var(--foil);
+  clip-path: inherit;
+  -webkit-mask: linear-gradient(var(--ink-solid) 0 0) content-box, linear-gradient(var(--ink-solid) 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Botões: chapa inclinada como a faixa do logo */
+.btn {
+  --skew: -12deg;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 26px;
+  border: 0;
+  background: transparent;
+  color: var(--lacquer);
+  font: 400 1.05rem/1 var(--display);
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  cursor: pointer;
+  isolation: isolate;
+  transition: transform 0.2s var(--ease-out), filter 0.2s;
+}
+.btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--foil);
+  transform: skewX(var(--skew));
+  box-shadow: 0 10px 30px -10px rgb(var(--gold-rgb) / 0.6), inset 0 1px 0 rgb(255 255 255 / 0.5);
+}
+.btn:hover { transform: translateY(-2px); filter: brightness(1.08); }
+.btn:active { transform: translateY(1px) scale(0.98); }
+.btn:disabled { cursor: not-allowed; filter: grayscale(1) brightness(0.55); transform: none; }
+.btn.ghost { color: var(--ivory); }
+.btn.ghost::before { background: rgb(var(--ink) / 0.45); border: 1.5px solid var(--gold); box-shadow: none; }
+.btn.ghost:hover { color: var(--gold-hi); }
+.btn.danger::before { background: linear-gradient(160deg, #ff6b74, var(--blood) 50%, #7d0f19); }
+.btn.danger { color: var(--ivory); }
+.btn.big { min-height: 64px; padding: 0 40px; font-size: 1.35rem; }
+
+/* Carta: imagem + acabamento foil que segue o ponteiro (--mx/--my) */
+@property --mx { syntax: '<percentage>'; inherits: true; initial-value: 50%; }
+@property --my { syntax: '<percentage>'; inherits: true; initial-value: 50%; }
+.card {
+  --mx: 50%;
+  --my: 50%;
+  position: relative;
+  aspect-ratio: 421 / 614;
+  border-radius: 4.5% / 3.1%;
+  overflow: hidden;
+  background: #120c07;
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.12) inset, 0 14px 28px -12px rgb(var(--ink) / 0.9);
+}
+.card img { width: 100%; height: 100%; object-fit: cover; }
+.card[class*='foil-']::after, .card[class*='foil-']::before { content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit; }
+
+/* Ouro (LEGEND): varredura quente + faíscas finas */
+.card.foil-gold::after {
+  mix-blend-mode: soft-light;
+  opacity: 0.55;
+  background: linear-gradient(115deg, transparent calc(var(--mx) - 28%), rgb(255 226 140 / 0.9) var(--mx), transparent calc(var(--mx) + 28%));
+}
+.card.foil-gold::before {
+  mix-blend-mode: color-dodge;
+  opacity: 0.22;
+  background: radial-gradient(circle at var(--mx) var(--my), rgb(255 214 120 / 0.8), transparent 45%),
+    radial-gradient(1px 1px at 20% 30%, var(--paper) 50%, transparent), radial-gradient(1px 1px at 70% 60%, var(--paper) 50%, transparent), radial-gradient(1.5px 1.5px at 40% 80%, var(--paper) 50%, transparent);
+  background-size: 100% 100%, 37px 41px, 53px 47px, 61px 59px;
+}
+
+/* Prisma: arco-íris fino, bem baixo */
+.card.foil-prism::after {
+  mix-blend-mode: color-dodge;
+  opacity: 0.2;
+  background: repeating-linear-gradient(115deg, #ff5c8a 0%, #ffd25c 5%, #5cffc0 10%, #5cb4ff 15%, #c45cff 20%, #ff5c8a 25%);
+  background-size: 260% 260%;
+  background-position: var(--mx) var(--my);
+  filter: saturate(0.9);
+}
+.card.foil-prism::before { mix-blend-mode: overlay; opacity: 0.4; background: radial-gradient(circle at var(--mx) var(--my), rgb(255 255 255 / 0.7), transparent 38%); }
+
+/* Estrelas: pontos de luz espalhados que acendem perto do ponteiro */
+.card.foil-star::after {
+  mix-blend-mode: screen;
+  opacity: 0.45;
+  background:
+    radial-gradient(1.5px 1.5px at 12% 18%, var(--paper) 60%, transparent), radial-gradient(1px 1px at 33% 64%, var(--paper) 60%, transparent),
+    radial-gradient(1.5px 1.5px at 58% 26%, var(--paper) 60%, transparent), radial-gradient(1px 1px at 81% 72%, var(--paper) 60%, transparent),
+    radial-gradient(1px 1px at 47% 88%, var(--paper) 60%, transparent);
+  background-size: 71px 83px, 59px 67px, 89px 79px, 47px 53px, 97px 101px;
+  -webkit-mask: radial-gradient(circle at var(--mx) var(--my), var(--ink-solid) 0 22%, transparent 55%);
+  mask: radial-gradient(circle at var(--mx) var(--my), var(--ink-solid) 0 22%, transparent 55%);
+}
+.card.foil-star::before { mix-blend-mode: soft-light; opacity: 0.35; background: radial-gradient(circle at var(--mx) var(--my), rgb(170 220 255 / 0.9), transparent 40%); }
+
+/* Gravado (Magias/Armadilhas): linhas diagonais que brilham em faixa */
+.card.foil-etched::after {
+  mix-blend-mode: overlay;
+  opacity: 0.32;
+  background: repeating-linear-gradient(135deg, rgb(255 255 255 / 0.55) 0 1px, transparent 1px 5px);
+  -webkit-mask: linear-gradient(115deg, transparent calc(var(--mx) - 22%), var(--ink-solid) var(--mx), transparent calc(var(--mx) + 22%));
+  mask: linear-gradient(115deg, transparent calc(var(--mx) - 22%), var(--ink-solid) var(--mx), transparent calc(var(--mx) + 22%));
+}
+
+/* Galáxia (só vem de booster): nebulosa fria + estrelas */
+.card.foil-galaxy::after {
+  mix-blend-mode: color-dodge;
+  opacity: 0.3;
+  background:
+    radial-gradient(40% 30% at calc(var(--mx) * 0.6 + 10%) 30%, rgb(140 90 255 / 0.9), transparent 70%),
+    radial-gradient(35% 28% at 75% calc(var(--my) * 0.5 + 40%), rgb(40 200 255 / 0.8), transparent 70%),
+    radial-gradient(30% 25% at 30% 80%, rgb(255 80 180 / 0.7), transparent 70%);
+}
+.card.foil-galaxy::before {
+  mix-blend-mode: screen;
+  opacity: 0.55;
+  background:
+    radial-gradient(1px 1px at 15% 25%, var(--paper) 60%, transparent), radial-gradient(1.5px 1.5px at 62% 38%, var(--paper) 60%, transparent),
+    radial-gradient(1px 1px at 40% 72%, var(--paper) 60%, transparent), radial-gradient(1px 1px at 85% 15%, var(--paper) 60%, transparent);
+  background-size: 43px 47px, 71px 61px, 53px 79px, 89px 67px;
+  background-position: calc(var(--mx) * -0.3) calc(var(--my) * -0.3), 0 0, calc(var(--mx) * 0.2) 0, 0 calc(var(--my) * 0.2);
+}
+
+/* Brilho sozinho quando não há ponteiro (zoom, magia ativada) */
+.card.shimmer { animation: shimmer 4.5s ease-in-out infinite alternate; }
+@keyframes shimmer { from { --mx: 15%; --my: 20%; } to { --mx: 85%; --my: 80%; } }
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 50;
+  max-width: min(92vw, 460px);
+  padding: 14px 20px;
+  background: var(--lacquer);
+  border: 1px solid var(--gold);
+  color: var(--ivory);
+  font-weight: 600;
+  transform: translate(-50%, 140%);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.4s var(--ease-out), opacity 0.2s;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+}
+.toast.show { transform: translate(-50%, 0); opacity: 1; }
+
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Superfícies: placa (duelista, interativo), ficha (dados em papel escuro) e pergaminho (regras). */
+.sheet { background: rgb(var(--ink) / 0.42); border: 1px solid rgb(244 236 220 / 0.1); border-left: 3px solid var(--rule); }
+.scroll { background: linear-gradient(180deg, #1b1710, #120f0a); border-block: 3px double rgb(var(--gold-rgb) / 0.38); box-shadow: 0 18px 40px -16px rgb(var(--ink) / 0.8); }
+
+/* Forma única: canto chanfrado em abas, filtros e campos (nada de pílula). */
+.cut { --c: 8px; clip-path: polygon(var(--c) 0, 100% 0, 100% calc(100% - var(--c)), calc(100% - var(--c)) 100%, 0 100%, 0 var(--c)); }
+
+/* Barra inferior (só no celular) */
+.bar-nav { display: none; }
+
+@media (max-width: 640px) {
+  .brand span { display: none; }
+  .topbar { gap: 10px; padding-block: 10px; backdrop-filter: none; z-index: 35; } /* sem blur: ele prenderia a barra fixa dentro do topo */
+  .key-chip { margin-left: auto; padding: 7px 10px; }
+  .key-chip span { display: none; }
+  .tabs { display: none; }
+  body:has(.bar-nav) { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+  .bar-nav {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 30;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    padding-bottom: env(safe-area-inset-bottom);
+    background: rgb(10 8 7 / 0.97);
+    border-top: 1px solid var(--rule);
+  }
+  .bar-nav > a, .bar-more {
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    gap: 3px;
+    min-height: 56px;
+    padding: 6px 2px;
+    border: 0;
+    background: none;
+    color: var(--ivory-dim);
+    font: 600 0.78rem/1 var(--body);
+    font-stretch: 85%;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .bar-nav [aria-current='page'] { color: var(--gold); box-shadow: inset 0 3px 0 var(--gold); }
+  .bar-menu { position: absolute; right: 8px; bottom: calc(100% + 8px); display: grid; min-width: 168px; padding: 8px 0; }
+  .bar-menu a { padding: 12px 20px; min-height: 44px; color: var(--ivory); font-weight: 600; text-decoration: none; }
+  .bar-menu a[aria-current='page'] { color: var(--gold); }
+  .toast { bottom: calc(76px + env(safe-area-inset-bottom)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+
+/* Inspeção de carta */
+.inspect {
+  max-width: min(94vw, 860px);
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ivory);
+  overflow: visible;
+}
+.inspect[open] { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 32px; align-items: center; animation: rise 0.45s var(--ease-snap); }
+.inspect::backdrop { background: radial-gradient(circle at 35% 50%, rgb(15 42 37 / 0.85), rgb(2 6 5 / 0.96)); backdrop-filter: blur(4px); }
+.inspect-card { width: 100%; box-shadow: 0 40px 80px -20px rgb(var(--ink) / 0.95), 0 0 0 1px rgb(var(--gold-rgb) / 0.35); }
+.inspect-copy h2 { margin: 0 0 6px; font: 400 clamp(1.6rem, 3vw, 2.3rem)/1.05 var(--display); }
+.inspect-stats { margin: 0 0 14px; color: var(--gold); font-weight: 700; font-stretch: 75%; font-size: 1.1rem; }
+.inspect-copy p:not(.inspect-stats) { margin: 0 0 22px; color: var(--ivory-dim); max-width: 42ch; font-size: 1.05rem; }
+@keyframes rise { from { opacity: 0; transform: translateY(24px) scale(0.96); } }
+@media (max-width: 640px) {
+  .inspect[open] { grid-template-columns: 1fr; justify-items: center; gap: 18px; text-align: center; }
+  .inspect-card { max-width: 260px; }
+}

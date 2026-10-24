@@ -1,0 +1,169 @@
+/* Arena clássica: tapete oficial em grade 7x5 (Deck, Adicional, Cemitério e Campo nas pontas). */
+.classic {
+  --cols: 7;
+  /* Largura da carta: o que couber na largura (7 colunas) e na altura (5 linhas + mão). */
+  --hand: clamp(60px, min(8.4vw, 12dvh), 104px);
+  --gap: clamp(4px, 0.8vw, 10px);
+  /* Altura livre = tela - topo (~70px) - bandeja (mão + 30px) - folgas da grade. */
+  --card: clamp(40px, min((100vw - 300px) / 8.2, (100dvh - 104px - var(--hand) * 1.4 - 7 * var(--gap)) / 7.3), 104px);
+}
+.classic .arena-top { padding-block: 6px; }
+.top-center { display: grid; justify-items: center; gap: 4px; min-width: 0; }
+.classic .log { display: block; max-width: min(60ch, 56vw); min-height: 1.2em; text-align: center; }
+.classic .log span { display: none; }
+.classic .log span:first-child { display: block; font-size: 0.86rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.table {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(150px, 210px) auto minmax(150px, 210px);
+  grid-template-rows: 1fr 1fr;
+  grid-template-areas: 'foe field .' 'me field .';
+  justify-content: center;
+  align-items: center;
+  gap: 0 clamp(12px, 2vw, 28px);
+  min-height: 0;
+  padding: 0 clamp(10px, 2vw, 24px);
+}
+.field {
+  grid-area: field;
+  display: grid;
+  grid-template-columns: repeat(7, var(--card));
+  grid-template-rows: repeat(5, calc(var(--card) * 1.457));
+  gap: var(--gap);
+  padding: calc(var(--gap) * 1.4);
+  /* lados tingidos: o do rival puxa para o sangue, o seu para o céu */
+  background: linear-gradient(180deg, rgb(224 48 63 / 0.1) 0 38%, transparent 38% 62%, rgb(79 179 232 / 0.09) 62%), radial-gradient(ellipse at 50% 50%, rgb(15 42 37 / 0.55), rgb(2 6 5 / 0.35));
+  clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
+  box-shadow: inset 0 0 0 1px rgb(var(--gold-rgb) / 0.14);
+}
+.seat { --c: 12px; display: grid; gap: 6px; padding: 12px 16px 14px; }
+.seat.foe { grid-area: foe; align-self: start; }
+.seat.me { grid-area: me; align-self: end; }
+.seat-extra { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 26px; }
+.banish-chip { min-height: 28px; padding: 3px 10px; border: 1px solid rgb(79 179 232 / 0.5); background: rgb(var(--ink) / 0.4); color: var(--sky); font: 700 0.72rem/1 var(--body); cursor: pointer; }
+.classic .enemy-hand { display: flex; align-items: center; gap: 6px; min-height: 0; padding: 0; margin: 0; color: var(--ivory-dim); font: 700 0.8rem/1 var(--body); }
+
+/* Zonas */
+.classic .zone { width: var(--card); height: calc(var(--card) * 1.457); aspect-ratio: auto; border-radius: 5px; }
+.classic .zone.empty { border-width: 1px; }
+.classic .zone.empty::after { inset: 36% 30% 32%; }
+.classic .zone.szone.empty { border-color: rgb(79 179 232 / 0.28); }
+.classic .zone.theirs.empty { opacity: 0.75; }
+.zone.fzone.empty { border-color: rgb(110 200 140 / 0.35); border-style: dashed; }
+.zone.fzone.empty::after { content: 'Campo'; display: grid; place-items: center; inset: 0; clip-path: none; border: 0; border-radius: 0; color: rgb(110 200 140 / 0.6); font: 600 0.66rem/1 var(--body); align-content: end; padding-bottom: 14%; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236ec88c' stroke-width='1.6'%3E%3Cpath d='M2 19 9 7l4 6 3-4 6 10Z'/%3E%3C/svg%3E") center 30% / 38% no-repeat; }
+.zone.emz-zone.empty { border-style: dotted; border-color: rgb(var(--gold-rgb) / 0.35); }
+.zone.emz-zone.empty::after { content: 'Extra'; display: grid; place-items: center; inset: 0; clip-path: none; border: 0; color: rgb(var(--gold-rgb) / 0.45); font: 600 0.66rem/1 var(--body); align-content: end; padding-bottom: 14%; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f5b21a' stroke-width='1.6'%3E%3Cpath d='M12 3 21 12 12 21 3 12Z'/%3E%3C/svg%3E") center 30% / 38% no-repeat; }
+.zone.emz-zone.theirs .face { outline: 2px solid rgb(224 48 63 / 0.6); }
+.classic .zone.defense .face { transform: rotate(90deg) scale(0.69); }
+
+/* Pilhas dentro da grade (reseta o `.pile span` do duel.css, que posiciona tudo no rodapé) */
+.classic .pile { position: relative; display: block; width: var(--card); height: calc(var(--card) * 1.457); padding: 0; border: 1px dashed rgb(244 236 220 / 0.22); border-radius: 5px; background: rgb(var(--ink) / 0.3); color: inherit; cursor: pointer; aspect-ratio: auto; }
+.classic .pile .ycard { position: absolute; inset: 0; left: 0; bottom: auto; translate: none; width: 100%; height: 100%; padding: 0; border: 0; background: #111; }
+.classic .pile.deck .ycard, .classic .pile.extra .ycard { box-shadow: 2px 2px 0 #2a1d0c, 4px 4px 0 #1a1208, 0 10px 16px rgb(var(--ink) / 0.7); }
+.classic .pile .pile-count { position: absolute; left: auto; right: 3px; bottom: 3px; translate: none; z-index: 2; min-width: 22px; padding: 3px 5px; background: var(--lacquer); border: 1px solid var(--gold); border-radius: 10px; font: 400 clamp(0.62rem, calc(var(--card) * 0.17), 0.8rem)/1 var(--display); color: var(--gold-hi); text-align: center; }
+.classic .pile .pile-name { position: absolute; left: 50%; top: 3px; bottom: auto; translate: -50% 0; z-index: 2; max-width: 96%; padding: 2px 4px; background: rgb(var(--ink) / 0.7); border: 0; border-radius: 3px; font: 600 clamp(0.5rem, calc(var(--card) * 0.15), 0.7rem)/1 var(--body); color: var(--ivory-dim); white-space: nowrap; }
+.classic .pile.grave .pile-count { bottom: 3px; }
+.classic .pile.extra { border-color: rgb(177 138 208 / 0.45); }
+.classic .pile.grave { border-color: rgb(244 236 220 / 0.3); background: rgb(var(--ink) / 0.3) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b8ad97' stroke-width='1.6'%3E%3Cpath d='M6 21V10a6 6 0 0 1 12 0v11ZM12 8v7M9.5 11h5'/%3E%3C/svg%3E") center 55% / 34% no-repeat; }
+.classic .pile:hover, .classic .pile:focus-visible { border-color: var(--gold); }
+
+/* ---------- Carta clássica: imagem oficial + faixa de ATK/DEF na mesa ---------- */
+.ycard { position: relative; display: block; width: 100%; aspect-ratio: 418 / 609; border-radius: 4.5% / 3.1%; overflow: hidden; background: #111; }
+.ycard > img, .card .ycard > img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.live-stats { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; gap: 2px; padding: 2px 3px; background: linear-gradient(0deg, rgb(var(--ink) / 0.92), rgb(var(--ink) / 0.65)); font: 800 clamp(0.5rem, calc(var(--card) * 0.155), 0.82rem)/1.1 var(--body); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: var(--ivory); }
+.live-stats b { font-weight: 800; }
+.live-stats b:last-child { color: var(--ivory-dim); }
+.live-stats .up { color: #7dffa4 !important; } .live-stats .down { color: #ff7a84 !important; }
+/* Em Defesa a carta gira 90°: a faixa gira de volta, fica no meio e horizontal (DEF em destaque). */
+.zone.defense .live-stats { left: 50%; top: 50%; right: auto; bottom: auto; width: max-content; gap: 5px; padding: 2px 6px; border-radius: 4px; transform: translate(-50%, -50%) rotate(-90deg) scale(1.45); }
+.zone.defense .live-stats b:first-child { color: var(--ivory-dim); }
+.zone.defense .live-stats b:last-child { color: var(--gold-hi); }
+.classic .card:has(> .ycard) { background: none; overflow: visible; }
+.zone.facedown .ycard:not(.back) { filter: brightness(0.55) saturate(0.5); }
+/* Carta virada (campo) ou marcada para baixar (mão): só um realce azul em volta, sem texto por cima. */
+.classic .zone.facedown .ycard, .classic .hand-card.set-pose .ycard { box-shadow: 0 0 0 2px var(--sky), 0 0 16px 2px rgb(79 179 232 / 0.55); }
+.zone .ycard, .pile .ycard { box-shadow: 0 6px 14px -6px var(--ink-solid); }
+.xyz-mats { position: absolute; top: -6px; left: -6px; z-index: 2; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #111; border: 1.5px solid var(--gold); color: var(--gold-hi); font: 700 0.7rem/1 var(--body); }
+
+/* Mão: a largura da carta encolhe quando há muitas cartas (cqw = largura da mão) */
+.classic .hand { container-type: inline-size; height: calc(var(--hand) * 1.4 + 12px); padding-top: 12px; }
+.classic .hand-card { --w: min(var(--hand), calc((100cqw - var(--hand) * 0.3) / (var(--n) * 0.8 + 0.2))); background: none; width: var(--w); margin-left: calc(var(--w) * -0.2); transform: translateY(calc(var(--o) * var(--o) * 2.5px - var(--w) * 0.1)) rotate(calc(var(--o) * 2.5deg)); }
+.classic .hand-card:first-child { margin-left: 0; }
+.classic .hand-card:hover, .classic .hand-card:focus-visible { transform: translateY(-10px) scale(1.12) rotate(0); }
+.classic .hand-card.set-pose { filter: none; }
+.classic .enemy-hand { min-height: 34px; gap: 8px; }
+.classic .enemy-hand .ycard { width: 22px; margin-left: 0; }
+.classic .enemy-hand b::before { content: 'Mão '; font-weight: 600; color: var(--ivory-dim); }
+
+/* Zoom: carta grande + texto legível + ações */
+.classic .zoom { grid-template-columns: minmax(0, min(380px, 40vw)) minmax(0, 400px); }
+.classic .zoom .card { box-shadow: 0 40px 80px -20px var(--ink-solid); }
+.zoom-text { max-height: 40dvh; overflow: auto; color: var(--ivory) !important; font-size: 1rem; line-height: 1.45; }
+.zoom-actions { display: grid; gap: 10px; margin-top: 16px; }
+.zoom-actions .btn { min-height: 46px; }
+
+/* Diálogo de escolhas */
+.ask { width: min(94vw, 640px); max-height: 88dvh; overflow: auto; }
+.ask-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 18px; }
+.ask-search { grid-column: 1 / -1; padding: 10px 14px; border: 1px solid var(--rule); border-radius: 6px; background: rgb(var(--ink) / 0.4); color: var(--ivory); font: inherit; }
+.ask-search:focus { outline: 2px solid var(--gold); outline-offset: 2px; }
+.ask-item[hidden] { display: none; }
+.ask-item { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 6px; background: rgb(var(--ink) / 0.35); color: var(--ivory); font: 600 0.92rem/1.2 var(--body); cursor: pointer; text-align: center; }
+.ask-item.with-card { grid-template-columns: 1fr; justify-items: center; }
+.ask-item.with-card .ycard { width: 96px; }
+.ask-item span { font-size: 0.8rem; }
+.ask-item:hover { border-color: var(--gold); }
+.ask-item[aria-pressed='true'] { border-color: var(--gold-hi); background: rgb(var(--gold-rgb) / 0.18); box-shadow: 0 0 0 2px var(--gold-hi); }
+.float.heal { color: #7dffa4; }
+
+
+/* Notebook baixo */
+@media (min-width: 861px) and (max-height: 760px) {
+  .classic .hint { display: none; }
+}
+/* Até 2 botões por fase, sempre numa linha: o tapete não pula quando aparece "Ir para a Batalha". */
+.classic .dock-actions { flex-wrap: nowrap; }
+.classic .dock .btn { flex: 1; padding: 0 12px; white-space: nowrap; }
+.classic .hint { min-height: calc(3 * 1.3em); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* Celular: placas compactas em cima e embaixo da grade; mão e botões no rodapé */
+@media (max-width: 860px) {
+  .classic {
+    --gap: 4px;
+    --hand: min(21vw, 14dvh);
+    --card: min((100vw - 16px - 6 * var(--gap)) / 7.15, (100dvh - 205px - var(--hand) * 1.2) / 7.3);
+  }
+  .classic .arena-top { grid-template-columns: auto 1fr auto; padding: 4px 8px; gap: 8px; }
+  .classic .hint { display: none; }
+  .classic .tray { padding-top: 4px; }
+  .classic .log { max-width: 62vw; }
+  .classic .log span:first-child { font-size: 0.74rem; }
+  .table { grid-template-columns: 1fr; grid-template-rows: auto auto auto; grid-template-areas: 'foe' 'field' 'me'; align-content: center; gap: 6px; padding: 0 8px; }
+  .field { justify-self: center; padding: 4px; }
+  .seat { grid-template-columns: auto 1fr auto; align-items: center; column-gap: 10px; row-gap: 3px; padding: 6px 12px; --c: 8px; }
+  .seat .who { font-size: 0.78rem; }
+  .seat .lp-value { font-size: 1.15rem; }
+  .seat .lp-bar { grid-column: 1 / -1; grid-row: 2; }
+  .seat-extra { grid-column: 3; grid-row: 1; min-height: 0; }
+  .seat.foe, .seat.me { align-self: stretch; }
+  .classic .pile .pile-name { font-size: 0; padding: 1px 3px; top: 2px; }
+  .classic .pile .pile-name::after { content: attr(data-short); font-size: 0.46rem; }
+  .classic .pile .pile-count { min-width: 16px; padding: 2px 3px; right: 2px; bottom: 2px; }
+  .zone.fzone.empty::after, .zone.emz-zone.empty::after { font-size: 0.46rem; }
+  .classic .zoom { grid-template-columns: 1fr; align-content: start; padding-top: 16px; overflow: auto; }
+  .classic .zoom .card { width: min(64vw, 260px); }
+  .zoom-text { max-height: none; font-size: 0.92rem; }
+  .ask-items { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+  .ask-item.with-card .ycard { width: 74px; }
+}
+
+/* Replay (só leitura): os controles ocupam a linha dos botões do turno */
+.replay-bar { display: flex; flex: 1; gap: 8px; }
+.replay-bar[hidden] { display: none; }
+.replay-mode .hand-card { cursor: default; }
+/* Puzzle: encerrar o turno só perde; "Recomeçar" ocupa o lugar (no celular não cabem quatro botões) */
+.puzzle-mode #to-end { display: none; }
+/* Títulos longos do puzzle ("Peça recuperada!", "O turno acabou") cabem no celular */
+.puzzle-mode .result-title { font-size: clamp(2.4rem, 10vw, 5.2rem); overflow-wrap: anywhere; padding-inline: 0.1em; }

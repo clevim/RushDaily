@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#020605" />
+    <title>RushDaily · Arena Clássica</title>
+    <link rel="icon" href="src/assets/logo-mark.png" type="image/png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,300..900;1,62..125,300..900&family=Dela+Gothic+One&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="src/styles/rush.css" />
+    <link rel="stylesheet" href="src/styles/duel.css" />
+    <link rel="stylesheet" href="src/styles/arena.css" />
+  </head>
+  <body class="arena classic">
+    <canvas class="scene-canvas" id="mat" aria-hidden="true"></canvas>
+
+    <header class="arena-top">
+      <a class="leave" href="index.html"><img src="src/assets/logo-mark.png" alt="" width="34" height="36" /><span>Sair da arena</span></a>
+      <div class="top-center">
+        <p class="turn-chip" id="turn-chip">Preparando o duelo…</p>
+        <p class="log" id="log" aria-live="polite"></p>
+      </div>
+      <button class="help-chip" id="help-toggle" type="button" aria-expanded="false" aria-controls="help">Como jogar</button>
+    </header>
+
+    <main class="table">
+      <section class="seat foe plate" id="foe-plate" aria-label="Rival">
+        <p class="who">Rival</p>
+        <p class="lp"><span class="lp-value" id="foe-lp"></span><span class="lp-label">PV</span></p>
+        <div class="lp-bar"><i id="foe-bar"></i></div>
+        <div class="seat-extra"><div class="enemy-hand" id="foe-hand"></div><button class="banish-chip" type="button" data-pile="1:banished" id="foe-banished"></button></div>
+      </section>
+      <div class="field" id="field" aria-label="Campo"></div>
+      <section class="seat me plate" aria-label="Você">
+        <p class="who">Você <span class="who-key" id="player-key"></span></p>
+        <p class="lp"><span class="lp-value" id="me-lp"></span><span class="lp-label">PV</span></p>
+        <div class="lp-bar"><i id="me-bar"></i></div>
+        <div class="seat-extra"><button class="banish-chip" type="button" data-pile="0:banished" id="me-banished"></button></div>
+      </section>
+    </main>
+
+    <footer class="tray">
+      <div class="dock">
+        <p class="hint" id="hint"></p>
+        <div class="dock-actions">
+          <button class="btn" id="to-battle" type="button" hidden>Ir para a Batalha</button>
+          <button class="btn ghost" id="to-m2" type="button" hidden>Fase Principal 2</button>
+          <button class="btn ghost" id="to-end" type="button" hidden>Encerrar turno</button>
+          <button class="btn ghost" id="restart" type="button" hidden>Recomeçar</button>
+          <span class="replay-bar" id="replay-bar" hidden>
+            <button class="btn" id="rp-play" type="button" aria-pressed="false">Pausar</button>
+            <button class="btn ghost" id="rp-speed" type="button" aria-label="Velocidade">1x</button>
+            <button class="btn ghost" id="rp-turn" type="button">Próximo turno</button>
+          </span>
+        </div>
+      </div>
+      <div class="hand" id="hand" aria-label="Sua mão"></div>
+    </footer>
+
+    <aside class="help plate" id="help" hidden>
+      <h2>Como jogar</h2>
+      <ul>
+        <li><b>Toque</b> numa carta para ler e ver o que ela pode fazer agora.</li>
+        <li><b>Arraste</b> da mão até uma zona acesa: monstros são Invocados, magias são ativadas.</li>
+        <li><b>Toque duas vezes ou segure</b> uma carta da mão para alternar entre jogar e <b>baixar virada</b>.</li>
+        <li>No campo, <b>toque duas vezes</b> no seu monstro para mudar a posição; <b>segure</b> o virado para Invocar por Virada.</li>
+        <li>Na Batalha, <b>arraste</b> seu monstro até o alvo (ou até o rival para ataque direto).</li>
+        <li>Toque no <b>Deck Adicional</b> ou no <b>Cemitério</b> para ver as cartas e usar as que estiverem disponíveis.</li>
+      </ul>
+      <p>Formato clássico: 8000 PV, deck de 40 a 60 cartas, uma Invocação-Normal por turno, duas Fases Principais e até 40 turnos (no limite, vence quem tiver mais PV). Depois da Batalha, use <b>Fase Principal 2</b> para baixar cartas ou invocar mais.</p>
+    </aside>
+
+    <div class="zoom" id="zoom" aria-hidden="true"></div>
+    <div class="banner" id="banner" aria-hidden="true"><span></span></div>
+    <div class="cast" id="cast" aria-hidden="true"></div>
+
+    <dialog class="prompt plate ask" id="ask">
+      <p class="prompt-kicker" id="ask-title"></p>
+      <div class="ask-items" id="ask-items"></div>
+      <div class="result-actions" id="ask-actions"></div>
+    </dialog>
+
+    <dialog class="result" id="result">
+      <p class="result-kicker" id="result-kicker"></p>
+      <h1 class="result-title" id="result-title"></h1>
+      <p class="result-copy" id="result-copy"></p>
+      <div class="result-actions">
+        <a class="btn" href="screens.html?screen=deck">Meus decks</a>
+        <button class="btn ghost" id="rematch" type="button">Jogar de novo</button>
+        <button class="btn ghost" type="button" data-share-replay>Copiar replay</button>
+      </div>
+    </dialog>
+
+    <script type="module" src="src/ui/arena.js"></script>
+  </body>
+</html>

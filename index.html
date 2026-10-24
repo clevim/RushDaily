@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0a0807" />
+    <title>RushDaily · Desafio do dia</title>
+    <link rel="icon" href="src/assets/logo-mark.png" type="image/png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,300..900;1,62..125,300..900&family=Dela+Gothic+One&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="src/styles/rush.css" />
+    <link rel="stylesheet" href="src/styles/home.css" />
+  </head>
+  <body class="home">
+    <div class="felt" aria-hidden="true"></div>
+    <div id="nav"></div>
+
+    <main>
+      <section class="hero" aria-labelledby="matchup">
+        <div class="challenge">
+          <img class="wordmark" src="src/assets/logo.png" alt="RushDaily" width="680" height="340" />
+          <p class="date" id="date"></p>
+          <h1 class="matchup" id="matchup">
+            <span class="side you" id="you"></span>
+            <span class="versus">contra</span>
+            <span class="side foe" id="foe"></span>
+          </h1>
+          <p class="brief" id="brief"></p>
+
+          <fieldset class="difficulty" id="difficulty">
+            <legend>Dificuldade</legend>
+          </fieldset>
+
+          <div class="cta">
+            <a class="btn big" id="enter" href="duel.html">Entrar na arena</a>
+            <p class="status" id="status" aria-live="polite"></p>
+          </div>
+        </div>
+        <div class="stage">
+          <canvas class="stage-canvas" id="stage" aria-label="Suas três cartas mais fortes de hoje"></canvas>
+        </div>
+      </section>
+
+      <section class="ledger" aria-labelledby="deck-title">
+        <div class="deck">
+          <div class="ledger-head">
+            <h2 id="deck-title">Seu deck de hoje</h2>
+            <p id="deck-meta"></p>
+          </div>
+          <ul class="deck-rail" id="deck-rail"></ul>
+        </div>
+        <aside class="rival plate" aria-labelledby="rival-title">
+          <h2 id="rival-title">O rival</h2>
+          <div class="rival-backs" aria-hidden="true">
+            <img src="src/assets/card-back.svg" alt="" /><img src="src/assets/card-back.svg" alt="" /><img src="src/assets/card-back.svg" alt="" />
+          </div>
+          <dl class="rival-stats" id="rival-stats"></dl>
+          <p class="rival-note">O deck dele fica escondido até o duelo.</p>
+        </aside>
+      </section>
+    </main>
+
+    <script type="module" src="src/ui/home.js"></script>
+  </body>
+</html>

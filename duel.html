@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#020605" />
+    <title>RushDaily · Arena</title>
+    <link rel="icon" href="src/assets/logo-mark.png" type="image/png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,300..900;1,62..125,300..900&family=Dela+Gothic+One&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="src/styles/rush.css" />
+    <link rel="stylesheet" href="src/styles/duel.css" />
+  </head>
+  <body class="arena">
+    <script src="src/ui/entering.js"></script>
+    <canvas class="scene-canvas" id="mat" aria-hidden="true"></canvas>
+
+    <header class="arena-top">
+      <a class="leave" href="index.html" id="leave" aria-label="Sair da arena"><img src="src/assets/logo-mark.png" alt="" width="34" height="36" /><span>Sair da arena</span></a>
+      <p class="turn-chip" id="turn-chip"></p>
+      <button class="help-chip" id="help-toggle" type="button" aria-expanded="false" aria-controls="help">Como jogar</button>
+    </header>
+
+    <main class="board">
+      <section class="row enemy" aria-label="Lado do rival">
+        <div class="duelist plate" id="enemy-plate" data-drop="direct">
+          <p class="who" id="enemy-name"></p>
+          <p class="lp"><span class="lp-value" id="enemy-lp"></span><span class="lp-label">PV</span></p>
+          <div class="lp-bar"><i id="enemy-bar"></i></div>
+          <div class="enemy-hand" id="enemy-hand"></div>
+        </div>
+        <div class="zones">
+          <div class="szones" id="enemy-backrow" aria-label="Magias e Armadilhas do rival"></div>
+          <div class="mzones" id="enemy-field" aria-label="Monstros do rival"></div>
+        </div>
+        <div class="piles">
+          <div class="pile" title="Deck do rival"><img src="src/assets/card-back.svg" alt="" /><span id="enemy-deck"></span></div>
+          <div class="pile grave" title="Cemitério do rival"><span id="enemy-grave"></span></div>
+        </div>
+      </section>
+
+      <div class="midline"><p class="log" id="log" aria-live="polite"></p></div>
+
+      <section class="row player" aria-label="Seu lado">
+        <div class="duelist plate">
+          <p class="who">Você <span class="who-key" id="player-key"></span></p>
+          <p class="lp"><span class="lp-value" id="player-lp"></span><span class="lp-label">PV</span></p>
+          <div class="lp-bar"><i id="player-bar"></i></div>
+        </div>
+        <div class="zones">
+          <div class="mzones" id="player-field" aria-label="Seus monstros"></div>
+          <div class="szones" id="player-backrow" aria-label="Suas Magias e Armadilhas"></div>
+        </div>
+        <div class="piles">
+          <div class="pile" title="Seu deck"><img src="src/assets/card-back.svg" alt="" /><span id="player-deck"></span></div>
+          <div class="pile grave" title="Seu cemitério"><span id="player-grave"></span></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="tray">
+      <div class="dock">
+        <div class="tip" id="tip" role="status" hidden>
+          <p id="tip-text"></p>
+          <div class="tip-actions"><button class="btn ghost" id="tip-skip" type="button">Pular</button><button class="btn" id="tip-next" type="button">Próxima</button></div>
+        </div>
+        <p class="hint" id="hint"></p>
+        <div class="dock-actions">
+          <button class="btn heart-btn" id="heart" type="button" hidden>Coração das Cartas</button>
+          <button class="btn danger" id="direct" type="button" hidden>Ataque direto</button>
+          <button class="btn ghost" id="end" type="button">Encerrar turno</button>
+        </div>
+      </div>
+      <div class="hand" id="hand" aria-label="Sua mão"></div>
+    </footer>
+
+    <aside class="help scroll" id="help" hidden>
+      <h2>Como jogar</h2>
+      <ul>
+        <li><b>Toque</b> numa carta para ler a descrição.</li>
+        <li><b>Toque duas vezes</b> para deitar ou levantar a carta: em pé entra em Ataque, deitada em Defesa. No campo, troca a posição.</li>
+        <li><b>Segure</b> para virar a carta de costas, mantendo a posição. Segurar sua carta virada no campo desvira ela.</li>
+        <li><b>Arraste</b> a carta até uma zona que acender. Para atacar, arraste seu monstro até o alvo.</li>
+        <li>Nível 5 e 6 pedem 1 tributo; nível 7 ou mais, 2. Solte em cima do monstro que vai virar tributo.</li>
+        <li>Armadilhas entram viradas e disparam quando o rival declara um ataque, a partir do turno seguinte.</li>
+        <li>Todo turno você compra até ficar com 5 cartas. <b>Quem precisa comprar e não tem cartas no deck perde</b>: a pilha fica vermelha quando restam 6 ou menos.</li>
+      </ul>
+      <p>Teclado: Enter escolhe a carta e depois a zona; I lê, D deita, V vira.</p>
+    </aside>
+
+    <div class="zoom" id="zoom" aria-hidden="true"></div>
+    <div class="banner" id="banner" aria-hidden="true"><span></span></div>
+    <div class="cast" id="cast" aria-hidden="true"></div>
+    <div class="enigma-burst" id="enigma-burst" hidden><canvas id="enigma-canvas" aria-hidden="true"></canvas><p>O Enigma do Milênio se desfaz e libera o Coração das Cartas</p></div>
+
+    <dialog class="prompt plate" id="trap-prompt">
+      <p class="prompt-kicker" id="trap-kicker"></p>
+      <div class="prompt-cards" id="trap-cards"></div>
+      <p class="prompt-desc" id="trap-desc"></p>
+      <div class="result-actions">
+        <button class="btn" id="trap-yes" type="button">Ativar armadilha</button>
+        <button class="btn ghost" id="trap-no" type="button">Deixar passar</button>
+      </div>
+    </dialog>
+
+    <dialog class="result" id="result">
+      <p class="result-kicker" id="result-kicker"></p>
+      <h1 class="result-title" id="result-title"></h1>
+      <p class="result-copy" id="result-copy"></p>
+      <div class="result-actions">
+        <a class="btn" id="result-main" href="index.html">Voltar ao desafio</a>
+        <button class="btn ghost" id="share" type="button">Compartilhar</button>
+        <button class="btn ghost" id="rematch" type="button">Jogar de novo</button>
+      </div>
+    </dialog>
+
+    <script type="module" src="src/ui/duel.js"></script>
+  </body>
+</html>
