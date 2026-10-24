@@ -44,6 +44,7 @@ const saida = (cmd, cmdArgs, env = {}) => spawnSync(cmd, cmdArgs, { encoding: 'u
 const py = (script, ...resto) => rodar('python3', [script, ...resto]);
 // O importador clássico usa -I (modo isolado), como no README.
 const classico = (...resto) => rodar('python3', ['-I', 'tools/classic/import_cards.py', ...resto]);
+const rush = (...resto) => rodar('python3', ['-I', 'tools/rush/import_rush.py', ...resto]);
 const existe = (...partes) => existsSync(p(...partes));
 const arquivos = (dir, re) => (existsSync(dir) ? readdirSync(dir).filter((n) => re.test(n)) : []);
 
@@ -150,10 +151,19 @@ const ETAPAS = [
       if (force || !cache('cards.cdb') || !cache('ygopro-pt.json') || !existe('tools/classic/cache/CardScripts/official')) classico('fetch');
       else log('fetch: cache já existe');
       if (force || !cache('decks.json')) classico('decks'); else log('decks: cache já existe');
-      if (force || !existe('src/data/classic', `s${temporadas}.json`) || !existe('src/vendor/card-scripts/index.json')) classico('build', '--ate', String(temporadas));
+      if (force || !existe('src/data/classic', `s${temporadas}.json`) || !existe('src/vendor/card-scripts/index.json') || !existe('src/vendor/card-scripts/official')) classico('build', '--ate', String(temporadas));
       else log(`build: temporadas 1..${temporadas} já geradas`);
       if (force || !existe('src/data/classic/puzzles.json')) classico('puzzles'); else log('puzzles: já gerados');
       classico('art'); // pula as artes já convertidas
+    },
+  },
+  {
+    nome: 'rush-ocg', desc: 'Rush Duel no motor do EDOPro: BabelCDB (cards-rush.cdb) e CardScripts (rush/) -> src/data/rush/cards.json, src/vendor/card-scripts/rush/',
+    pronto: () => existe('src/data/rush/cards.json') && existe('src/vendor/card-scripts/rush/index.json') && existe('src/vendor/card-scripts/constant.lua'),
+    run() {
+      if (force || !existe('tools/rush/cache/cards-rush.cdb') || !existe('tools/rush/cache/CardScripts/rush')) rush('fetch');
+      else log('fetch: cache já existe');
+      rush('build');
     },
   },
   {
@@ -205,13 +215,13 @@ function avisosVendor() {
   const anda = (dir) => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       const rel = join(dir, e.name);
-      if (e.isDirectory()) { if (!['official', 'assets'].includes(e.name)) anda(rel); } else if (e.name !== 'CHECKSUMS.txt') arquivos.push(rel);
+      if (e.isDirectory()) { if (!['official', 'rush', 'assets'].includes(e.name)) anda(rel); } else if (e.name !== 'CHECKSUMS.txt') arquivos.push(rel);
     }
   };
   anda(p('src/vendor'));
   const sha = existsSync(p('tools/classic/CARDSCRIPTS_SHA')) ? readFileSync(p('tools/classic/CARDSCRIPTS_SHA'), 'utf8').trim() : '?';
   const linhas = arquivos.sort().map((f) => `${createHash('sha256').update(readFileSync(f)).digest('hex')}  ${f.slice(p('src/vendor').length + 1)}`);
-  writeFileSync(p('src/vendor/CHECKSUMS.txt'), `# SHA-256 dos arquivos de src/vendor (sem card-scripts/official e assets/). CardScripts no commit ${sha}.\n# Conferir: cd src/vendor && sha256sum -c --ignore-missing CHECKSUMS.txt\n${linhas.join('\n')}\n`);
+  writeFileSync(p('src/vendor/CHECKSUMS.txt'), `# SHA-256 dos arquivos de src/vendor (sem card-scripts/official, card-scripts/rush e assets/). CardScripts no commit ${sha}.\n# Conferir: cd src/vendor && sha256sum -c --ignore-missing CHECKSUMS.txt\n${linhas.join('\n')}\n`);
   log(`CHECKSUMS.txt: ${linhas.length} arquivos`);
 }
 function npmLibs() {

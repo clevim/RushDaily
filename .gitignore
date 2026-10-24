@@ -14,6 +14,7 @@ src/vendor/
 src/data/cards.mjs
 src/data/classic/*
 !src/data/classic/strings-pt.mjs
+src/data/rush/
 
 # Imagens de cartas e artes: material da Konami (YGOPRODeck, Yugipedia) ou derivado de molduras de terceiros
 src/assets/cards/
