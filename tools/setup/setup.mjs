@@ -122,8 +122,9 @@ const ETAPAS = [
     },
   },
   {
-    nome: 'yugioh', desc: 'yugioh-card (kooriookami, MIT): bundle e molduras reduzidas -> src/vendor/yugioh-card/',
-    pronto: () => existe('src/vendor/yugioh-card/yugioh-card.js') && existe('src/vendor/yugioh-card/assets/yugioh/font/font-list.json'),
+    nome: 'yugioh', desc: 'yugioh-card (kooriookami, MIT): bundle e molduras reduzidas (clássica e Rush) -> src/vendor/yugioh-card/',
+    // A moldura Rush (rush-duel) entrou depois: cache antigo sem ela refaz o bundle.
+    pronto: () => existe('src/vendor/yugioh-card/yugioh-card.js') && existe('src/vendor/yugioh-card/assets/yugioh/font/font-list.json') && existe('src/vendor/yugioh-card/assets/rush-duel/font/font-list.json'),
     run() {
       baixarMolduras();
       npmRender();
@@ -244,9 +245,9 @@ function npmRender(comSkia = false) {
 }
 
 function baixarMolduras() {
-  // Só a pasta "yugioh" (molduras e fontes) é usada; o cache tem o mesmo formato que o render.mjs espera.
+  // Só as pastas "yugioh" (clássica) e "rush-duel" (molduras e fontes) são usadas; o cache tem o formato que os render.mjs esperam.
   const repo = p('tools/classic/cache/yugioh-card');
-  baixarRepo('https://github.com/kooriookami/yugioh-card', repo, SHA_YGO_CARD, ['src/assets/yugioh-card/yugioh']);
+  baixarRepo('https://github.com/kooriookami/yugioh-card', repo, SHA_YGO_CARD, ['src/assets/yugioh-card/yugioh', 'src/assets/yugioh-card/rush-duel']);
   const ponte = p('tools/classic/cache/yugioh-card-assets');
   if (!existsSync(ponte)) symlinkSync(join(repo, 'src/assets/yugioh-card'), ponte, 'dir');
 }
