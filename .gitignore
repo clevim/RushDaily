@@ -1,0 +1,44 @@
+# O repositório guarda só o código, o CSS/HTML, os testes, a documentação e os assets próprios (logo, versos, ícones).
+# Tudo que é dado ou asset de terceiros é gerado por `npm run setup` (tools/setup/).
+
+# Dependências e caches das ferramentas (downloads, bases de dados, clones, artes baixadas)
+node_modules
+tools/**/node_modules/
+tools/**/cache/
+
+# Bibliotecas de terceiros copiadas pelo setup (Three.js, ocgcore-wasm com patch, yugioh-card, qrcode, scripts das cartas,
+# licenças e CHECKSUMS): tudo em src/vendor/ é gerado por `npm run setup`
+src/vendor/
+
+# Dados gerados a partir de fontes de terceiros (Yugipedia, YGOPRODeck, BabelCDB, ProjectIgnis)
+src/data/cards.mjs
+src/data/classic/*
+!src/data/classic/strings-pt.mjs
+
+# Imagens de cartas e artes: material da Konami (YGOPRODeck, Yugipedia) ou derivado de molduras de terceiros
+src/assets/cards/
+src/assets/classic-art/
+src/assets/classic-cards/
+src/assets/cards-sm/
+src/assets/classic-cards-sm/
+
+# Modelo 3D do Enigma (Printables 517699, CC BY-NC-SA): baixado e convertido pelo setup
+src/assets/puzzle/
+
+# Antiga pasta de molduras/fontes do rush-hub; agora o render.py baixa de volta para tools/card-render/cache/
+tools/card-render/vendor/
+
+# Anotações locais: estudos, planos, auditorias e pendências (docs/imagens continua, o README usa)
+docs/**/*.md
+
+# Lixo comum
+.DS_Store
+*.log
+.hallmark/
+__pycache__/
+*.pyc
+server/data/
+
+# Segredos locais (ADMIN_TOKEN do compose)
+.env
+.env.*
