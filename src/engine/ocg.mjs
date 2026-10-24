@@ -8,12 +8,13 @@ import { OcgDuelMode, OcgLocation, OcgMessageType, OcgPosition, OcgProcessResult
  * Uma Invocação Normal por turno, como no clássico. Medido: mediana de 9 turnos, igual ao Speed Duel.
  */
 export const FORMATS = {
+  // O motor não embaralha o deck no início (o servidor do EDOPro faz isso antes): shuffle embaralha pela seed do duelo.
+  // createDuel aceita shuffle: false para repetir partidas e replays gravados antes do embaralhamento.
   rapido: { flags: OcgDuelMode.MODE_MR5 | OcgDuelMode.NO_MAIN_PHASE_2, lp: 4000, hand: 4, main: 20, extra: 5, turnLimit: 20 },
-  classico: { flags: OcgDuelMode.MODE_MR5, lp: 8000, hand: 5, main: 40, extra: 15, turnLimit: 40 }, // 40: corta a cauda longa (mediana 16)
+  classico: { flags: OcgDuelMode.MODE_MR5, lp: 8000, hand: 5, main: 40, extra: 15, turnLimit: 40, shuffle: true }, // 40: corta a cauda longa (mediana 16)
   puzzle: { flags: OcgDuelMode.MODE_MR5, lp: 8000, hand: 0, main: 0, extra: 0, turnLimit: 0 }, // o script do puzzle troca regras, PV e campo
   // Rush Duel oficial: deck de 40 a 60, adicional até 15 (só Fusão), mão inicial 4 e compra até ter 5 (DRAW_UNTIL_5),
   // campo de 3 colunas, sem Fase de Apoio nem Fase Principal 2, Invocações Normais ilimitadas. Scripts em card-scripts/rush/.
-  // O motor não embaralha o deck no início (o servidor do EDOPro faz isso antes): shuffle embaralha pela seed do duelo.
   rush: { flags: OcgDuelMode.MODE_RUSH, lp: 8000, hand: 4, main: 40, extra: 15, turnLimit: 40, scripts: 'rush', shuffle: true },
 };
 
@@ -69,7 +70,7 @@ export function shuffled(list, seed) {
  *   next() roda o motor até ele precisar de uma resposta ou o duelo acabar
  *   e devolve { events, prompt, winner } — prompt é a mensagem SELECT_* a responder.
  */
-export function createDuel(lib, { seed, format = FORMATS.rapido, decks = [], puzzle = null, lp = null, skills = [], cards, readScript, onError = () => {} }) {
+export function createDuel(lib, { seed, format = FORMATS.rapido, decks = [], puzzle = null, lp = null, skills = [], shuffle = format.shuffle, cards, readScript, onError = () => {} }) {
   const startLp = lp || [format.lp, format.lp];
   let aliases = null;
   const aliasOf = (code) => {
@@ -96,7 +97,7 @@ export function createDuel(lib, { seed, format = FORMATS.rapido, decks = [], puz
   for (const name of ['constant.lua', 'utility.lua']) lib.loadScript(handle, name, readScript(name));
   if (puzzle && !lib.loadScript(handle, puzzle.name, puzzle.script)) { lib.destroyDuel(handle); throw new Error('o motor recusou o script do puzzle'); }
   decks.forEach((deck, team) => {
-    const main = format.shuffle ? shuffled(deck.main, `${seed}:deck:${team}`) : deck.main;
+    const main = shuffle ? shuffled(deck.main, `${seed}:deck:${team}`) : deck.main;
     for (const [ids, location] of [[main, OcgLocation.DECK], [deck.extra || [], OcgLocation.EXTRA]]) {
       for (const code of ids) lib.duelNewCard(handle, { team, duelist: 0, code, controller: team, location, sequence: 0, position: OcgPosition.FACEDOWN_DEFENSE });
     }
