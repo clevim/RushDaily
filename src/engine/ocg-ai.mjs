@@ -1,6 +1,6 @@
 // IA gulosa para o motor clássico: responde qualquer pergunta do ocgcore com uma regra simples.
 // ponytail: sem busca ainda; a fase 4 troca decide() por simulação (o motor é determinístico e rápido).
-import { cardMatchesOpcode, OcgLocation as L, OcgMessageType as M, OcgPosition as P, OcgResponseType as R } from '../vendor/ocgcore/index.js';
+import { cardMatchesOpcode, OcgLocation as L, OcgMessageType as M, OcgOpCode, OcgPosition as P, OcgResponseType as R } from '../vendor/ocgcore/index.js';
 import { toCoreCard } from './ocg.mjs';
 
 /** Os `count` primeiros bits ligados de `available` (Tipos e Atributos a declarar). */
@@ -153,7 +153,10 @@ export function decide(prompt, { view, me, cards, state, memory }) {
       // Declara a carta mais popular que cumpre a regra do efeito (ex.: "declare um monstro de Efeito").
       const valid = [...cards.values()].filter((card) => card.name && cardMatchesOpcode(toCoreCard(card), prompt.opcodes));
       const best = valid.sort((a, b) => (b.pop || 0) - (a.pop || 0))[0];
-      return { type: R.ANNOUNCE_CARD, card: best?.id ?? 0 };
+      if (best) return { type: R.ANNOUNCE_CARD, card: best.id };
+      // Nenhuma carta do pool serve: o efeito pede códigos fixos (scripts Rush citam o código da carta clássica, que só existe como alias).
+      const codes = prompt.opcodes.filter((op, i) => prompt.opcodes[i + 1] === OcgOpCode.ISCODE && op < 0x100000000n).map(Number);
+      return { type: R.ANNOUNCE_CARD, card: codes.find((code) => [...cards.values()].some((card) => card.alias === code)) ?? codes[0] ?? 0 };
     }
     case M.ROCK_PAPER_SCISSORS: return { type: R.ROCK_PAPER_SCISSORS, value: 1 + (state.turn % 3) };
     default: return null;

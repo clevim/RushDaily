@@ -11,7 +11,18 @@ export const FORMATS = {
   rapido: { flags: OcgDuelMode.MODE_MR5 | OcgDuelMode.NO_MAIN_PHASE_2, lp: 4000, hand: 4, main: 20, extra: 5, turnLimit: 20 },
   classico: { flags: OcgDuelMode.MODE_MR5, lp: 8000, hand: 5, main: 40, extra: 15, turnLimit: 40 }, // 40: corta a cauda longa (mediana 16)
   puzzle: { flags: OcgDuelMode.MODE_MR5, lp: 8000, hand: 0, main: 0, extra: 0, turnLimit: 0 }, // o script do puzzle troca regras, PV e campo
+  // Rush Duel oficial: deck de 40 a 60, adicional até 15 (só Fusão), mão inicial 4 e compra até ter 5 (DRAW_UNTIL_5),
+  // campo de 3 colunas, sem Fase de Apoio nem Fase Principal 2, Invocações Normais ilimitadas. Scripts em card-scripts/rush/.
+  // O motor não embaralha o deck no início (o servidor do EDOPro faz isso antes): shuffle embaralha pela seed do duelo.
+  rush: { flags: OcgDuelMode.MODE_RUSH, lp: 8000, hand: 4, main: 40, extra: 15, turnLimit: 40, scripts: 'rush', shuffle: true },
 };
+
+/**
+ * Zonas válidas no campo de 3 colunas (THREE_COLUMNS_FIELD, formato rush): o motor bloqueia as colunas das pontas,
+ * então só as sequences 1, 2 e 3 existem em MZONE e em SZONE (as 0 e 4 ficam sempre vazias). SZONE 5 é a Magia de Campo.
+ * Sem zonas extras de monstro (MZONE 5/6) nem de Pêndulo (SZONE 6/7).
+ */
+export const RUSH_ZONES = { monsters: [1, 2, 3], spells: [1, 2, 3], field: 5 };
 
 export const TYPE = { MONSTER: 0x1, SPELL: 0x2, TRAP: 0x4, NORMAL: 0x10, EFFECT: 0x20, FUSION: 0x40, RITUAL: 0x80, TOKEN: 0x4000, SYNCHRO: 0x2000, XYZ: 0x800000, PENDULUM: 0x1000000, LINK: 0x4000000 };
 const EXTRA_TYPES = TYPE.FUSION | TYPE.SYNCHRO | TYPE.XYZ | TYPE.LINK;
@@ -40,6 +51,15 @@ function seedOf(text) {
   return words;
 }
 
+/** Embaralha (Fisher-Yates) uma cópia da lista com um gerador fixo pela seed: mesma seed, mesma ordem nos dois aparelhos. */
+export function shuffled(list, seed) {
+  let value = Number(seedOf(seed)[0] & 0xffffffffn) || 1;
+  const random = () => { value ^= value << 13; value ^= value >>> 17; value ^= value << 5; return (value >>> 0) / 4294967296; };
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i -= 1) { const j = Math.floor(random() * (i + 1)); [out[i], out[j]] = [out[j], out[i]]; }
+  return out;
+}
+
 /**
  * Cria um duelo. decks: [{ main: [ids], extra: [ids] }, { ... }] (jogador 0 e 1).
  * puzzle: { name, script } no lugar dos decks: o script monta campo, mão e PV (Debug.*) e aux.BeginPuzzle dá a derrota no fim do turno.
@@ -48,20 +68,33 @@ function seedOf(text) {
  *   e devolve { events, prompt, winner } — prompt é a mensagem SELECT_* a responder.
  */
 export function createDuel(lib, { seed, format = FORMATS.rapido, decks = [], puzzle = null, cards, readScript, onError = () => {} }) {
+  let aliases = null;
+  const aliasOf = (code) => {
+    if (!aliases) { aliases = new Map(); for (const card of cards.values()) if (card.alias && !cards.has(card.alias) && !aliases.has(card.alias)) aliases.set(card.alias, card); }
+    return aliases.get(code);
+  };
   const handle = lib.createDuel({
     flags: format.flags,
     seed: seedOf(seed),
     team1: { drawCountPerTurn: 1, startingDrawCount: format.hand, startingLP: format.lp },
     team2: { drawCountPerTurn: 1, startingDrawCount: format.hand, startingLP: format.lp },
-    cardReader: (code) => { const card = cards.get(code); return card ? toCoreCard(card) : null; },
-    scriptReader: (name) => readScript(name.match(/^c\d+\.lua$/) ? `official/${name}` : name),
+    cardReader: (code) => {
+      const card = cards.get(code);
+      if (card) return toCoreCard(card);
+      // Código que só existe como alias (ex.: script Rush que declara a carta clássica "X-Head Cannon"): usa a carta que aponta para ele.
+      const twin = aliasOf(code);
+      return twin ? { ...toCoreCard(twin), code, alias: 0 } : null;
+    },
+    // Script de carta (cNNN.lua) vem da pasta do formato: official/ (padrão) ou rush/.
+    scriptReader: (name) => readScript(name.match(/^c\d+\.lua$/) ? `${format.scripts || 'official'}/${name}` : name),
     errorHandler: (type, text) => onError(text),
   });
   if (!handle) throw new Error('o motor não criou o duelo');
   for (const name of ['constant.lua', 'utility.lua']) lib.loadScript(handle, name, readScript(name));
   if (puzzle && !lib.loadScript(handle, puzzle.name, puzzle.script)) { lib.destroyDuel(handle); throw new Error('o motor recusou o script do puzzle'); }
   decks.forEach((deck, team) => {
-    for (const [ids, location] of [[deck.main, OcgLocation.DECK], [deck.extra || [], OcgLocation.EXTRA]]) {
+    const main = format.shuffle ? shuffled(deck.main, `${seed}:deck:${team}`) : deck.main;
+    for (const [ids, location] of [[main, OcgLocation.DECK], [deck.extra || [], OcgLocation.EXTRA]]) {
       for (const code of ids) lib.duelNewCard(handle, { team, duelist: 0, code, controller: team, location, sequence: 0, position: OcgPosition.FACEDOWN_DEFENSE });
     }
   });
