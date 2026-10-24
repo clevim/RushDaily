@@ -8,9 +8,9 @@ Jogo web de cartas de **Yu-Gi-Oh!**, feito por fã, sem fins comerciais. Tem um 
 
 ## O que é
 
-- **Desafio do dia (Rush Duel):** todo mundo recebe o mesmo desafio no mesmo dia: um deck seu, um deck do rival e uma dificuldade. Vencer libera um booster.
+- **Desafio do dia (Rush Duel):** todo mundo recebe o mesmo desafio no mesmo dia: um confronto de Tipos (por exemplo, Bestas contra Psíquicos), um deck seu, o deck do rival e uma dificuldade. O duelo roda no modo Rush do motor do EDOPro, com as 3.232 cartas Rush, correntes de efeitos e as perguntas do próprio motor. Vencer libera um booster.
 - **Coleção e decks clássicos:** o booster traz cartas do Yu-Gi-Oh! clássico, organizadas por temporada. Hoje está liberada a Temporada 1, com cerca de 3.100 cartas. Você monta decks no formato clássico normal (Principal de 40 a 60 cartas, Adicional de até 15).
-- **Motor do EDOPro:** as partidas clássicas rodam no ocgcore, o núcleo do EDOPro compilado para WebAssembly, com os scripts das cartas do ProjectIgnis/CardScripts.
+- **Motor do EDOPro:** o desafio Rush e as partidas clássicas rodam no ocgcore, o núcleo do EDOPro compilado para WebAssembly, com os scripts das cartas do ProjectIgnis/CardScripts.
 - **PvP assíncrono por link:** você envia o seu deck por um link; quem abre o link joga contra ele, com o deck pilotado pela IA. Não há servidor de partidas.
 - **Enigma do Milênio:** um quebra-cabeça 3D mensal. Cada vitória diária dá uma peça; o mês completo libera a carga Coração das Cartas.
 - **Cartas desenhadas no navegador:** as cartas clássicas usam a moldura oficial e recebem texto em português.
@@ -47,9 +47,14 @@ Celular (390x844):
 
 ### Desafio do dia
 
-Na tela **Hoje** você vê o confronto do dia (por exemplo, Bestas-Guerreiras contra Feiticeiros), a regra do dia e o deck que recebeu. Escolha a dificuldade (Aprendiz, Duelista, Elite ou Caos, indicadas por estrelas na luva) e entre na arena.
+Na tela **Hoje** você vê o confronto do dia (por exemplo, Bestas contra Psíquicos), o deck de 40 cartas que recebeu (e as Fusões do Adicional) e o rival. O confronto e o seu deck são os mesmos para todo mundo e não mudam com a dificuldade; a dificuldade (Aprendiz, Duelista, Elite ou Caos, indicadas por estrelas na luva) escolhe o deck do rival entre quatro do Tipo dele, do mais fraco ao mais forte, os PV dele (4.000 a 7.000, contra os seus 6.000) e o jeito da IA jogar.
 
-Na arena Rush, arraste as cartas da mão para o campo, toque para ler uma carta, toque duas vezes para deitar e segure para virar. Ataques liberam no turno seguinte. Vencer o duelo libera o booster do dia.
+A arena é Rush Duel de verdade, no motor do EDOPro: Invocações-Normais ilimitadas, compra até ficar com 5 cartas, campo de 3 colunas (Campo, Cemitério, Adicional e Deck nas pontas), Invocação-Tributo, Fusão e Máximo, e no máximo 30 turnos (no limite, vence quem tiver mais PV). Você sempre começa e não ataca no primeiro turno.
+
+- **Arraste** da mão até uma zona acesa para Invocar ou ativar; solte um monstro de Nível 5 ou mais **em cima** do monstro que vai virar tributo. Na Batalha, arraste seu monstro até o alvo ou até a placa do rival.
+- **Toque** numa carta para ler e ver as ações dela agora; **toque duas vezes** (ou segure) na mão para alternar entre jogar e baixar virada. No teclado, Tab e Enter abrem a mesma leitura com as ações.
+- A **Corrente** aparece ao lado do campo enquanto monta (1, 2, 3...) e resolve de trás para frente; quando você pode responder, o motor pergunta. A narração do lado lista as jogadas de cada turno.
+- A partida fica salva: sair e voltar no mesmo dia retoma do ponto onde parou. Vencer libera o booster do dia e a peça do Enigma; o resultado vira uma grade para compartilhar.
 
 ### Booster
 
@@ -67,7 +72,7 @@ Na tela de decks, copie o link do seu deck (`arena.html?vs=…`) e envie para um
 
 ### Enigma do Milênio
 
-A tela **Enigma** mostra o mês atual em 3D, com um calendário de dias. Cada dia com vitória no desafio diário libera uma peça. Dia sem vitória fica em branco, e o mês não fecha se faltar algum. Com o mês completo, a carga **Coração das Cartas** passa a aparecer nos duelos e puxa a carta-chave do deck.
+A tela **Enigma** mostra o mês atual em 3D, com um calendário de dias. Cada dia com vitória no desafio diário libera uma peça. Dia sem vitória fica em branco, e o mês não fecha se faltar algum. Com o mês completo, a carga **Coração das Cartas** entra no desafio do dia como uma Skill do EDOPro: uma vez por duelo, na Fase Principal, você escolhe 1 carta do seu Deck e adiciona à mão (e o Enigma do mês recomeça).
 
 ### Arena clássica (treino)
 
@@ -220,22 +225,22 @@ Efeito esperado por duelo clássico: ~85 requisições de `.lua` (≈ 600 KB sem
 
 ```text
 index.html            Desafio do dia (Rush): leque 3D, confronto, dificuldade, deck do dia
-duel.html             Arena Rush (motor próprio)
+duel.html             Arena Rush do desafio do dia (motor do EDOPro, modo Rush)
 screens.html          Coleção, Decks, Booster 3D, Enigma do Milênio, Histórico e Ajustes
 arena.html            Arena clássica (motor do EDOPro): PvP por link, treino, puzzles e replay
 src/
   engine/             Regras e IA, sem DOM nem Three.js
-    game-engine.mjs   Rush: posições, viradas, magias/armadilhas, Coração das Cartas
-    rules.mjs · effects.mjs · ai.mjs · daily-generator.mjs
-    ocg.mjs           Ponte com o ocgcore (WebAssembly): formatos, duelo, limite de turnos
+    ocg.mjs           Ponte com o ocgcore (WebAssembly): formatos, duelo, PV por jogador, Skills, limite de turnos
+    daily-generator.mjs  Desafio do dia: confronto de Tipos, decks Rush e rival por dificuldade
+    rush-deck.mjs     Decks Rush gerados por tema, com validação das regras de deck
+    rush-ai.mjs       IA do rival no Rush (níveis aprendiz, duelista, elite e caos)
+    heart.mjs         Coração das Cartas como Skill do EDOPro (script Lua próprio)
     ocg-ai.mjs        IA do rival no clássico
     classic-deck.mjs  Decks gerados por sinergia de decks reais
-    rush-deck.mjs     Decks Rush (motor do EDOPro) gerados por tema, com validação das regras de deck
-  ui/                 Interface: home.js, duel.js, screens.js, arena.js, common.js (nav, chave, Enigma),
-                      scene.js (Three.js), classic-store.js (coleção/decks/link de desafio),
-                      classic-render.js (desenho das cartas sob demanda), classic-card*.js,
-                      rush-render.js e rush-card-data.js (cartas Rush do motor do EDOPro)
-  styles/             rush.css (tokens e componentes) + home, duel, screens, arena
+  ui/                 Interface: home.js, duel.js (arena Rush), arena.js (arena clássica), ocg-ask.js (perguntas do
+                      motor nas duas arenas), screens.js, common.js (nav, chave, Enigma), scene.js (Three.js),
+                      rush-render.js e rush-info.js (cartas Rush), classic-store.js, classic-render.js, classic-card*.js
+  styles/             rush.css (tokens e componentes) + home, duel (base das arenas), rush-arena, screens, arena
   data/               Dados gerados pelo setup (exceto classic/strings-pt.mjs, editado à mão)
   assets/             Logo, versos e ícones do projeto; cartas, artes e Enigma vêm do setup
   vendor/             Three.js, ocgcore-wasm, yugioh-card e scripts das cartas (vêm do setup)
