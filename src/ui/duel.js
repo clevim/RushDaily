@@ -1,4 +1,4 @@
-import { RULES, activateSpell, activateTrap, attack, changePosition, createGame, endTurn, heartOfTheCards, serializeGame, setCard, summon, trapsFor } from '../engine/game-engine.mjs';
+import { RULES, activateSpell, activateTrap, attack, changePosition, createGame, endTurn, heartOfTheCards, heartRanking, serializeGame, setCard, summon, trapsFor } from '../engine/game-engine.mjs';
 import { chooseAction, chooseTrap, recordOutcome } from '../engine/ai.mjs';
 import { canAttackNow, canChangePosition, canSet, canSummon, isAttacker, tributesFor, zoneOf } from '../engine/rules.mjs';
 import { canActivate } from '../engine/effects.mjs';
@@ -45,6 +45,7 @@ const ERRORS = {
   FIRST_TURN: 'Quem começa não ataca no primeiro turno.',
   NOT_YOUR_TURN: 'Espere a sua vez.',
   DUEL_OVER: 'O duelo já terminou.',
+  NOT_IN_DECK: 'Essa carta não está mais no deck.',
   HEART_USED: 'O Coração das Cartas já foi usado neste duelo.',
 };
 
@@ -870,19 +871,49 @@ function shatterEnigma() {
   });
 }
 
-$('#heart').addEventListener('click', () => playerAction(async () => {
-  const from = $('#player-deck').closest('.pile').getBoundingClientRect();
-  const event = heartOfTheCards(game, 'player');
-  useHeart(playerKey);
-  hasHeart = false;
-  save(); // grava já: se a aba fechar na animação, a carga gasta não pode voltar sem o efeito
-  await shatterEnigma();
-  scene.burst(GOLD);
-  render();
-  await flyFrom(el(event.card), from);
-  await cast(findCard(event.card), 'player', 'puxou com o Coração das Cartas');
-  log(`O Coração das Cartas trouxe ${event.name}.`);
-}));
+/* Coração das Cartas: o jogador escolhe qualquer carta do deck; cancelar não gasta a carga. */
+let heartPick = null;
+function renderHeartPick() {
+  const list = heartRanking(game, 'player');
+  if (!list.some((card) => card.uid === heartPick)) heartPick = list[0]?.uid ?? null;
+  const picked = list.find((card) => card.uid === heartPick);
+  $('#heart-list').innerHTML = list.map((card, index) => `<button class="heart-opt ${card.uid === heartPick ? 'on' : ''}" type="button" data-uid="${card.uid}" aria-pressed="${card.uid === heartPick}" aria-label="${escape(card.name)}${index === 0 ? ', recomendada' : ''}"><span class="card ${foil(card)}"><img src="${cardImage(card)}" alt="" loading="lazy" draggable="false"></span>${index === 0 ? '<i>Sugerida</i>' : ''}</button>`).join('');
+  $('#heart-name').textContent = picked ? picked.name : '';
+  $('#heart-ok').disabled = !picked;
+}
+function openHeartPick() {
+  heartPick = null;
+  renderHeartPick();
+  $('#heart-pick').hidden = false;
+  $('#heart-list .on')?.scrollIntoView({ block: 'nearest' });
+}
+function closeHeartPick() { $('#heart-pick').hidden = true; hideZoom(); }
+$('#heart').addEventListener('click', () => { if (myTurn() && !busy) openHeartPick(); });
+$('#heart-list').addEventListener('click', (event) => {
+  const opt = event.target.closest('.heart-opt');
+  if (!opt) return;
+  heartPick = [...game.player.deck].find((card) => String(card.uid) === opt.dataset.uid)?.uid ?? heartPick;
+  renderHeartPick();
+});
+$('#heart-view').addEventListener('click', () => { const card = game.player.deck.find((item) => item.uid === heartPick); if (card) showZoom(card); });
+$('#heart-cancel').addEventListener('click', closeHeartPick);
+$('#heart-ok').addEventListener('click', () => {
+  const uid = heartPick;
+  closeHeartPick();
+  playerAction(async () => {
+    const from = $('#player-deck').closest('.pile').getBoundingClientRect();
+    const event = heartOfTheCards(game, 'player', { uid });
+    useHeart(playerKey);
+    hasHeart = false;
+    save(); // grava já: se a aba fechar na animação, a carga gasta não pode voltar sem o efeito
+    await shatterEnigma();
+    scene.burst(GOLD);
+    render();
+    await flyFrom(el(event.card), from);
+    await cast(findCard(event.card), 'player', 'puxou com o Coração das Cartas');
+    log(`O Coração das Cartas trouxe ${event.name}.`);
+  });
+});
 
 $('#tribute-ok').addEventListener('click', confirmTribute);
 $('#tribute-cancel').addEventListener('click', () => cancelTribute());

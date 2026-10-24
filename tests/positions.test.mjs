@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { activateTrap, attack, changePosition, createGame, endTurn, heartOfTheCards, setCard, summon, trapsFor } from '../src/engine/game-engine.mjs';
+import { activateTrap, attack, changePosition, createGame, endTurn, heartOfTheCards, heartRanking, setCard, summon, trapsFor } from '../src/engine/game-engine.mjs';
 
 const knight = { id: 1, name: 'Cavaleiro', type: 'monster', atk: 1800, def: 1000, level: 4 };
 const wall = { id: 2, name: 'Muralha', type: 'monster', atk: 500, def: 2000, level: 4 };
@@ -62,6 +62,22 @@ console.log('positions: defense battle, face-down flip, position change and trap
   assert.equal(pulled.name, 'Ás');
   assert.equal(heart.player.hand.length, before + 1);
   assert.throws(() => heartOfTheCards(heart, 'player'), /HEART_USED/);
+
+  // Com escolha: qualquer carta do deck; uid fora do deck é recusado e não gasta o poder.
+  const heart2 = createGame({ seed: 'heart2', playerDeck: [...Array(9).fill(weak), ace], enemyDeck: Array(10).fill(brute) });
+  endTurn(heart2, 'player');
+  endTurn(heart2, 'enemy');
+  const chosen = heart2.player.deck[heart2.player.deck.length - 1];
+  const handUid = heart2.player.hand[0].uid;
+  assert.throws(() => heartOfTheCards(heart2, 'player', { uid: handUid }), /NOT_IN_DECK/);
+  assert.ok(!heart2.player.heartUsed);
+  assert.equal(heartRanking(heart2, 'player').length, heart2.player.deck.length);
+  const decked = heart2.player.deck.length;
+  const event = heartOfTheCards(heart2, 'player', { uid: chosen.uid });
+  assert.equal(event.card, chosen.uid);
+  assert.ok(heart2.player.hand.some((card) => card.uid === chosen.uid));
+  assert.equal(heart2.player.deck.length, decked - 1);
+  assert.throws(() => heartOfTheCards(heart2, 'player', { uid: heart2.player.deck[0].uid }), /HEART_USED/);
 }
 
 // Regra da casa: virado em Ataque; trocar posição mantendo a face; desvirar mantendo a posição.

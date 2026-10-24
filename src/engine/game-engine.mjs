@@ -344,18 +344,24 @@ function keyValue(state, owner, card) {
   return opponent.field.some(isAttacker) ? 0.6 : 0.2;
 }
 
-/** Coração das Cartas: uma vez por duelo, puxa do deck a carta-chave para a mesa atual. */
-export function heartOfTheCards(state, owner) {
+/** Deck ordenado pelas cartas mais fortes para a mesa atual (sugestão do Coração das Cartas). */
+export function heartRanking(state, owner) {
+  const player = playerFor(state, owner);
+  return player.deck.map((card) => ({ card, value: keyValue(state, owner, card) })).sort((a, b) => b.value - a.value).map((item) => item.card);
+}
+
+/** Coração das Cartas: uma vez por duelo, puxa para a mão a carta escolhida do deck (sem escolha, a carta-chave). */
+export function heartOfTheCards(state, owner, { uid = null } = {}) {
   assertTurn(state, owner);
   const player = playerFor(state, owner);
   if (player.heartUsed) throw new Error('HEART_USED');
   if (!player.deck.length) throw new Error('DECK_EMPTY');
-  let best = player.deck[0];
-  for (const card of player.deck) if (keyValue(state, owner, card) > keyValue(state, owner, best)) best = card;
-  player.deck.splice(player.deck.indexOf(best), 1);
-  player.hand.push(best);
+  const picked = uid == null ? heartRanking(state, owner)[0] : player.deck.find((card) => card.uid === uid);
+  if (!picked) throw new Error('NOT_IN_DECK');
+  player.deck.splice(player.deck.indexOf(picked), 1);
+  player.hand.push(picked);
   player.heartUsed = true;
-  const event = { type: 'heart', owner, card: best.uid, name: best.name };
+  const event = { type: 'heart', owner, card: picked.uid, name: picked.name };
   state.events.push(event);
   return event;
 }

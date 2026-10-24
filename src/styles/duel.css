@@ -392,3 +392,19 @@ body.entering.reveal .board, body.entering.reveal .tray { opacity: 1; animation:
 .tip-actions { display: flex; gap: 6px; }
 .tip .btn { min-height: 40px; padding: 0 14px; font-size: 0.85rem; }
 .tip-target { outline: 2px dashed var(--gold-hi); outline-offset: 4px; }
+
+/* Seletor do Coração das Cartas */
+.heart-pick { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 12px; background: rgb(2 6 5 / 0.88); }
+.heart-pick[hidden] { display: none; }
+.heart-pick-box { width: min(560px, 100%); max-height: 100%; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto auto; gap: 10px; padding: 16px; box-sizing: border-box; max-height: calc(100dvh - 24px); }
+.heart-pick-box h2 { margin: 0; font: 400 1.3rem/1 var(--display); color: var(--gold-hi); }
+.heart-pick-box p { margin: 0; color: var(--ivory-dim); }
+.heart-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; overflow-y: auto; padding: 4px; min-height: 0; }
+.heart-opt { position: relative; padding: 0; border: 2px solid transparent; border-radius: 6px; background: none; cursor: pointer; }
+.heart-opt .card { display: block; width: 100%; }
+.heart-opt img { width: 100%; display: block; }
+.heart-opt.on { border-color: var(--gold); box-shadow: 0 0 14px rgb(var(--gold-rgb) / 0.6); }
+.heart-opt i { position: absolute; top: 4px; left: 4px; padding: 1px 6px; border-radius: 4px; background: var(--gold); color: var(--ink-solid); font: 700 0.68rem/1.4 var(--display); font-style: normal; }
+.heart-pick-box .heart-name { color: var(--ivory); font-weight: 700; min-height: 1.3em; }
+.heart-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.heart-actions .btn { min-width: 0; min-height: 44px; padding-inline: 8px; font-size: 0.9rem; }
