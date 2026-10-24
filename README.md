@@ -111,6 +111,7 @@ O setup é idempotente: o que já existe é pulado, e se uma etapa falhar basta 
 | `rush` | yaml-yugi (`rush.json`) e Yugipedia (artes e scans das cartas Rush) | `src/data/cards.mjs` (usa `pool-en.json` e `pt-br.json` do repositório) | Artes da Konami |
 | `rush-render` | repositório JLtheking2/rush-hub (molduras, ícones e fontes) e o selo LEGEND do yugioh-card, em `tools/card-render/cache/` | `src/assets/cards/*.webp` | rush-hub sem licença declarada; ver pendências |
 | `classico` | YGOPRODeck (dados en/pt, decks de jogadores e artes recortadas), BabelCDB, ProjectIgnis/CardScripts e ProjectIgnis/Puzzles | `src/data/classic/`, `src/vendor/card-scripts/`, `src/assets/classic-art/` | Dados e artes da Konami; scripts AGPL-3.0 |
+| `rush-ocg` | BabelCDB (`cards-rush.cdb`) e ProjectIgnis/CardScripts (pasta `rush/` e utilitários da raiz, mesmo commit do clássico), em `tools/rush/cache/` | `src/data/rush/cards.json`, `src/vendor/card-scripts/rush/` (usa `pt-br.json` e `pool-en.json` do repositório para o texto em PT) | Dados da Konami; scripts AGPL-3.0 |
 | `classico-render` | (usa as molduras da etapa `yugioh` e as artes da etapa `classico`) | `src/assets/classic-cards/*.webp` (miniaturas pré-desenhadas) | Derivadas de itens acima |
 | `vendor-avisos` | (local) | `src/vendor/LICENSE-three.txt`, `yugioh-card/LICENSE`, `ocgcore/COPYING-AGPL-3.0` e `src/vendor/CHECKSUMS.txt` (SHA-256) | Roda sempre; barata |
 | `enigma` | API pública do Printables (modelo 517699, 39 arquivos STL, sem login) | `src/assets/puzzle/` | CC BY-NC-SA, crédito na tela do Enigma |
@@ -227,6 +228,7 @@ src/
     ocg.mjs           Ponte com o ocgcore (WebAssembly): formatos, duelo, limite de turnos
     ocg-ai.mjs        IA do rival no clássico
     classic-deck.mjs  Decks gerados por sinergia de decks reais
+    rush-deck.mjs     Decks Rush (motor do EDOPro) gerados por tema, com validação das regras de deck
   ui/                 Interface: home.js, duel.js, screens.js, arena.js, common.js (nav, chave, Enigma),
                       scene.js (Three.js), classic-store.js (coleção/decks/link de desafio),
                       classic-render.js (desenho das cartas sob demanda), classic-card*.js
@@ -235,6 +237,7 @@ src/
   assets/             Logo, versos e ícones do projeto; cartas, artes e Enigma vêm do setup
   vendor/             Three.js, ocgcore-wasm, yugioh-card e scripts das cartas (vêm do setup)
 tools/                setup/ (npm run setup), classic/ (pool, decks, puzzles, render), card-render/ (Rush),
+                      rush/ (Rush no motor do EDOPro: importador e simulador),
                       puzzle/ (modelo do Enigma), serve.py (servidor de desenvolvimento)
 tests/                node --test tests/*.test.mjs
 ```
@@ -262,6 +265,14 @@ O `npm run setup` chama os comandos abaixo. Para regerar só uma parte, rode a p
 - `node tools/classic/render/render.mjs [--force] [id ...]`: desenha as cartas clássicas em PT-BR (precisa do `npm ci` em `tools/classic/render`, que o setup faz).
 - `node tools/classic/simulate.mjs 300 N`: simula duelos com decks sorteados e conta erros de script.
 
+**Rush Duel no motor do EDOPro** (`tools/rush/import_rush.py`, rode com `python3 -I`; etapa `rush-ocg` do setup):
+
+- `fetch`: baixa o `cards-rush.cdb` do BabelCDB e os scripts Rush do CardScripts (clone sparse no commit de `tools/classic/CARDSCRIPTS_SHA`).
+- `build`: gera `src/data/rush/cards.json` (todas as cartas jogáveis, no mesmo formato do pool clássico, mais `legend` e `maximum`) e copia os scripts para `src/vendor/card-scripts/rush/`. Nome e texto em PT vêm do `pt-br.json` do desafio diário; o resto fica em inglês (`pt: false`).
+- `node tools/rush/simulate.mjs 600 [todos|ia|aleatorio]`: duelos da IA com decks gerados e de um bot aleatório com decks sorteados; conta erros de script e travamentos.
+
+O formato fica em `FORMATS.rush` (`src/engine/ocg.mjs`): regras do Rush pelo próprio ocgcore (`MODE_RUSH`: campo de 3 colunas, compra até 5, Invocações ilimitadas), 8000 PV, mão inicial de 4, deck de 40 e scripts da pasta `rush/`. As zonas válidas do campo estão em `RUSH_ZONES`.
+
 **Cartas Rush** (`tools/card-render/`):
 
 - `python3 tools/card-render/import_pool.py fetch` e depois `build`: escolhe as cartas e gera `src/data/cards.mjs`.
@@ -279,7 +290,7 @@ O `npm run setup` chama os comandos abaixo. Para regerar só uma parte, rode a p
 O `.gitignore` deixa de fora tudo que o setup popula:
 
 - **Bibliotecas de terceiros** (`src/vendor/three.module.js`, `ocgcore/`, `yugioh-card/`, `card-scripts/`).
-- **Dados gerados** (`src/data/cards.mjs`, `src/data/classic/*`, menos `strings-pt.mjs`, que é editado à mão; `tools/classic/puzzle-solutions.json`).
+- **Dados gerados** (`src/data/cards.mjs`, `src/data/rush/`, `src/data/classic/*`, menos `strings-pt.mjs`, que é editado à mão; `tools/classic/puzzle-solutions.json`).
 - **Imagens de cartas e artes** (`src/assets/cards/`, `classic-art/`, `classic-cards/`): artes da Konami ou derivadas de molduras de terceiros, sem licença para publicação no repositório.
 - **Modelo do Enigma** (`src/assets/puzzle/`): CC BY-NC-SA, baixado do Printables.
 - **Caches e dependências** (`tools/**/cache/`, `node_modules`): downloads, clones e bases de dados, regeráveis.
@@ -290,7 +301,7 @@ Ficam no repositório: código, HTML, CSS, testes, documentação, traduções (
 ## Créditos
 
 - **Motor de duelo clássico:** núcleo do EDOPro (ygopro-core), através do wrapper `ocgcore-wasm` de Simone Miraglia (MIT).
-- **Scripts das cartas clássicas:** ProjectIgnis/CardScripts.
+- **Scripts das cartas clássicas e Rush:** ProjectIgnis/CardScripts.
 - **Dados e artes:** YGOPRODeck (API e imagens), BabelCDB.
 - **Molduras das cartas clássicas e selo LEGEND:** yugioh-card, de kooriookami (MIT).
 - **Molduras, ícones e fontes das cartas Rush:** rush-hub, de JLtheking2, com molduras de AlixSep.
@@ -327,7 +338,7 @@ Os arquivos de terceiros **não estão no repositório**: o `npm run setup` baix
 |---|---|---|
 | Núcleo do EDOPro (ygopro-core), compilado em WebAssembly | `src/vendor/ocgcore/` | AGPL-3.0 (`COPYING-AGPL-3.0`) |
 | `ocgcore-wasm` 0.1.6 (wrapper), com patch local | `src/vendor/ocgcore/` | MIT (`LICENSE.md`, com a descrição do patch) |
-| Scripts Lua das cartas (ProjectIgnis/CardScripts, commit fixo em `tools/classic/CARDSCRIPTS_SHA`) | `src/vendor/card-scripts/` | AGPL-3.0 (`COPYING`) |
+| Scripts Lua das cartas (ProjectIgnis/CardScripts, commit fixo em `tools/classic/CARDSCRIPTS_SHA`; clássicas em `official/`, Rush em `rush/`) | `src/vendor/card-scripts/` | AGPL-3.0 (`COPYING`) |
 | yugioh-card (kooriookami), desenho das cartas clássicas | `src/vendor/yugioh-card/` | MIT (`LICENSE`) |
 | Three.js r170 | `src/vendor/three.module.js` | MIT (`LICENSE-three.txt`) |
 | qrcode-generator 2.0.4 (QR de ligar aparelho) | `src/vendor/qrcode/` | MIT (`LICENSE`) |
