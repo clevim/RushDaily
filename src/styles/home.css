@@ -142,19 +142,29 @@ body.launching::after {
   .challenge { gap: 14px; }
 }
 @media (max-width: 960px) {
-  .hero { grid-template-columns: 1fr; min-height: 0; padding-top: 0; }
-  .stage { order: -1; min-height: 0; height: min(58vh, 520px); margin: 0 -16px; }
+  .hero { grid-template-columns: minmax(0, 1fr); min-height: 0; padding: 0 clamp(18px, 5vw, 40px) 24px; gap: 8px; }
+  .stage { order: -1; min-height: 0; height: clamp(190px, 30svh, 420px); margin: 0; }
   .wordmark { display: none; }
-  .ledger { grid-template-columns: 1fr; }
+  .challenge { max-width: none; justify-items: stretch; }
+  .difficulty { min-width: 0; width: 100%; }
+  .ledger { grid-template-columns: minmax(0, 1fr); padding-inline: clamp(18px, 5vw, 40px); }
 }
 @media (max-width: 480px) {
   /* Leque menor: título, dificuldade e "Entrar na arena" aparecem sem rolar. */
-  .stage { height: min(26vh, 220px); }
-  .challenge { gap: 14px; }
-  .brief { order: 1; font-size: 0.95rem; } /* o texto longo vai para depois do botão */
-  .difficulty { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-  .tier-face { grid-template-columns: minmax(0, 1fr); padding: 6px 6px 7px; }
-  .tier .glove { max-width: 130px; }
+  .stage { height: clamp(170px, 27svh, 240px); }
+  .challenge { gap: 12px; }
+  .date { font-size: 1rem; }
+  .matchup { font-size: clamp(1.6rem, calc(88cqi / (var(--len, 12) * 0.62)), 2.6rem); }
+  .versus { font-size: 0.95rem; }
+  .versus::before, .versus::after { width: 32px; }
+  .brief { order: 1; font-size: 0.95rem; max-width: none; } /* o texto longo vai para depois do botão */
+  .difficulty { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 0; }
+  .difficulty legend { margin-bottom: 6px; }
+  .tier-face { padding: 6px 3px 7px; }
+  .tier-name { font-size: 0.85rem; }
+  .tier .glove { max-width: 100%; }
+  .cta { display: grid; gap: 10px; margin-top: 2px; }
+  .status { max-width: none; font-size: 0.9rem; }
   .deck-rail { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .btn.big { width: 100%; }
+  .btn.big { width: calc(100% - 14px); max-width: 100%; margin-inline: 7px; justify-content: center; } /* o corte inclinado não passa da coluna */
 }

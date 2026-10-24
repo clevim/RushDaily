@@ -61,6 +61,11 @@ const TAREFAS = {
       if (!CLASSICO.includes(q.comando)) throw new Error(`comando: ${CLASSICO.join(', ')}`);
       return IMP(q.comando, ...(q.comando === 'build' ? ['--ate', String(inteiro(q.ate, 'ate', 1, NUM_TEMPORADAS, 1))] : []));
     } },
+  'artes-hd': { titulo: 'Artes em alta resolução', desc: 'import_cards.py art: baixa a arte nativa (até 640px). Com "refazer" troca as antigas de 320px; ids opcionais; limite opcional (0 = sem limite). Lento: ~2 pedidos/s.', params: ['ids', 'refazerArte', 'limiteArtes'],
+    montar: (q) => {
+      const lista = ids(q.ids), limite = inteiro(q.limiteArtes, 'limite', 0, 5000, 0);
+      return IMP('art', ...(lista.length ? ['--ids', lista.join(',')] : []), ...(limite ? ['--limite', String(limite)] : []), ...(q.refazerArte ? ['--hd'] : []));
+    } },
   'puzzles-buscar': { titulo: 'Buscar puzzles (busca de soluções)', desc: 'puzzles --buscar com teto de nós e meta; usa a configuração salva se vazio. Pesado.', params: ['nos', 'meta'],
     montar: (q) => IMP('puzzles', '--buscar', '--nos', String(inteiro(q.nos, 'nos', 100, 1000000, config().nos)), '--meta', String(inteiro(q.meta, 'meta', 1, 200, config().meta))) },
   'render-classico': { titulo: 'Render das clássicas', desc: 'render.mjs: desenha as cartas clássicas (todas as que faltam, ou só os ids dados).', params: ['force', 'ids'],

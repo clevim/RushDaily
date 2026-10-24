@@ -55,4 +55,35 @@ assert.equal(tiny.gameOver, true);
 assert.equal(tiny.winner, 'enemy');
 assert.ok(tiny.events.some((event) => event.type === 'deck_out'));
 
+// Zona e tributos escolhidos pelo jogador.
+{
+  const big = { id: 9, name: 'Grande', type: 'monster', atk: 2400, def: 1000, level: 6 };
+  const huge = { id: 8, name: 'Enorme', type: 'monster', atk: 3000, def: 2000, level: 8 };
+  const game = createGame({ seed: 'zonas', playerDeck: deck, enemyDeck: deck });
+  const [a, b, c] = game.player.hand;
+  summon(game, 'player', a.uid, { zone: 2 });
+  assert.equal(game.player.field[0].zone, 2);
+  assert.throws(() => summon(game, 'player', b.uid, { zone: 2 }), /ZONE_TAKEN/);
+  summon(game, 'player', b.uid, { zone: 0 });
+  summon(game, 'player', c.uid);
+  assert.deepEqual(game.player.field.map((card) => card.zone).sort(), [0, 1, 2]);
+  // Tributo escolhido (não o mais fraco) e o monstro novo entra na zona liberada.
+  game.player.hand.push({ ...big, uid: 'player-big' });
+  const strong = game.player.field.reduce((x, y) => (x.atk >= y.atk ? x : y));
+  const weak = game.player.field.find((card) => card.atk < strong.atk);
+  const event = summon(game, 'player', 'player-big', { tributes: [strong.uid], zone: strong.zone });
+  assert.deepEqual(event.tributes, [strong.uid]);
+  assert.equal(game.player.field.find((card) => card.uid === 'player-big').zone, strong.zone);
+  assert.ok(game.player.field.some((card) => card.uid === weak.uid));
+  assert.equal(game.player.field.length, 3);
+  // Dois tributos: os escolhidos valem, e escolher demais é erro.
+  game.player.hand.push({ ...huge, uid: 'player-huge' });
+  const keep = game.player.field.find((card) => card.uid !== 'player-big');
+  const give = game.player.field.filter((card) => card !== keep).map((card) => card.uid);
+  assert.throws(() => summon(game, 'player', 'player-huge', { tributes: game.player.field.map((card) => card.uid) }), /TOO_MANY_TRIBUTES/);
+  summon(game, 'player', 'player-huge', { tributes: give });
+  assert.ok(game.player.field.some((card) => card.uid === keep.uid));
+  assert.equal(game.player.field.length, 2);
+}
+
 console.log('game-engine: deterministic setup, turn guards, summon, attack and turn transition passed');

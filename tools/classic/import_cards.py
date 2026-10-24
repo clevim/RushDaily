@@ -3,7 +3,8 @@
 
   python3 tools/classic/import_cards.py fetch          # baixa YGOPRODeck (en + pt), BabelCDB e CardScripts para cache/
   python3 tools/classic/import_cards.py build [--ate N] # escreve src/data/classic/ e copia os scripts das temporadas 1..N
-  python3 tools/classic/import_cards.py art             # baixa as artes recortadas das temporadas ativas (WebP 320px)
+  python3 tools/classic/import_cards.py art [--ids 1,2] [--limite N] [--hd]  # baixa as artes recortadas das temporadas ativas (WebP, nativo até 640px);
+                                                       # --ids só essas cartas, --limite N no máximo N a baixar, --hd refaz as antigas de 320px
   python3 tools/classic/import_cards.py decks           # baixa decks de jogadores (YGOPRODeck) para medir sinergia
   python3 -I tools/classic/import_cards.py puzzles      # baixa os puzzles do EDOPro, confere no motor as soluções conhecidas e grava puzzles.json
   python3 -I tools/classic/import_cards.py puzzles --buscar [--nos 10000] [--meta 35]  # procura vitória nos que faltam até a meta (lento)
@@ -432,7 +433,7 @@ def copy_puzzle_scripts():
     return copied
 
 
-def art():
+def art(only=None, limit=None, redo=False):
     from PIL import Image  # só este comando precisa do Pillow
 
     raw = CACHE / 'art'
@@ -442,9 +443,16 @@ def art():
     if (OUT / 'puzzles.json').exists():  # cartas dos puzzles, mesmo fora da temporada
         ids = list(dict.fromkeys(ids + [int(card['id']) for item in json.loads((OUT / 'puzzles.json').read_text()) for card in item['cards']]))
 
+    if only:
+        ids = [cid for cid in only if cid in ids]
+
+    def old(target):  # arte antiga (320px) a refazer em alta resolução
+        with Image.open(target) as image:
+            return max(image.size) < 500
+
     def one(cid):
         target = ART_OUT / f'{cid}.webp'
-        if target.exists():
+        if target.exists() and not (redo and old(target)):
             return 'ok'
         source = raw / f'{cid}.jpg'
         if not source.exists():
@@ -453,9 +461,15 @@ def art():
                 fetch_url(ART_URL.format(cid), source)
             except RuntimeError:
                 return 'falhou'
-        Image.open(source).convert('RGB').resize((320, 320), Image.LANCZOS).save(target, 'WEBP', quality=74, method=6)
+        image = Image.open(source).convert('RGB')
+        if max(image.size) > 640:  # as originais têm ~624px; guarda o tamanho nativo (nítido no zoom de telas 3x)
+            image = image.resize((640, 640), Image.LANCZOS)
+        image.save(target, 'WEBP', quality=85, method=6)
         return 'nova'
 
+    if limit is not None:  # conta só o que dá trabalho (as já prontas não gastam o limite)
+        todo = [cid for cid in ids if not (ART_OUT / f'{cid}.webp').exists() or (redo and old(ART_OUT / f'{cid}.webp'))]
+        ids = todo[:limit]
     with ThreadPoolExecutor(10) as pool:
         results = list(pool.map(one, ids))
     print({status: results.count(status) for status in set(results)}, '->', ART_OUT)
@@ -471,7 +485,10 @@ if __name__ == '__main__':
         arg = lambda name, default: int(sys.argv[sys.argv.index(name) + 1]) if name in sys.argv else default
         puzzles(search='--buscar' in sys.argv, budget=arg('--nos', 10000), meta=arg('--meta', 35))
     elif command == 'art':
-        art()
+        def value(name):
+            return sys.argv[sys.argv.index(name) + 1] if name in sys.argv else None
+        art(only=[int(x) for x in value('--ids').split(',') if x] if value('--ids') else None,
+            limit=int(value('--limite')) if value('--limite') else None, redo='--hd' in sys.argv)
     elif command == 'build':
         build(int(sys.argv[sys.argv.index('--ate') + 1]) if '--ate' in sys.argv else 1)
     else:

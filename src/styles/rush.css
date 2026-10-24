@@ -302,10 +302,16 @@ button { font: inherit; color: inherit; }
 /* Forma única: canto chanfrado em abas, filtros e campos (nada de pílula). */
 .cut { --c: 8px; clip-path: polygon(var(--c) 0, 100% 0, 100% calc(100% - var(--c)), calc(100% - var(--c)) 100%, 0 100%, 0 var(--c)); }
 
+/* Tablet: o nome ao lado da marca encostava na primeira aba */
+@media (min-width: 641px) and (max-width: 900px) {
+  .brand span { display: none; }
+}
+
 /* Barra inferior (só no celular) */
 .bar-nav { display: none; }
 
 @media (max-width: 640px) {
+  .felt::before { inset: 6px; outline: 0; } /* moldura rente à borda: não disputa espaço com o conteúdo */
   .brand span { display: none; }
   .topbar { gap: 10px; padding-block: 10px; backdrop-filter: none; z-index: 35; } /* sem blur: ele prenderia a barra fixa dentro do topo */
   .key-chip { margin-left: auto; padding: 7px 10px; }
