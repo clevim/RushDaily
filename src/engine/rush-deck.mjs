@@ -88,13 +88,15 @@ export function validateRushDeck(deck, byId, limits = RUSH_LIMITS) {
 
 /**
  * Deck Rush de 40 (+ adicional de até 15 Fusões). Mesma seed e mesmo pool: mesmo deck.
+ * race: força o Tipo do tema (ex.: confronto do desafio diário); sem ele, sorteia entre rushThemes.
  * Devolve { main, extra, theme: { race, name, attribute, setcode } }.
  */
-export function buildRushDeck({ seed, pool, format = FORMATS.rush }) {
+export function buildRushDeck({ seed, pool, format = FORMATS.rush, race = null }) {
   const random = seeded(`rush:${seed}`);
   const byId = new Map(pool.map((card) => [card.id, card]));
   const themes = rushThemes(pool);
-  const theme = weightedPick(random, themes.map((t) => [t, Math.sqrt(t.size)]));
+  const picked = weightedPick(random, themes.map((t) => [t, Math.sqrt(t.size)]));
+  const theme = (race && themes.find((t) => t.race === race)) || picked;
   const ofRace = pool.filter((card) => playable(card) && isMonster(card) && card.race === theme.race);
   // Atributo de apoio: sorteado entre os mais comuns do Tipo.
   const attrCount = new Map();

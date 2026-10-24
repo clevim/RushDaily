@@ -54,6 +54,7 @@ export const RACES = [
   'Guerreiro', 'Mago', 'Fada', 'Demônio', 'Zumbi', 'Máquina', 'Aqua', 'Piro', 'Rocha', 'Besta Alada', 'Planta', 'Inseto',
   'Trovão', 'Dragão', 'Besta', 'Besta-Guerreira', 'Dinossauro', 'Peixe', 'Serpente Marinha', 'Réptil', 'Psíquico',
   'Besta Divina', 'Deus Criador', 'Wyrm', 'Ciberso', 'Ilusão',
+  'Ciborgue', 'Cavaleiro Mágico', 'Dragão Supremo', 'Psíquico Ômega', 'Guerreiro Celestial', 'Galáxia', // só no Rush
 ]; // bit i = RACES[i]
 
 /** Texto de uma "description" do motor: (código da carta << 20) | índice do rótulo, ou um número de sistema. */

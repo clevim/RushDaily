@@ -63,11 +63,14 @@ export function shuffled(list, seed) {
 /**
  * Cria um duelo. decks: [{ main: [ids], extra: [ids] }, { ... }] (jogador 0 e 1).
  * puzzle: { name, script } no lugar dos decks: o script monta campo, mão e PV (Debug.*) e aux.BeginPuzzle dá a derrota no fim do turno.
+ * lp: [PV do time 0, PV do time 1] no lugar do format.lp (ex.: rival com menos PV no desafio diário).
+ * skills: [{ team, code }] cartas de Skill (proc_skill.lua) postas no deck antes do início; o script tira elas do duelo.
  * Devolve { next(), respond(response), state, destroy() }:
  *   next() roda o motor até ele precisar de uma resposta ou o duelo acabar
  *   e devolve { events, prompt, winner } — prompt é a mensagem SELECT_* a responder.
  */
-export function createDuel(lib, { seed, format = FORMATS.rapido, decks = [], puzzle = null, cards, readScript, onError = () => {} }) {
+export function createDuel(lib, { seed, format = FORMATS.rapido, decks = [], puzzle = null, lp = null, skills = [], cards, readScript, onError = () => {} }) {
+  const startLp = lp || [format.lp, format.lp];
   let aliases = null;
   const aliasOf = (code) => {
     if (!aliases) { aliases = new Map(); for (const card of cards.values()) if (card.alias && !cards.has(card.alias) && !aliases.has(card.alias)) aliases.set(card.alias, card); }
@@ -76,8 +79,8 @@ export function createDuel(lib, { seed, format = FORMATS.rapido, decks = [], puz
   const handle = lib.createDuel({
     flags: format.flags,
     seed: seedOf(seed),
-    team1: { drawCountPerTurn: 1, startingDrawCount: format.hand, startingLP: format.lp },
-    team2: { drawCountPerTurn: 1, startingDrawCount: format.hand, startingLP: format.lp },
+    team1: { drawCountPerTurn: 1, startingDrawCount: format.hand, startingLP: startLp[0] },
+    team2: { drawCountPerTurn: 1, startingDrawCount: format.hand, startingLP: startLp[1] },
     cardReader: (code) => {
       const card = cards.get(code);
       if (card) return toCoreCard(card);
@@ -98,10 +101,11 @@ export function createDuel(lib, { seed, format = FORMATS.rapido, decks = [], puz
       for (const code of ids) lib.duelNewCard(handle, { team, duelist: 0, code, controller: team, location, sequence: 0, position: OcgPosition.FACEDOWN_DEFENSE });
     }
   });
+  for (const { team, code } of skills) lib.duelNewCard(handle, { team, duelist: 0, code, controller: team, location: OcgLocation.DECK, sequence: 0, position: OcgPosition.FACEDOWN_DEFENSE });
   lib.startDuel(handle);
 
   let lastPrompt = null;
-  const state = { turn: 0, active: 0, phase: 0, hint: 0n, lp: [format.lp, format.lp], winner: null, reason: null };
+  const state = { turn: 0, active: 0, phase: 0, hint: 0n, lp: [...startLp], winner: null, reason: null };
   const track = (message) => {
     switch (message.type) {
       case OcgMessageType.NEW_TURN: state.turn += 1; state.active = message.player; break;

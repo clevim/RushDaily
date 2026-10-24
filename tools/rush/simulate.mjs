@@ -2,16 +2,23 @@
 // e duelos com decks sorteados do pool inteiro jogados por um bot de escolhas aleatórias.
 //   node tools/rush/simulate.mjs [duelos=200] [modo=todos|ia|aleatorio]
 // Conta erros de script, perguntas sem resposta, respostas recusadas, travamentos e a duração dos duelos.
+//   node tools/rush/simulate.mjs [dias=60] diario [cartas=30]
+// Desafio diário (daily-generator.mjs) em cada dificuldade: jogador pilotado pela IA "elite" contra o rival do nível.
+//   node tools/rush/simulate.mjs [duelos=100] niveis
+// IA do Rush contra a IA gulosa do clássico com os mesmos decks (trocando de lado): mede o ganho de cada nível.
 import { readFileSync } from 'node:fs';
 import createCore, { OcgLocation as L, OcgMessageType as M, OcgResponseType as R } from '../../src/vendor/ocgcore/index.js';
 import { FORMATS, RUSH_ZONES, createDuel, isExtra } from '../../src/engine/ocg.mjs';
 import { decide } from '../../src/engine/ocg-ai.mjs';
+import { AI_LEVELS, decideRush } from '../../src/engine/rush-ai.mjs';
 import { buildRushDeck, validateRushDeck } from '../../src/engine/rush-deck.mjs';
+import { DAILY_FORMAT, generateDailyMatch, listDifficulties } from '../../src/engine/daily-generator.mjs';
+import { HEART_CARD, HEART_CODE, withHeart } from '../../src/engine/heart.mjs';
 
 const ROOT = new URL('../../', import.meta.url);
 const duels = Number(process.argv[2] || 200);
 const mode = process.argv[3] || 'todos';
-if (!Number.isInteger(duels) || duels < 1 || !['todos', 'ia', 'aleatorio'].includes(mode)) { console.error('uso: simulate.mjs [duelos] [todos|ia|aleatorio]'); process.exit(1); }
+if (!Number.isInteger(duels) || duels < 1 || !['todos', 'ia', 'aleatorio', 'diario', 'niveis'].includes(mode)) { console.error('uso: simulate.mjs [duelos] [todos|ia|aleatorio|diario|niveis] [cartas]'); process.exit(1); }
 const FORMAT = FORMATS.rush;
 const pool = JSON.parse(readFileSync(new URL('src/data/rush/cards.json', ROOT)));
 const cards = new Map(pool.map((card) => [card.id, card]));
@@ -68,6 +75,79 @@ function randomBot(m) {
 
 const lib = await createCore({ sync: true });
 const errors = new Map();
+const onError = (text) => errors.set(text.split('\n')[0], (errors.get(text.split('\n')[0]) || 0) + 1);
+const median = (list) => [...list].sort((a, b) => a - b)[list.length >> 1];
+const p90 = (list) => [...list].sort((a, b) => a - b)[Math.floor(list.length * 0.9)];
+
+/** Um duelo com a IA do Rush nos dois lados (levels[time]); 'gulosa' usa a IA do clássico. */
+function runDuel({ seed, decks, format, lp = null, levels, skills = [] }) {
+  const table = skills.length ? new Map([...cards, [HEART_CODE, HEART_CARD]]) : cards;
+  const duel = createDuel(lib, { seed, decks, format, lp, skills, cards: table, readScript: withHeart(readScript), onError });
+  const memory = [{}, {}];
+  let steps = 0, retries = 0, out = null;
+  for (;;) {
+    const { prompt, winner, retry } = duel.next();
+    if (winner !== null) { out = { winner, turns: duel.state.turn, reason: duel.state.reason, retries }; break; }
+    if (retry) retries += 1;
+    const player = prompt.player ?? duel.state.active;
+    const context = { view: duel.snapshot(), me: player, cards: table, state: duel.state, memory: memory[player], level: levels[player] };
+    const response = levels[player] === 'gulosa' ? decide(prompt, context) : decideRush(prompt, context);
+    if (!response || steps++ > 6000 || retries > 50) { out = { winner: null, turns: duel.state.turn, reason: 'travou', retries }; break; }
+    duel.respond(response);
+  }
+  duel.destroy();
+  return out;
+}
+
+if (mode === 'diario') {
+  const size = Number(process.argv[4] || DAILY_FORMAT.main);
+  const format = { ...DAILY_FORMAT, main: size };
+  const started = Date.now();
+  console.log(`desafio diário: ${duels} dias x 4 dificuldades, deck de ${size}, jogador = IA elite`);
+  const all = [];
+  for (const difficulty of listDifficulties()) {
+    const turns = [], reasons = new Map();
+    let wins = 0, stuck = 0;
+    for (let n = 0; n < duels; n += 1) {
+      const date = new Date(Date.UTC(2026, 0, 1 + n)).toISOString().slice(0, 10);
+      const match = generateDailyMatch({ date, difficulty: difficulty.id, pool });
+      const decks = [match.player.deck, match.enemy.deck];
+      if (size !== DAILY_FORMAT.main) decks.forEach((deck, team) => { deck.main = buildRushDeck({ seed: `${date}:${team}`, pool, format, race: [match.player.theme, match.enemy.theme][team].race }).main; });
+      const result = runDuel({ seed: match.seed, decks, format, lp: [match.player.lp, match.enemy.lp], levels: ['elite', match.enemy.ai] });
+      if (result.winner === null) { stuck += 1; continue; }
+      turns.push(result.turns); all.push(result.turns);
+      if (result.winner === 0) wins += 1;
+      reasons.set(result.reason, (reasons.get(result.reason) || 0) + 1);
+    }
+    console.log(`  ${difficulty.label.padEnd(9)} turnos: mediana ${median(turns)}, p90 ${p90(turns)} | jogador vence ${Math.round((wins / turns.length) * 100)}% | fim: ${JSON.stringify(Object.fromEntries(reasons))} | travados ${stuck}`);
+  }
+  console.log(`  geral: mediana ${median(all)} turnos, p90 ${p90(all)} (${((Date.now() - started) / 1000).toFixed(1)}s)`);
+  console.log('erros de script:', errors.size ? [...errors].sort((a, b) => b[1] - a[1]).slice(0, 15) : 'nenhum');
+  process.exit(0);
+}
+
+if (mode === 'niveis') {
+  const started = Date.now();
+  console.log(`IA do Rush x IA gulosa do clássico: ${duels} duelos por nível, decks gerados de 40, cada lado começa metade das vezes`);
+  for (const level of AI_LEVELS) {
+    const turns = [];
+    let wins = 0, done = 0, stuck = 0;
+    for (let n = 0; n < duels; n += 1) {
+      const decks = [0, 1].map((team) => buildRushDeck({ seed: `niveis:${n}:${team}`, pool }));
+      const seat = n % 2; // lado da IA testada
+      const levels = seat ? ['gulosa', level] : [level, 'gulosa'];
+      const result = runDuel({ seed: `niveis:${n}`, decks, format: FORMAT, levels });
+      if (result.winner === null) { stuck += 1; continue; }
+      done += 1; turns.push(result.turns);
+      if (result.winner === seat) wins += 1;
+    }
+    console.log(`  ${level.padEnd(9)} vence ${Math.round((wins / done) * 100)}% | turnos: mediana ${median(turns)}, p90 ${p90(turns)} | travados ${stuck}`);
+  }
+  console.log(`  (${((Date.now() - started) / 1000).toFixed(1)}s)`);
+  console.log('erros de script:', errors.size ? [...errors].sort((a, b) => b[1] - a[1]).slice(0, 15) : 'nenhum');
+  process.exit(0);
+}
+
 const unanswered = new Map();
 const stuckBy = new Map();
 const badZones = new Set();
