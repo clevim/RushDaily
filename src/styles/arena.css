@@ -132,31 +132,50 @@
 @media (max-width: 860px) {
   .classic {
     --gap: 4px;
-    --hand: min(21vw, 14dvh);
-    --card: min((100vw - 16px - 6 * var(--gap)) / 7.15, (100dvh - 205px - var(--hand) * 1.2) / 7.3);
+    --hand: min(21vw, 12dvh);
+    /* topo (~64) + 2 placas (~100) + folgas + bandeja (botões 38 + mão): o que sobrar vira altura do tabuleiro */
+    --card: min((100vw - 16px - 6 * var(--gap)) / 7.15, (100dvh - 272px - var(--hand) * 1.4) / 7.3);
   }
-  .classic .arena-top { grid-template-columns: auto 1fr auto; padding: 4px 8px; gap: 8px; }
+  .classic .arena-top { grid-template-columns: auto minmax(0, 1fr) auto; padding: 4px 8px; gap: 8px; }
+  .classic .leave img { width: 30px; }
+  .classic .top-center { width: 100%; justify-items: stretch; gap: 2px; }
+  .classic .turn-chip { justify-self: center; max-width: 100%; box-sizing: border-box; gap: 6px; padding: 4px 12px; white-space: nowrap; overflow: hidden; font-size: 0.8rem; }
+  .classic .turn-chip b { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 0.92rem; }
+  .classic .help-chip { min-height: 34px; padding: 4px 10px; white-space: nowrap; }
   .classic .hint { display: none; }
   .classic .tray { padding-top: 4px; }
-  .classic .log { max-width: 62vw; }
-  .classic .log span:first-child { font-size: 0.74rem; }
-  .table { grid-template-columns: 1fr; grid-template-rows: auto auto auto; grid-template-areas: 'foe' 'field' 'me'; align-content: center; gap: 6px; padding: 0 8px; }
+  .classic .log { max-width: 100%; min-width: 0; }
+  .classic .log span:first-child { font-size: 0.72rem; }
+  .table { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; grid-template-areas: 'foe' 'field' 'me'; align-content: center; gap: 6px; padding: 0 8px; min-height: 0; }
   .field { justify-self: center; padding: 4px; }
-  .seat { grid-template-columns: auto 1fr auto; align-items: center; column-gap: 10px; row-gap: 3px; padding: 6px 12px; --c: 8px; }
-  .seat .who { font-size: 0.78rem; }
-  .seat .lp-value { font-size: 1.15rem; }
-  .seat .lp-bar { grid-column: 1 / -1; grid-row: 2; }
-  .seat-extra { grid-column: 3; grid-row: 1; min-height: 0; }
+  .seat { grid-template-columns: minmax(0, auto) auto 1fr; align-items: center; column-gap: 8px; row-gap: 3px; padding: 5px 12px 6px; --c: 8px; min-width: 0; }
+  .seat .who { font-size: 0.78rem; min-width: 0; white-space: nowrap; overflow: hidden; }
+  .seat .who-key { overflow: hidden; text-overflow: ellipsis; }
+  .seat.foe .who { display: block; text-overflow: ellipsis; }
+  .seat .lp { white-space: nowrap; }
+  .seat .lp-value { font-size: 1.05rem; }
+  .seat .lp-bar { grid-column: 1 / -1; grid-row: 2; height: 5px; }
+  .seat-extra { grid-column: 3; grid-row: 1; min-height: 0; min-width: 0; justify-self: end; gap: 6px; }
+  .classic .enemy-hand { min-height: 0; gap: 6px; font-size: 0.74rem; white-space: nowrap; }
+  .classic .enemy-hand .ycard { width: 16px; }
+  .banish-chip { min-height: 24px; padding: 2px 8px; font-size: 0.68rem; white-space: nowrap; }
   .seat.foe, .seat.me { align-self: stretch; }
   .classic .pile .pile-name { font-size: 0; padding: 1px 3px; top: 2px; }
   .classic .pile .pile-name::after { content: attr(data-short); font-size: 0.46rem; }
   .classic .pile .pile-count { min-width: 16px; padding: 2px 3px; right: 2px; bottom: 2px; }
   .zone.fzone.empty::after, .zone.emz-zone.empty::after { font-size: 0.46rem; }
+  .classic .dock { gap: 0; padding-bottom: 4px; }
+  .classic .dock .btn { min-height: 38px; font-size: 0.8rem; min-width: 0; }
   .classic .zoom { grid-template-columns: 1fr; align-content: start; padding-top: 16px; overflow: auto; }
   .classic .zoom .card { width: min(64vw, 260px); }
   .zoom-text { max-height: none; font-size: 0.92rem; }
   .ask-items { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
   .ask-item.with-card .ycard { width: 74px; }
+}
+/* Telas muito estreitas */
+@media (max-width: 380px) {
+  .classic .turn-chip { padding-inline: 8px; }
+  .classic .help-chip { font-size: 0.72rem; padding-inline: 8px; }
 }
 
 /* Replay (só leitura): os controles ocupam a linha dos botões do turno */
