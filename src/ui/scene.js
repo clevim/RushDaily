@@ -199,7 +199,7 @@ export function homeScene(canvas, { fronts, back, reduced = false, anchor = null
     const worldHeight = 2 * camera.position.z * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
     // Cabe na coluna pela altura (leque ~4.4 de altura) e pela largura (~7 de largura, contando a inclinação).
     const worldWidth = worldHeight * camera.aspect;
-    const fanScale = box ? Math.min(1.05, Math.max(0.4, Math.min((box.height / view.height) * worldHeight / 4.4, (box.width / view.width) * worldWidth / 7))) : 1.15;
+    const fanScale = box ? Math.min(1.05, Math.max(0.12, Math.min((box.height / view.height) * worldHeight / 4.4, (box.width / view.width) * worldWidth / 7))) : 1.15;
     if (!rigPlaced) { rig.position.copy(spot); rig.scale.setScalar(fanScale); rigPlaced = true; }
     rig.position.lerp(spot, launchAt !== null ? 0.12 : 0.25);
     rig.scale.setScalar(THREE.MathUtils.lerp(rig.scale.x, fanScale, 0.12));
