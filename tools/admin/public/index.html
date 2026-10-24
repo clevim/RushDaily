@@ -171,17 +171,19 @@ async function status() {
 // ---- tarefas ----
 let meta, etapas = [];
 const CAMPOS = {
-  temporadas: () => fmtN('temporadas', 'Temporadas liberadas (1..5)', 1, 5, 1),
+  temporadas: () => num('temporadas', 'Temporadas liberadas (1..5)', 1, 5, 1),
   semRender: () => chk('semRender', 'Não desenhar as imagens (--sem-render)'),
   etapa: () => sel('etapa', 'Etapa', etapas.map((e) => [e.nome, `${e.nome}: ${e.desc}`])),
   force: () => chk('force', 'Refazer mesmo se já existir (--force)'),
   comando: () => sel('comando', 'Comando', ['fetch', 'decks', 'build', 'art', 'puzzles'].map((c) => [c, c])),
-  ate: () => fmtN('ate', 'Temporadas (só para build --ate N)', 1, 5, 1),
-  nos: () => fmtN('nos', 'Teto de nós (vazio = configuração salva)', 100, 1000000, ''),
-  meta: () => fmtN('meta', 'Meta de puzzles validados (vazio = configuração salva)', 1, 200, ''),
+  ate: () => num('ate', 'Temporadas (só para build --ate N)', 1, 5, 1),
+  nos: () => num('nos', 'Teto de nós (vazio = configuração salva)', 100, 1000000, ''),
+  meta: () => num('meta', 'Meta de puzzles validados (vazio = configuração salva)', 1, 200, ''),
   ids: () => txt('ids', 'Só estes ids (opcional, separados por vírgula)'),
-  duelos: () => fmtN('duelos', 'Duelos', 1, 5000, 100),
-  temporada: () => fmtN('temporada', 'Temporada', 1, 5, 1),
+  refazerArte: () => chk('refazerArte', 'Refazer as artes antigas de 320px em alta resolução (--hd)'),
+  limiteArtes: () => num('limiteArtes', 'Limite de artes a baixar (0 = sem limite)', 0, 5000, 0),
+  duelos: () => num('duelos', 'Duelos', 1, 5000, 100),
+  temporada: () => num('temporada', 'Temporada', 1, 5, 1),
 };
 const num = (n, rot, min, max, v) => el('label', {}, rot, el('input', { name: n, type: 'number', min, max, value: v }));
 const txt = (n, rot) => el('label', {}, rot, el('input', { name: n, type: 'text', autocomplete: 'off' }));
