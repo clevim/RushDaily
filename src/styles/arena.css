@@ -94,7 +94,9 @@
 .classic .hand-card:hover, .classic .hand-card:focus-visible { transform: translateY(-10px) scale(1.12) rotate(0); }
 .classic .hand-card.set-pose { filter: none; }
 .classic .enemy-hand { min-height: 34px; gap: 8px; }
-.classic .enemy-hand .ycard { width: 22px; margin-left: 0; }
+.classic .enemy-hand .fan { display: flex; align-items: center; }
+.classic .enemy-hand .ycard { flex: none; width: 24px; margin-left: -14px; box-shadow: -2px 0 4px rgb(var(--ink) / 0.6); }
+.classic .enemy-hand .fan .ycard:first-child { margin-left: 0; }
 .classic .enemy-hand b::before { content: 'Mão '; font-weight: 600; color: var(--ivory-dim); }
 
 /* Zoom: carta grande + texto legível + ações */
@@ -132,7 +134,7 @@
 @media (max-width: 860px) {
   .classic {
     --gap: 4px;
-    --hand: min(21vw, 12dvh);
+    --hand: min(24vw, 14dvh);
     /* topo (~64) + 2 placas (~100) + folgas + bandeja (botões 38 + mão): o que sobrar vira altura do tabuleiro */
     --card: min((100vw - 16px - 6 * var(--gap)) / 7.15, (100dvh - 272px - var(--hand) * 1.4) / 7.3);
   }
@@ -146,7 +148,7 @@
   .classic .tray { padding-top: 4px; }
   .classic .log { max-width: 100%; min-width: 0; }
   .classic .log span:first-child { font-size: 0.72rem; }
-  .table { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; grid-template-areas: 'foe' 'field' 'me'; align-content: center; gap: 6px; padding: 0 8px; min-height: 0; }
+  .table { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; grid-template-areas: 'foe' 'field' 'me'; align-content: space-evenly; gap: 6px; padding: 0 8px; min-height: 0; }
   .field { justify-self: center; padding: 4px; }
   .seat { grid-template-columns: minmax(0, auto) auto 1fr; align-items: center; column-gap: 8px; row-gap: 3px; padding: 5px 12px 6px; --c: 8px; min-width: 0; }
   .seat .who { font-size: 0.78rem; min-width: 0; white-space: nowrap; overflow: hidden; }
@@ -157,7 +159,11 @@
   .seat .lp-bar { grid-column: 1 / -1; grid-row: 2; height: 5px; }
   .seat-extra { grid-column: 3; grid-row: 1; min-height: 0; min-width: 0; justify-self: end; gap: 6px; }
   .classic .enemy-hand { min-height: 0; gap: 6px; font-size: 0.74rem; white-space: nowrap; }
-  .classic .enemy-hand .ycard { width: 16px; }
+  .classic .enemy-hand { gap: 8px; }
+  .classic .enemy-hand .ycard { width: 24px; margin-left: -10px; }
+  .classic .tray { padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+  .classic .hand { height: calc(var(--hand) * 1.457 + 26px); padding: 10px 0 12px; box-sizing: border-box; }
+  .classic .hand-card { transform: translateY(calc(var(--o) * var(--o) * 1.5px - var(--w) * 0.08)) rotate(calc(var(--o) * 2.5deg)); }
   .banish-chip { min-height: 24px; padding: 2px 8px; font-size: 0.68rem; white-space: nowrap; }
   .seat.foe, .seat.me { align-self: stretch; }
   .classic .pile .pile-name { font-size: 0; padding: 1px 3px; top: 2px; }
