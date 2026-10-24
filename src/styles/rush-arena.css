@@ -1,0 +1,242 @@
+/* Arena Rush (desafio do dia, motor do EDOPro): tapete de 3 colunas com Campo, Cemitério, Adicional e Deck nas pontas,
+   faixa do meio com as fases e a narração, Corrente montando ao lado. Base: duel.css (topo, mão, zoom, faixas, resultado). */
+.rush-arena {
+  --hand: clamp(64px, min(7.6vw, 12.5dvh), 108px);
+  --gap: clamp(5px, 0.75vw, 10px);
+  /* Carta: o que couber em 5 colunas na largura e em 4 linhas + faixa do meio + mão na altura. */
+  --card: clamp(44px, min((100vw - 600px) / 5.6, (100dvh - 150px - var(--hand) * 1.4 - 7 * var(--gap)) / 5.95), 112px);
+  --ch: calc(var(--card) * 1.457);
+  --rush: #ff5a2a;
+}
+
+/* ---------- Mesa ---------- */
+.rush-table {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(170px, 230px) auto minmax(170px, 230px);
+  grid-template-rows: 1fr 1fr;
+  grid-template-areas: 'foe field chain' 'me field chain';
+  justify-content: center;
+  align-items: center;
+  gap: 0 clamp(14px, 2vw, 30px);
+  min-height: 0;
+  padding: 0 clamp(10px, 2vw, 24px);
+}
+.field {
+  grid-area: field;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, var(--card));
+  grid-template-rows: var(--ch) var(--ch) auto var(--ch) var(--ch);
+  gap: var(--gap);
+  padding: calc(var(--gap) * 1.5) calc(var(--gap) * 1.8);
+  /* Rival puxa para o sangue, você para o ouro; listras diagonais de velocidade (Rush) bem fracas por cima. */
+  background:
+    repeating-linear-gradient(115deg, rgb(255 255 255 / 0.018) 0 14px, transparent 14px 34px),
+    linear-gradient(180deg, rgb(224 48 63 / 0.13) 0 40%, transparent 40% 60%, rgb(var(--gold-rgb) / 0.09) 60%),
+    radial-gradient(ellipse at 50% 50%, rgb(15 42 37 / 0.6), rgb(2 6 5 / 0.4));
+  clip-path: polygon(18px 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%, 0 18px);
+  box-shadow: inset 0 0 0 1px rgb(var(--gold-rgb) / 0.18);
+}
+.zones-grid { display: contents; }
+
+/* Faixa do meio: fases do turno numa chapa inclinada + narração */
+.midline { grid-area: 3 / 1 / 4 / 6; display: grid; justify-items: center; gap: 4px; padding: 4px 0; min-width: 0; }
+.phases { display: flex; margin: 0; padding: 0; list-style: none; transform: skewX(-14deg); box-shadow: 0 6px 18px -8px var(--ink-solid); }
+.phases li {
+  padding: 4px clamp(8px, 1.1vw, 16px);
+  background: rgb(var(--ink) / 0.55);
+  border: 1px solid rgb(var(--gold-rgb) / 0.22);
+  border-left-width: 0;
+  color: var(--ivory-dim);
+  font: 700 clamp(0.62rem, 0.9vw, 0.8rem)/1.1 var(--body);
+  font-stretch: 80%;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.phases li:first-child { border-left-width: 1px; }
+.phases li[aria-current] { background: var(--foil); color: var(--lacquer); border-color: var(--gold-hi); }
+.phases[data-owner='enemy'] li[aria-current] { background: linear-gradient(160deg, #ff8a5c, var(--blood) 55%, #7d0f19); color: var(--ivory); border-color: #ff8a92; }
+.rush-arena .log { display: block; max-width: 100%; min-width: 0; justify-self: stretch; min-height: 1.25em; margin: 0; text-align: center; }
+.rush-arena .log span { display: none; }
+.rush-arena .log span:first-child { display: block; color: var(--ivory); font: 600 clamp(0.74rem, 1vw, 0.92rem)/1.25 var(--body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: logIn 0.35s var(--ease-out); }
+
+/* Placas dos duelistas */
+.seat { --c: 12px; display: grid; gap: 6px; padding: 12px 16px 14px; transition: box-shadow 0.25s, transform 0.25s var(--ease-snap); }
+.seat.foe { grid-area: foe; align-self: start; }
+.seat.me { grid-area: me; align-self: end; }
+.seat.hit { animation: hit 0.45s ease-out; }
+.seat.foe .lp-bar i { background: linear-gradient(90deg, #7d0f19, var(--blood), #ff6b74); }
+.foe-hand { display: flex; align-items: center; gap: 10px; min-height: 30px; color: var(--ivory-dim); font: 700 0.8rem/1 var(--body); }
+.foe-backs { display: flex; padding-left: 9px; }
+.foe-backs img { width: 20px; margin-left: -9px; border-radius: 2px; box-shadow: -2px 2px 5px rgb(var(--ink) / 0.7); }
+.foe-hand b::before { content: 'Mão '; font-weight: 600; }
+.matchup-chip { margin: 2px 0 0; color: var(--ivory-dim); font: 600 0.78rem/1.25 var(--body); }
+.matchup-chip i { font-style: normal; color: var(--gold); }
+#foe-plate.drop-ok { box-shadow: 0 0 0 2px var(--blood), 0 0 40px 6px rgb(224 48 63 / 0.5); }
+#foe-plate.drop-hover { transform: scale(1.04); }
+
+/* ---------- Zonas ---------- */
+.rush-arena .zone { width: var(--card); height: var(--ch); aspect-ratio: auto; border-radius: 6px; }
+.rush-arena .zone.empty { border-width: 1.5px; }
+.rush-arena .zone.empty.szone { border-color: rgb(79 179 232 / 0.32); }
+.rush-arena .zone.theirs.empty { opacity: 0.78; }
+.zone.fzone.empty { border-color: rgb(110 200 140 / 0.38); border-style: dashed; }
+.zone.fzone.empty::after { content: 'Campo'; display: grid; place-items: center; inset: 0; clip-path: none; border: 0; border-radius: 0; color: rgb(110 200 140 / 0.65); font: 600 clamp(0.5rem, calc(var(--card) * 0.13), 0.7rem)/1 var(--body); align-content: end; padding-bottom: 14%; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236ec88c' stroke-width='1.6'%3E%3Cpath d='M2 19 9 7l4 6 3-4 6 10Z'/%3E%3C/svg%3E") center 32% / 40% no-repeat; }
+.rush-arena .zone.defense .face { transform: rotate(90deg) scale(0.686); }
+.rush-arena .zone.facedown .rcard { box-shadow: 0 0 0 2px var(--sky), 0 0 14px 1px rgb(79 179 232 / 0.5); }
+.rush-arena .zone.theirs.facedown .rcard { box-shadow: 0 0 0 1.5px rgb(224 48 63 / 0.7), 0 8px 16px -8px var(--ink-solid); }
+.rush-arena .zone.facedown.mine .rcard:not(.back) > img { filter: brightness(0.62) saturate(0.6); }
+.zone.arrive { animation: arrive 0.5s var(--ease-snap); }
+@keyframes arrive { 0% { transform: scale(1.35) translateY(-14px); filter: brightness(2.2) sepia(0.6); } 100% { transform: none; filter: none; } }
+
+/* Pilhas dentro da grade */
+.rush-arena .pile { position: relative; display: block; width: var(--card); height: var(--ch); padding: 0; border: 1px dashed rgb(244 236 220 / 0.24); border-radius: 6px; background: rgb(var(--ink) / 0.3); color: inherit; cursor: pointer; aspect-ratio: auto; }
+.rush-arena .pile .rcard { position: absolute; inset: 0; left: 0; bottom: auto; translate: none; width: 100%; height: 100%; padding: 0; border: 0; background: #111; } /* reseta o `.pile span` do duel.css */
+.rush-arena .pile.deck .rcard, .rush-arena .pile.extra .rcard { box-shadow: 2px 2px 0 #2a1d0c, 4px 4px 0 #1a1208, 0 10px 16px rgb(var(--ink) / 0.7); }
+.rush-arena .pile .pile-count { position: absolute; left: auto; right: 3px; bottom: 3px; translate: none; z-index: 2; min-width: 22px; padding: 3px 5px; background: var(--lacquer); border: 1px solid var(--gold); border-radius: 10px; font: 400 clamp(0.6rem, calc(var(--card) * 0.17), 0.8rem)/1 var(--display); color: var(--gold-hi); text-align: center; }
+.rush-arena .pile.low .pile-count { background: var(--blood); border-color: #ff8a92; color: var(--paper); animation: lowDeck 1.6s ease-in-out infinite; }
+.rush-arena .pile .pile-name { position: absolute; left: 50%; top: 3px; bottom: auto; translate: -50% 0; z-index: 2; max-width: 96%; padding: 2px 4px; background: rgb(var(--ink) / 0.72); border: 0; border-radius: 3px; font: 600 clamp(0.48rem, calc(var(--card) * 0.14), 0.7rem)/1 var(--body); color: var(--ivory-dim); white-space: nowrap; }
+.rush-arena .pile.extra { border-color: rgb(177 138 208 / 0.5); }
+.rush-arena .pile.grave { border-color: rgb(244 236 220 / 0.3); background: rgb(var(--ink) / 0.3) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b8ad97' stroke-width='1.6'%3E%3Cpath d='M6 21V10a6 6 0 0 1 12 0v11ZM12 8v7M9.5 11h5'/%3E%3C/svg%3E") center 55% / 34% no-repeat; }
+.rush-arena .pile:hover, .rush-arena .pile:focus-visible { border-color: var(--gold); }
+
+/* ---------- Carta Rush: imagem + faixa de ATK/DEF no campo ---------- */
+.rcard { position: relative; display: block; width: 100%; aspect-ratio: 418 / 609; border-radius: 4.5% / 3.1%; overflow: hidden; background: #120c07; }
+.rcard > img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.rush-arena .card:has(> .rcard) { background: none; overflow: visible; box-shadow: none; }
+.zone .rcard, .pile .rcard { box-shadow: 0 6px 14px -6px var(--ink-solid); }
+.live-stats { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; gap: 2px; padding: 2px 4px; background: linear-gradient(0deg, rgb(var(--ink) / 0.92), rgb(var(--ink) / 0.66)); font: 800 clamp(0.52rem, calc(var(--card) * 0.155), 0.84rem)/1.15 var(--body); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: var(--ivory); }
+.live-stats b { font-weight: 800; }
+.live-stats b:last-child { color: var(--ivory-dim); }
+.live-stats .up { color: #7dffa4 !important; }
+.live-stats .down { color: #ff7a84 !important; }
+/* Em Defesa a carta gira 90°: a faixa gira de volta, fica no meio e na horizontal (DEF em destaque). */
+.zone.defense .live-stats { left: 50%; top: 50%; right: auto; bottom: auto; width: max-content; gap: 5px; padding: 2px 6px; border-radius: 4px; transform: translate(-50%, -50%) rotate(-90deg) scale(1.45); }
+.zone.defense .live-stats b:first-child { color: var(--ivory-dim); }
+.zone.defense .live-stats b:last-child { color: var(--gold-hi); }
+.heart-face { display: grid; place-items: center; align-content: center; gap: 8%; padding: 10%; background: radial-gradient(circle at 50% 38%, #fff2b8, var(--gold) 38%, #6b3a05 80%); color: var(--lacquer); text-align: center; }
+.heart-face svg { width: 62%; fill: #b0141f; stroke: #fff2b8; stroke-width: 2; filter: drop-shadow(0 4px 6px rgb(0 0 0 / 0.45)); }
+.heart-face b { font: 400 clamp(0.6rem, 1.6vw, 1.1rem)/1.05 var(--display); }
+
+/* Mão */
+.rush-arena .hand { container-type: inline-size; height: calc(var(--hand) * 1.4 + 12px); padding-top: 12px; }
+.rush-arena .hand-card { --w: min(var(--hand), calc((100cqw - var(--hand) * 0.3) / (var(--n) * 0.8 + 0.2))); background: none; width: var(--w); margin-left: calc(var(--w) * -0.2); transform: translateY(calc(var(--o) * var(--o) * 2.5px - var(--w) * 0.1)) rotate(calc(var(--o) * 2.5deg)); }
+.rush-arena .hand-card:first-child { margin-left: 0; }
+.rush-arena .hand-card:hover, .rush-arena .hand-card:focus-visible { transform: translateY(-10px) scale(1.12) rotate(0); }
+.rush-arena .hand-card.set-pose .rcard { box-shadow: 0 0 0 2px var(--sky), 0 0 16px 2px rgb(79 179 232 / 0.55); }
+.rush-arena .hand-card.set-pose .rcard::after { content: 'Baixar'; position: absolute; left: 50%; bottom: 6%; translate: -50% 0; padding: 2px 6px; border-radius: 3px; background: var(--sky); color: var(--lacquer); font: 800 clamp(0.5rem, calc(var(--w) * 0.12), 0.72rem)/1.1 var(--body); text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* Zonas acesas ao arrastar (pilha e placa também) */
+.rush-arena .zone.filled.mine.drop-ok .face { box-shadow: 0 0 0 3px var(--sky), 0 0 28px 6px rgb(79 179 232 / 0.55); }
+
+/* ---------- Corrente ---------- */
+/* Coluna da direita: Corrente (quando há) em cima e a narração embaixo */
+.chronicle { grid-area: chain; align-self: stretch; display: flex; flex-direction: column; gap: 12px; min-height: 0; max-height: 100%; padding: 8px 0; }
+.story { flex: 1; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 6px; padding: 12px 14px; border-left: 3px solid var(--rule); background: rgb(var(--ink) / 0.38); }
+.story-title { margin: 0; font: 400 0.9rem/1 var(--display); color: var(--ivory-dim); }
+.history { margin: 0; padding: 0; list-style: none; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; gap: 5px; mask-image: linear-gradient(0deg, var(--ink-solid) 70%, transparent); }
+.history li { position: relative; flex: none; padding-left: 10px; color: var(--ivory-dim); font: 500 0.8rem/1.3 var(--body); }
+.history li::before { content: ''; position: absolute; left: 0; top: 0.45em; width: 4px; height: 4px; background: var(--gold); transform: rotate(45deg); }
+.history li.theirs::before { background: var(--blood); }
+.history li:last-child { color: var(--ivory); animation: logIn 0.35s var(--ease-out); }
+.history li.turn-mark { margin-top: 6px; padding-left: 0; color: var(--gold); font: 700 0.66rem/1 var(--body); letter-spacing: 0.06em; text-transform: uppercase; }
+.history li.turn-mark::before { display: none; }
+.chain { --c: 12px; display: grid; gap: 10px; padding: 14px 14px 16px; background: linear-gradient(160deg, rgb(26 20 14 / 0.94), rgb(10 8 7 / 0.94)); clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px); box-shadow: inset 0 0 0 1px rgb(var(--gold-rgb) / 0.35); animation: chainIn 0.35s var(--ease-snap); }
+@keyframes chainIn { from { opacity: 0; transform: translateX(24px); } }
+.chain-title { margin: 0; font: 400 1rem/1 var(--display); color: var(--gold); letter-spacing: 0.02em; }
+.chain-links { position: relative; display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.chain-links::before { content: ''; position: absolute; left: 13px; top: 14px; bottom: 14px; width: 2px; background: repeating-linear-gradient(180deg, var(--gold) 0 6px, transparent 6px 10px); opacity: 0.6; }
+.link { position: relative; display: grid; grid-template-columns: 28px 40px 1fr; align-items: center; gap: 8px; transition: opacity 0.3s; }
+.link-n { position: relative; z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; background: var(--foil); color: var(--lacquer); font: 400 0.9rem/1 var(--display); clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); }
+.link.theirs .link-n { background: linear-gradient(160deg, #ff8a92, var(--blood) 55%, #7d0f19); color: var(--ivory); }
+.link-card .rcard { width: 40px; }
+.link-name { min-width: 0; font: 700 0.8rem/1.15 var(--body); color: var(--ivory); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.link-name small { display: block; color: var(--ivory-dim); font-weight: 600; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.link.solving .link-card .rcard { box-shadow: 0 0 0 2px var(--gold-hi), 0 0 18px 4px rgb(var(--gold-rgb) / 0.7); animation: solving 0.8s ease-in-out infinite; }
+.link.solving small { color: var(--gold-hi); }
+@keyframes solving { 50% { transform: scale(1.08); } }
+.link.done { opacity: 0.45; }
+.link.negated { opacity: 0.6; }
+.link.negated .link-name { text-decoration: line-through; text-decoration-color: var(--blood); }
+.link.negated small { color: #ff7a84; }
+
+/* Lançamento (carta ativada no centro): o do rival brilha em vermelho */
+.rush-arena .cast[data-owner='enemy'] .card { box-shadow: 0 0 0 2px var(--blood), 0 0 80px 20px rgb(224 48 63 / 0.45); }
+.rush-arena .cast .card { background: none; }
+
+/* ---------- Leitura e diálogos ---------- */
+.rush-arena .zoom { grid-template-columns: minmax(0, min(360px, 38vw)) minmax(0, 420px); }
+.rush-arena .zoom .card { background: none; box-shadow: 0 40px 80px -20px var(--ink-solid); }
+.zoom-text { max-height: 40dvh; overflow: auto; color: var(--ivory) !important; font-size: 1rem; line-height: 1.45; white-space: pre-line; }
+.zoom-actions { display: grid; gap: 10px; margin-top: 16px; }
+.zoom-actions .btn { min-height: 46px; }
+.ask { width: min(94vw, 680px); max-height: 88dvh; overflow: auto; }
+.ask-note { margin: -8px 0 14px; padding: 6px 10px; border-left: 3px solid var(--gold); background: rgb(var(--gold-rgb) / 0.08); color: var(--ivory-dim); font-size: 0.85rem; text-align: left; }
+.ask-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-bottom: 18px; }
+.ask-search { grid-column: 1 / -1; padding: 10px 14px; border: 1px solid var(--rule); border-radius: 6px; background: rgb(var(--ink) / 0.4); color: var(--ivory); font: inherit; }
+.ask-search:focus { outline: 2px solid var(--gold); outline-offset: 2px; }
+.ask-item[hidden] { display: none; }
+.ask-item { display: grid; gap: 6px; padding: 10px 12px; min-height: 44px; border: 1px solid var(--rule); border-radius: 6px; background: rgb(var(--ink) / 0.35); color: var(--ivory); font: 600 0.92rem/1.2 var(--body); cursor: pointer; text-align: center; }
+.ask-item.with-card { justify-items: center; }
+.ask-item.with-card .rcard, .ask-item .heart-face { width: 92px; }
+.ask-item span { font-size: 0.8rem; }
+.ask-item:hover { border-color: var(--gold); }
+.ask-item[aria-pressed='true'] { border-color: var(--gold-hi); background: rgb(var(--gold-rgb) / 0.18); box-shadow: 0 0 0 2px var(--gold-hi); }
+.float.heal { color: #7dffa4; }
+.result[data-result='draw'] .result-title { background: linear-gradient(160deg, #e9e3d6, #9c9384); -webkit-background-clip: text; background-clip: text; }
+
+/* Dock: até três botões numa linha */
+.rush-arena .dock-actions { flex-wrap: nowrap; }
+.rush-arena .dock .btn { flex: 1; padding: 0 12px; white-space: nowrap; }
+.rush-arena .hint { min-height: calc(3 * 1.3em); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* Notebook baixo */
+@media (min-width: 861px) and (max-height: 760px) {
+  .rush-arena .hint { display: none; }
+  .rush-arena .arena-top { padding-block: 4px; }
+}
+
+/* ---------- Celular: placas em cima e embaixo, Corrente como faixa sobre o campo ---------- */
+@media (max-width: 860px) {
+  .rush-arena {
+    --gap: 5px;
+    --hand: min(20vw, 12.5dvh);
+    --card: min((100vw - 20px - 4 * var(--gap)) / 5.25, (100dvh - 236px - var(--hand) * 1.25) / 6.25);
+  }
+  .rush-arena .arena-top { padding: 4px 8px; gap: 8px; }
+  .rush-arena .hint { display: none; }
+  .rush-arena .tray { padding-top: 2px; }
+  .rush-table { grid-template-columns: 1fr; grid-template-rows: auto auto auto; grid-template-areas: 'foe' 'field' 'me'; align-content: center; gap: 6px; padding: 0 8px; }
+  .field { justify-self: center; padding: 5px 6px; }
+  .seat { grid-template-columns: auto 1fr auto; align-items: center; column-gap: 10px; row-gap: 3px; padding: 6px 12px; --c: 8px; }
+  .seat .who { font-size: 0.78rem; }
+  .seat .lp-value { font-size: 1.15rem; }
+  .seat .lp-bar { grid-column: 1 / -1; grid-row: 2; }
+  .foe-hand { grid-column: 3; grid-row: 1; min-height: 0; }
+  .foe-backs { display: none; }
+  .matchup-chip { display: none; }
+  .seat.foe, .seat.me { align-self: stretch; }
+  .phases li { padding: 3px 7px; font-size: 0.58rem; }
+  .rush-arena .log span:first-child { font-size: 0.72rem; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .rush-arena .pile .pile-name { font-size: 0; padding: 1px 3px; top: 2px; }
+  .rush-arena .pile .pile-name::after { content: attr(data-short); font-size: 0.46rem; }
+  .rush-arena .pile .pile-count { min-width: 16px; padding: 2px 3px; right: 2px; bottom: 2px; }
+  .zone.fzone.empty::after { font-size: 0.46rem; }
+  .chronicle { display: contents; }
+  .story { display: none; }
+  .chain { position: fixed; z-index: 12; top: 48px; left: 8px; right: 8px; grid-template-columns: auto 1fr; align-items: center; gap: 8px; padding: 8px 10px; }
+  .chain-title { font-size: 0.8rem; }
+  .chain-links { grid-auto-flow: column; grid-auto-columns: minmax(120px, 1fr); overflow-x: auto; gap: 6px; }
+  .chain-links::before { display: none; }
+  .link { grid-template-columns: 22px 30px 1fr; gap: 5px; }
+  .link-n { width: 22px; height: 22px; font-size: 0.72rem; }
+  .link-card .rcard { width: 30px; }
+  .link-name { font-size: 0.7rem; -webkit-line-clamp: 1; }
+  .rush-arena .zoom { grid-template-columns: 1fr; align-content: start; padding-top: 16px; overflow: auto; }
+  .rush-arena .zoom .card { width: min(60vw, 250px); }
+  .zoom-text { max-height: none; font-size: 0.92rem; }
+  .ask-items { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
+  .ask-item.with-card .rcard { width: 72px; }
+}

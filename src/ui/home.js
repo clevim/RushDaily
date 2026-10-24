@@ -1,11 +1,13 @@
-import { ARCHETYPE_LABELS, ARCHETYPES, CARD_POOL, cardBackImage, cardImage, cardThumb } from '../data/cards.mjs';
-import { generateDailyMatch, listDifficulties } from '../engine/daily-generator.mjs';
-import { bindKeyChip, ensureStarter, escape, foil, glove, heartUnlocked, getPlayerKey, inspect, longDate, nav, readJson, reducedMotion, settingsFor, tilt, today, uniqueCards, writeJson } from './common.js';
+// Tela Hoje: o desafio do dia no Rush do EDOPro (o mesmo para todos), a dificuldade e o deck que você recebeu.
+import { ATTRIBUTE_OF, generateDailyMatch, listDifficulties } from '../engine/daily-generator.mjs';
+import { TYPE } from '../engine/ocg.mjs';
+import { bindKeyChip, escape, foil, glove, heartUnlocked, getPlayerKey, inspect, longDate, nav, readJson, reducedMotion, settingsFor, tilt, today, uniqueCards, writeJson } from './common.js';
+import { RUSH_BACK, paintRushCards, rushImg, warmRushCards } from './rush-render.js';
+import { cardStats, isMonster } from './rush-info.js';
 import { homeScene } from './scene.js';
 import { syncNow } from './sync.js';
 
 const playerKey = getPlayerKey();
-ensureStarter(playerKey);
 const date = today();
 const settingsKey = `rushdaily-settings:${playerKey}`;
 let difficulty = settingsFor(playerKey).difficulty;
@@ -16,13 +18,17 @@ document.querySelector('#nav').outerHTML = nav('today', playerKey);
 bindKeyChip(playerKey);
 $('#date').textContent = longDate(date);
 
-function match() {
-  return generateDailyMatch({ date, playerKey, difficulty, archetypes: ARCHETYPES, pool: CARD_POOL });
-}
+const pool = await (await fetch('src/data/rush/cards.json')).json();
+const cards = new Map(pool.map((card) => [card.id, card]));
+const match = () => generateDailyMatch({ date, difficulty, pool });
+const AI_LABEL = { aprendiz: 'Joga sem plano', duelista: 'Usa as Invocações ilimitadas', elite: 'Responde em toda chance', caos: 'Troca monstros sem medo' };
 
-function heroCards(deck) {
-  return uniqueCards(deck).map(({ card }) => card).sort((a, b) => b.power - a.power).slice(0, 3);
-}
+// Ordem do deck: monstros do mais forte ao mais fraco, depois Magias e Armadilhas.
+const rank = (card) => (isMonster(card) ? 0 : card.type & TYPE.SPELL ? 1 : 2);
+const order = (a, b) => rank(a) - rank(b) || (b.legend ? 1 : 0) - (a.legend ? 1 : 0) || b.atk - a.atk || a.name.localeCompare(b.name);
+/** As três cartas do leque: os monstros mais fortes do Tipo do dia (Lenda primeiro). */
+const heroCards = (side) => [...new Set(side.deck.main)].map((id) => cards.get(id)).filter(isMonster)
+  .sort((a, b) => (b.race === side.theme.race) - (a.race === side.theme.race) || order(a, b)).slice(0, 3);
 
 function renderDifficulty() {
   const field = $('#difficulty');
@@ -33,62 +39,81 @@ function renderDifficulty() {
     </label>`).join('')}`;
 }
 
+function railItem({ id, count }) {
+  const card = cards.get(id);
+  return `<li>
+      <button class="deck-card" type="button" data-id="${id}" aria-label="Ver ${escape(card.name)}${count > 1 ? `, ${count} cópias` : ''}">
+        <span class="card ${foil(card)}"><img data-rush-card="${id}" alt="" decoding="async" width="418" height="609"></span>
+        ${count > 1 ? `<span class="copies">×${count}</span>` : ''}
+      </button>
+    </li>`;
+}
+
 function render() {
   const data = match();
   const result = readJson('rushdaily-history', {})[playerKey]?.[date];
-  $('#you').textContent = ARCHETYPE_LABELS[data.player.archetype];
-  $('#foe').textContent = ARCHETYPE_LABELS[data.enemy.archetype];
+  $('#you').textContent = data.player.label;
+  $('#foe').textContent = data.enemy.label;
   // O nome mais longo manda no tamanho da fonte (CSS: --len), para o confronto caber na coluna.
-  $('#matchup').style.setProperty('--len', Math.max($('#you').textContent.length, $('#foe').textContent.length));
-  $('#brief').textContent = `${data.difficulty.modifier}${heartUnlocked(playerKey) ? ' Você tem um Coração das Cartas guardado.' : ''}`;
+  $('#matchup').style.setProperty('--len', Math.max(data.player.label.length, data.enemy.label.length));
+  $('#matchup').setAttribute('aria-label', `${data.player.label} contra ${data.enemy.label}`);
+  $('#brief').textContent = `Rush Duel: seu deck de ${data.player.label} ${ATTRIBUTE_OF[data.player.theme.attribute] || ''} contra ${data.enemy.label} ${ATTRIBUTE_OF[data.enemy.theme.attribute] || ''}. ${data.difficulty.modifier}${heartUnlocked(playerKey) ? ' Você tem um Coração das Cartas guardado: ele entra no duelo.' : ''}`.replace(/\s+/g, ' ').replace(' .', '.');
   const boosterOpen = Boolean(readJson(`rushdaily-classic-booster:${playerKey}:${date}`, null));
   const boosterLink = `<a href="screens.html?screen=reward&player=${playerKey}">Abrir booster</a>`;
+  const ongoing = readJson(`rushdaily-game:${playerKey}:${date}:${difficulty}`, null);
   $('#status').innerHTML = result === 'win' ? (boosterOpen ? 'Vitória registrada e booster aberto. Amanhã tem desafio novo.' : `Vitória registrada. Seu booster está esperando: ${boosterLink}.`)
     : result === 'loss' ? 'Você perdeu hoje. A revanche continua aberta.'
       : result === 'draw' ? 'Empate. A revanche continua aberta.'
-        : 'Vença o duelo de hoje para ganhar um booster.';
+        : ongoing?.v === 2 && ongoing.responses?.length && !ongoing.done ? 'Sua partida de hoje está salva: entre para continuar.'
+          : 'Vença o duelo de hoje para ganhar um booster.';
   $('#enter').href = `duel.html?player=${playerKey}&difficulty=${difficulty}`;
+  $('#enter').textContent = ongoing?.v === 2 && ongoing.responses?.length && !ongoing.done ? 'Continuar o duelo' : 'Entrar na arena';
 
-  const unique = uniqueCards(data.player.deck).sort((a, b) => b.card.power - a.card.power);
-  $('#deck-meta').textContent = `${data.player.stats.monsters} monstros, ${data.player.stats.spells} magias, ${data.player.stats.traps} armadilhas`;
-  $('#deck-rail').innerHTML = unique.map(({ card, count }) => `
-    <li>
-      <button class="deck-card" type="button" data-id="${card.id}" aria-label="Ver ${escape(card.name)}">
-        <span class="card ${foil(card)}"><img src="${cardThumb(card)}" alt="" loading="lazy" decoding="async" width="421" height="614"></span>
-        ${count > 1 ? `<span class="copies">×${count}</span>` : ''}
-      </button>
-    </li>`).join('');
+  const main = uniqueCards(data.player.deck.main).sort((a, b) => order(cards.get(a.id), cards.get(b.id)));
+  const ids = data.player.deck.main.map((id) => cards.get(id));
+  const monsters = ids.filter(isMonster).length;
+  const spells = ids.filter((card) => card.type & TYPE.SPELL).length;
+  const fusions = data.player.deck.extra.length;
+  $('#deck-meta').textContent = `${ids.length} cartas: ${monsters} monstros, ${spells} Magias, ${ids.length - monsters - spells} Armadilhas${fusions ? ` · ${fusions} ${fusions > 1 ? 'Fusões' : 'Fusão'} no Adicional` : ''}`;
+  $('#deck-rail').innerHTML = main.map(railItem).join('')
+    + (fusions ? `<li class="rail-break" aria-hidden="true"><span>Adicional</span></li>${uniqueCards(data.player.deck.extra).map(railItem).join('')}` : '');
+  paintRushCards($('#deck-rail'));
   document.querySelectorAll('.deck-card .card').forEach((node) => tilt(node, 18));
 
   $('#rival-stats').innerHTML = `
-    <div><dt>Arquétipo</dt><dd>${ARCHETYPE_LABELS[data.enemy.archetype]}</dd></div>
-    <div><dt>Pontos de vida</dt><dd>${lp(data.enemy.lp)}</dd></div>
-    <div><dt>Consistência</dt><dd>${Math.round(data.enemy.stats.consistency * 100)}%</dd></div>`;
+    <div><dt>Tipo</dt><dd>${escape(data.enemy.label)} ${escape(ATTRIBUTE_OF[data.enemy.theme.attribute] || '')}</dd></div>
+    <div><dt>Pontos de vida</dt><dd>${lp(data.enemy.lp)} <small>contra seus ${lp(data.player.lp)}</small></dd></div>
+    <div><dt>Estilo</dt><dd>${AI_LABEL[data.enemy.ai] || ''}</dd></div>`;
   return data;
 }
 
 renderDifficulty();
-const data = render();
-const scene = homeScene($('#stage'), { fronts: heroCards(data.player.deck).map((card) => cardThumb(card)), back: cardBackImage(), reduced: reducedMotion(), anchor: $('.stage') });
+let data = render();
+warmRushCards(data.player.deck.main.slice(0, 12));
+// Leque 3D: começa com o verso e troca pelas frentes quando as imagens ficam prontas.
+const frontsOf = (side) => Promise.all(heroCards(side).map((card) => rushImg(card).catch(() => RUSH_BACK)));
+const scene = homeScene($('#stage'), { fronts: [RUSH_BACK, RUSH_BACK, RUSH_BACK], back: RUSH_BACK, reduced: reducedMotion(), anchor: $('.stage') });
+const showFronts = () => { const side = data.player; frontsOf(side).then((urls) => { if (side.deck.main.join() === data.player.deck.main.join()) scene.setFronts(urls); }); };
+showFronts();
 // Sincroniza em segundo plano; se veio progresso de outro aparelho (vitória, booster), redesenha o dia.
 syncNow().then(({ changed }) => {
   if (!changed) return;
   difficulty = settingsFor(playerKey).difficulty;
-  scene.setFronts(heroCards(render().player.deck).map((card) => cardThumb(card)));
+  renderDifficulty();
+  data = render();
 });
 
 $('#difficulty').addEventListener('change', (event) => {
   difficulty = event.target.value;
   writeJson(settingsKey, { ...settingsFor(playerKey), difficulty, updatedAt: Date.now() });
-  const next = render();
-  scene.setFronts(heroCards(next.player.deck).map((card) => cardThumb(card)));
+  data = render(); // seu deck não muda com a dificuldade; o leque fica
 });
 
 $('#deck-rail').addEventListener('click', (event) => {
   const button = event.target.closest('.deck-card');
   if (!button) return;
-  const card = CARD_POOL.find((item) => String(item.id) === button.dataset.id);
-  inspect(card, cardImage(card));
+  const card = cards.get(Number(button.dataset.id));
+  inspect({ name: card.name, stats: cardStats(card), desc: card.desc, className: foil(card), html: `<img data-rush-card="${card.id}" alt="${escape(card.name)}">` }, paintRushCards);
 });
 
 $('#enter').addEventListener('click', async (event) => {

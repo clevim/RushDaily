@@ -158,3 +158,10 @@ body.launching::after {
   .deck-rail { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .btn.big { width: 100%; }
 }
+
+/* Deck do dia (Rush): separador do Adicional (Fusões) na grade e PV do rival comparados aos seus */
+.rail-break { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; color: var(--gold); font: 700 0.78rem/1 var(--body); letter-spacing: 0.08em; text-transform: uppercase; }
+.rail-break::before, .rail-break::after { content: ''; height: 1px; flex: 1; background: var(--rule); }
+.rival-stats dd small { display: block; margin-top: 4px; color: var(--ivory-dim); font: 600 0.72rem/1 var(--body); text-align: right; }
+.rival-stats dd { text-align: right; }
+.rival-stats div:last-child dd { font: 700 0.95rem/1.2 var(--body); font-stretch: 85%; color: var(--gold-hi); }

@@ -103,7 +103,7 @@ export async function answerCommon(prompt, ctx) {
       const valid = prompt.type === M.SELECT_TRIBUTE
         ? (chosen) => chosen.reduce((sum, index) => sum + (prompt.selects[index].release_param || 1), 0) >= prompt.min && chosen.length <= prompt.max
         : undefined;
-      const chosen = await ask({ title: `${hint('Escolha')}${prompt.max > 1 ? ` (${prompt.min === prompt.max ? prompt.min : `${prompt.min} a ${prompt.max}`})` : ''}`, items, min: prompt.min, max: prompt.max, cancel: prompt.can_cancel, valid, instant: prompt.min === 1 && prompt.max === 1 });
+      const chosen = await ask({ title: `${hint('Escolha')}${prompt.max > 1 ? ` (${prompt.min === prompt.max ? prompt.min : `${prompt.min} a ${prompt.max}`})` : ''}`, items, min: prompt.min, max: prompt.max, cancel: prompt.can_cancel, valid, instant: prompt.min === 1 && prompt.max === 1, search: items.length > 12 });
       return { type: prompt.type === M.SELECT_CARD ? R.SELECT_CARD : R.SELECT_TRIBUTE, indicies: chosen };
     }
     case M.SELECT_UNSELECT_CARD: {
