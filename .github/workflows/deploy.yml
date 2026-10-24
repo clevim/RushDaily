@@ -1,0 +1,124 @@
+# Pacote de deploy: gera os dados (npm run setup), roda os testes e publica as imagens Docker no GHCR.
+# O homelab só faz `docker compose pull && docker compose up -d` (README, seção "Deploy pelo GitHub Actions").
+#
+# As imagens levam as artes e cartas baixadas pelo setup (material da Konami): deixe os pacotes do GHCR
+# PRIVADOS (Packages › rushdaily › Package settings › Change visibility), mesmo com o repositório público.
+name: Pacote de deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      temporadas:
+        description: Temporadas clássicas liberadas (1 a 5)
+        default: '1'
+        required: true
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  WEB_IMAGE: ghcr.io/clevim/rushdaily
+  SYNC_IMAGE: ghcr.io/clevim/rushdaily-sync
+
+jobs:
+  pacote:
+    runs-on: ubuntu-24.04
+    # A primeira execução baixa tudo e desenha ~3.600 cartas; as seguintes reaproveitam o cache.
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # O setup exige ImageMagick 7 (comando `magick`); o Ubuntu traz o 6.
+      - uses: mfinelli/setup-imagemagick@v6
+
+      - name: Dependências do Python (Pillow, numpy)
+        run: python3 -m pip install --break-system-packages Pillow numpy
+
+      # Caches das ferramentas (downloads, clones, artes) e os arquivos já gerados em src/: o setup pula o que existe.
+      - name: Cache do setup
+        uses: actions/cache@v4
+        with:
+          path: |
+            tools/card-render/cache
+            tools/classic/cache
+            tools/setup/cache
+            src/vendor
+            src/data
+            src/assets/cards
+            src/assets/cards-sm
+            src/assets/classic-art
+            src/assets/classic-cards
+            src/assets/classic-cards-sm
+            src/assets/puzzle
+          key: setup-${{ inputs.temporadas || '1' }}-${{ hashFiles('tools/setup/**', 'tools/classic/import_cards.py', 'tools/classic/CARDSCRIPTS_SHA', 'tools/classic/puzzle-solutions.json', 'tools/classic/render/**', 'tools/card-render/*.py', 'tools/card-render/*.json', 'tools/puzzle/*.py', 'src/ui/classic-card-data.js') }}
+          restore-keys: |
+            setup-${{ inputs.temporadas || '1' }}-
+
+      # A entrada do formulário vai por variável de ambiente (nunca interpolada no shell) e é validada.
+      - name: Setup (dados, cartas e bibliotecas de terceiros)
+        env:
+          TEMPORADAS: ${{ inputs.temporadas || '1' }}
+        run: |
+          case "$TEMPORADAS" in [1-5]) ;; *) echo "temporadas inválidas: $TEMPORADAS" >&2; exit 1 ;; esac
+          npm run setup -- --temporadas "$TEMPORADAS"
+
+      - name: Testes
+        run: npm test
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Etiquetas do site
+        id: web
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.WEB_IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=sha,format=short
+            type=raw,value=latest
+
+      - name: Etiquetas da sincronização
+        id: sync
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.SYNC_IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=sha,format=short
+            type=raw,value=latest
+
+      # Os testes já rodaram acima: o estágio "test" do Dockerfile não é alvo e o BuildKit o pula.
+      - name: Imagem do site (nginx)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.web.outputs.tags }}
+          labels: ${{ steps.web.outputs.labels }}
+
+      - name: Imagem da sincronização (Node + SQLite)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: server/Dockerfile
+          push: true
+          tags: ${{ steps.sync.outputs.tags }}
+          labels: ${{ steps.sync.outputs.labels }}

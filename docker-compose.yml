@@ -1,0 +1,70 @@
+services:
+  rushdaily:
+    # Imagem publicada pelo workflow "Pacote de deploy" (GHCR, privada): `docker compose pull && docker compose up -d`.
+    # Para montar localmente depois do `npm run setup`: `docker compose up -d --build`.
+    image: ghcr.io/clevim/rushdaily:latest
+    build:
+      context: .
+    # Sem "ports": a única entrada é o cloudflared, na mesma rede Docker (ingress http://rushdaily:8080).
+    # Para teste local, descomente (só loopback, nunca 0.0.0.0):
+    # ports:
+    #   - "127.0.0.1:4173:8080"
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    networks: [default, sync]
+    # Para o cloudflared alcançar, entre na rede dele também (exemplo):
+    # networks: [default, sync, tunnel]
+
+  # Sincronização entre aparelhos (server/server.mjs, Node 24 + SQLite). Só o nginx alcança, pela rede interna "sync".
+  rushdaily-sync:
+    image: ghcr.io/clevim/rushdaily-sync:latest
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - sync-data:/data
+      # Backup diário (7 arquivos) em outro disco, de preferência (crie a pasta com dono 1000:1000):
+      # - /srv/backup/rushdaily:/data/backup
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8787/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    # Estatísticas de acesso (só ligam com ADMIN_TOKEN, de 32+ caracteres, no arquivo .env ao lado deste compose,
+    # fora do git: `echo "ADMIN_TOKEN=$(openssl rand -base64 36 | tr -d '/+=\n')" > .env && chmod 600 .env`).
+    environment:
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+    ports:
+      # Porta de estatísticas SÓ no loopback do host (acesso por `ssh -L 4192:127.0.0.1:4192 homelab`).
+      # NUNCA troque por 0.0.0.0 nem aponte o cloudflared/nginx para ela: não tem login além do token.
+      - "127.0.0.1:4192:8788"
+    # Publicar porta exige uma rede que não seja "internal"; por isso a rede "admin". Efeito colateral: o container
+    # passa a poder sair para a internet (não precisa; o `sync` continua sendo a única rede que o nginx enxerga).
+    networks: [sync, admin]
+
+networks:
+  sync:
+    internal: true # sem saída para a internet
+  admin: {} # só para publicar a porta de estatísticas em 127.0.0.1
+  # tunnel:
+  #   external: true
+
+volumes:
+  sync-data:
