@@ -19,6 +19,14 @@ const DADOS = join(RAIZ, 'tools/setup/cache/admin'); // o mesmo lugar onde o pai
 const INI = join(DADOS, 'inicializacao.json');
 const LOG = join(DADOS, 'inicializacao.log');
 const SEMENTES = new Set(['tools/classic/puzzle-solutions.json']); // o setup reescreve: junta em vez de sobrescrever
+// Memória de tradução editada no painel: a entrada revisada no volume vence a automática da imagem (as revisadas que já
+// foram para o repositório vêm iguais na imagem). Assim a edição no contêiner não se perde a cada subida.
+const TRADUCAO = new Set(['tools/rush/traducao/nomes.json', 'tools/rush/traducao/frases.json']);
+const juntaTraducao = (imagem, volume) => {
+  const out = { ...imagem };
+  for (const [en, e] of Object.entries(volume)) if (e?.origem === 'revisada' && (!out[en] || out[en].origem === 'automatica')) out[en] = e;
+  return out;
+};
 const IGNORA = new Set(['node_modules', 'cache', '__pycache__', '.git']);
 const fim = (msg) => { console.error(`ERRO: ${msg}`); process.exit(1); };
 
@@ -61,6 +69,10 @@ async function sincronizar() {
     }
     for (const rel of novos) {
       const de = join(CODIGO, ...rel.split('/')), para = join(RAIZ, ...rel.split('/'));
+      if (TRADUCAO.has(rel) && existsSync(para)) {
+        try { writeFileSync(para, JSON.stringify(juntaTraducao(JSON.parse(readFileSync(de, 'utf8')), JSON.parse(readFileSync(para, 'utf8'))), null, 0)); } catch { copyFileSync(de, para); }
+        continue;
+      }
       if (SEMENTES.has(rel) && existsSync(para)) {
         try { writeFileSync(para, JSON.stringify({ ...JSON.parse(readFileSync(de, 'utf8')), ...JSON.parse(readFileSync(para, 'utf8')) })); } catch { copyFileSync(de, para); }
         continue;

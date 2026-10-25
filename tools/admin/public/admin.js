@@ -574,23 +574,23 @@ $('notificar').onclick = async () => { try { await Notification.requestPermissio
 })();
 
 // ---- tradução Rush ----
-let tradPag = 0, tradTotal = 0, tradSoLeitura = false;
+let tradPag = 0, tradTotal = 0, tradConteiner = false;
 const ROTULO_ORIGEM = { automatica: 'automática', revisada: 'revisada', manual: 'manual', oficial: 'oficial' };
 async function tradCarrega() {
   const q = new URLSearchParams({ tipo: $('tradTipo').value, origem: $('tradOrigem').value, busca: $('tradBusca').value, pagina: tradPag });
   $('tradInfo').textContent = 'Carregando…';
   try {
     const r = await api('traducao?' + q);
-    tradTotal = r.total; tradSoLeitura = r.somenteLeitura;
+    tradTotal = r.total; tradConteiner = r.conteiner;
     const c = r.contagem;
     $('tradInfo').textContent = `${fmtN(r.total)} encontradas · página ${r.pagina + 1} de ${Math.max(1, Math.ceil(r.total / 50))} · automáticas ${fmtN(c.automatica)}, revisadas ${fmtN(c.revisada)}, manuais ${fmtN(c.manual)}, oficiais ${fmtN(c.oficial)}`
-      + (tradSoLeitura ? ' · contêiner: só leitura (edite no painel local)' : '');
+      + (tradConteiner ? ' · contêiner: as revisões ficam no volume; use "Baixar revisões" para levá-las ao repositório' : '');
     $('tradLista').replaceChildren(...r.itens.map((it) => tradItem(r.tipo, it)));
     $('tradAnt').disabled = tradPag === 0; $('tradProx').disabled = (tradPag + 1) * 50 >= tradTotal;
   } catch (e) { $('tradInfo').textContent = e.message; }
 }
 function tradItem(tipo, it) {
-  const area = el('textarea', { className: 'trad-pt', rows: tipo === 'nomes' ? 1 : 3, maxLength: 2000, value: it.pt, disabled: tradSoLeitura, 'aria-label': 'Tradução' });
+  const area = el('textarea', { className: 'trad-pt', rows: tipo === 'nomes' ? 1 : 3, maxLength: 2000, value: it.pt, 'aria-label': 'Tradução' });
   const estado = el('span', { className: 'desc' });
   const salvar = async (texto) => {
     estado.textContent = 'Salvando…';
@@ -601,13 +601,23 @@ function tradItem(tipo, it) {
   return el('li', { className: 'painel trad-item' },
     el('p', { className: 'trad-en' }, it.en), area,
     el('div', { className: 'trad-acoes' }, selo, it.usos != null ? el('span', { className: 'desc' }, `${it.usos} uso(s)`) : null,
-      el('button', { className: 'btn', type: 'button', disabled: tradSoLeitura, onclick: () => salvar(area.value) }, 'Salvar'),
-      el('button', { className: 'btn sec', type: 'button', disabled: tradSoLeitura || it.origem === 'revisada', onclick: () => salvar(it.pt) }, 'Aprovar'), estado));
+      el('button', { className: 'btn', type: 'button', onclick: () => salvar(area.value) }, 'Salvar'),
+      el('button', { className: 'btn sec', type: 'button', disabled: it.origem === 'revisada', onclick: () => salvar(it.pt) }, 'Aprovar'), estado));
 }
 $('tradForm').onsubmit = (e) => { e.preventDefault(); tradPag = 0; tradCarrega(); };
 $('tradAnt').onclick = () => { if (tradPag > 0) { tradPag--; tradCarrega(); } };
 $('tradProx').onclick = () => { if ((tradPag + 1) * 50 < tradTotal) { tradPag++; tradCarrega(); } };
 $('tradAplicar').onclick = () => executar('setup-etapa', { etapa: 'rush-ocg' }, 'Refazer o cards.json do Rush com as traduções atuais (setup --so rush-ocg)?');
+$('tradBaixar').onclick = async () => {
+  try {
+    const r = await api('traducao-revisadas');
+    const n = Object.keys(r.nomes).length + Object.keys(r.frases).length;
+    if (!n) { aviso('Nenhuma entrada revisada ainda.'); return; }
+    const a = el('a', { href: URL.createObjectURL(new Blob([JSON.stringify(r, null, 1)], { type: 'application/json' })), download: 'revisoes-traducao.json' });
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    aviso(`${n} revisões baixadas. No repositório: python3 -I tools/rush/traducao.py aplicar revisoes-traducao.json --origem revisada`);
+  } catch (e) { falha(e); }
+};
 $('tradMontar').onclick = $('artesMontar').onclick = () => executar('montar-rush', {}, 'Montar as cartas Rush que mudaram ou faltam (render.mjs)?');
 aoMostrar.traducao = () => { if (!$('tradLista').children.length) tradCarrega(); };
 
