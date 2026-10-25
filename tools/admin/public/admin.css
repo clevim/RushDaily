@@ -74,7 +74,7 @@ code { font-family: var(--mono); font-size: .88em; color: var(--gold-hi); overfl
 
 /* ---- conteúdo ---- */
 main { grid-area: main; min-width: 0; padding: 24px clamp(16px, 3vw, 36px) 64px; outline: none; }
-.secao { display: grid; gap: 18px; max-width: 1280px; }
+.secao { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; max-width: 1280px; }
 .cab h1 { margin: 0; font: 400 clamp(1.35rem, 2.4vw, 1.8rem)/1.15 var(--display); color: var(--gold); letter-spacing: .01em; outline: none; }
 .sub, .desc { margin: 4px 0 0; color: var(--ivory-dim); font-size: .92rem; }
 .desc { font-size: .88rem; }
@@ -119,7 +119,7 @@ input[type=checkbox] { width: 22px; height: 22px; min-height: 0; accent-color: v
 
 /* ---- visão geral ---- */
 .kpis { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); }
-#desafio { display: grid; gap: 16px; }
+#desafio, #jog { display: grid; gap: 16px; }
 #diaData { max-width: 220px; }
 .campo.inline:has(#diaData) { flex: 0 1 220px; }
 .kpi { background: var(--painel); border: 1px solid var(--rule); border-radius: var(--raio); padding: 14px 16px; display: grid; gap: 2px; align-content: start; min-width: 0; }
@@ -255,7 +255,9 @@ dialog::backdrop { background: rgb(0 0 0 / .72); }
   .etapa .lado .acoes-linha { justify-content: flex-start; }
   .tt-texto { text-align: left; }
   .confronto { grid-template-columns: minmax(0, 1fr); }
-  .kpi b { font-size: 1.4rem; }
+  .kpi b { font-size: 1.3rem; }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .kpi { padding: 12px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }

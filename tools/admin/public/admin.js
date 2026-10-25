@@ -30,6 +30,7 @@ const fmtN = (n) => Number(n || 0).toLocaleString('pt-BR');
 const pct = (n, m) => (m > 0 ? Math.min(100, Math.round(n / m * 100)) : 0);
 const hojeLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const barraEl = (n, m, ok) => { const b = el('div', { className: 'barra' + (ok ? ' ok' : ''), role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': pct(n, m) }, el('i')); b.firstChild.style.width = pct(n, m) + '%'; return b; };
+const troca = (alvo, ...f) => alvo.replaceChildren(...f.flat().filter((x) => x !== null && x !== undefined && x !== false));
 const chip = (classe, texto) => el('span', { className: 'chip ' + classe }, texto);
 let msgT;
 const aviso = (t, erro = false) => { $('msg').textContent = t; $('msg').className = erro ? 'erro' : ''; $('msg').hidden = false; clearTimeout(msgT); msgT = setTimeout(() => { $('msg').hidden = true; }, 6000); };
@@ -150,11 +151,11 @@ $('ttCancelar').onclick = async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && tituloFim) { tituloFim = ''; pintaTopo(); } });
 
 function pintaEstado(s) {
-  if (s.atual && s.atual.id !== ultimoId) { ultimoId = s.atual.id; logVivo.set([], `${s.atual.tarefa}-${s.atual.id}`); $('resumoAtual').replaceChildren(); }
+  if (s.atual && s.atual.id !== ultimoId) { ultimoId = s.atual.id; logVivo.set([], `${s.atual.tarefa}-${s.atual.id}`); troca($('resumoAtual'), ); }
   atual = s.atual; filaAtual = s.fila; histAtual = s.historico;
   pintaTopo();
   $('logTitulo').textContent = atual ? '· ao vivo: ' + atual.linha : ultimoId ? '· última tarefa desta sessão' : '';
-  $('fila').replaceChildren(...filaAtual.map((j) => el('div', {}, el('span', {}, `Na fila: ${j.titulo}`), el('button', { className: 'btn sec pequeno', onclick: () => api('cancelar', 'POST', { id: j.id }).catch(falha) }, 'Remover'))));
+  troca($('fila'), ...filaAtual.map((j) => el('div', {}, el('span', {}, `Na fila: ${j.titulo}`), el('button', { className: 'btn sec pequeno', onclick: () => api('cancelar', 'POST', { id: j.id }).catch(falha) }, 'Remover'))));
   pintaHistorico();
   pintaUltima();
 }
@@ -188,7 +189,7 @@ async function eventos() {
 function terminou(ev) {
   const txt = ev.cancelada ? `Cancelada: ${ev.titulo}` : ev.codigo === 0 ? `Concluída: ${ev.titulo}` : `Erro (${ev.codigo}): ${ev.titulo}`;
   aviso(txt, !ev.cancelada && ev.codigo !== 0);
-  $('resumoAtual').replaceChildren(resumoEl(ev.resumo, { codigo: ev.codigo, cancelada: ev.cancelada }) ?? '');
+  troca($('resumoAtual'), resumoEl(ev.resumo, { codigo: ev.codigo, cancelada: ev.cancelada }) ?? '');
   if (document.hidden) {
     tituloFim = `${txt} · ${TITULO}`;
     try { if ('Notification' in window && Notification.permission === 'granted') new Notification('RushDaily Admin', { body: txt, tag: 'rushdaily-admin' }); } catch { /* sem notificação */ }
@@ -198,7 +199,7 @@ function terminou(ev) {
 
 // ---- status: visão geral e dados/setup ----
 async function carregaStatus() {
-  try { ultimoStatus = await api('status'); pintaStatus(); } catch (e) { $('etapas').replaceChildren(el('li', { className: 'vazio' }, e.message)); }
+  try { ultimoStatus = await api('status'); pintaStatus(); } catch (e) { troca($('etapas'), el('li', { className: 'vazio' }, e.message)); }
 }
 const disponivel = (t) => meta?.tarefas[t] && !meta.tarefas[t].indisponivel;
 const temporadasAtivas = () => Math.max(1, ultimoStatus?.contagens?.temporadas || 1);
@@ -208,7 +209,7 @@ function pintaStatus() {
   const kpi = (valor, rotulo, extra, barra) => el('div', { className: 'kpi' }, el('b', {}, ...[valor].flat()), el('span', {}, rotulo), extra ? el('span', {}, extra) : null, barra ?? null);
   const de = (n, m) => [fmtN(n), el('small', {}, ` / ${fmtN(m)}`)];
   const jr = jogResumoCache;
-  $('kpis').replaceChildren(
+  troca($('kpis'), 
     total ? kpi(de(prontas, total), 'etapas do setup prontas', null, barraEl(prontas, total, prontas === total)) : kpi('—', 'setup não disponível aqui'),
     kpi(fmtN(c.rush), 'cartas Rush', `${fmtN(c.rushPt)} em PT · ${fmtN(c.scriptsRush)} scripts`),
     kpi(de(c.rushArte, c.rush), 'artes Rush', null, barraEl(c.rushArte, c.rush, c.rush && c.rushArte >= c.rush)),
@@ -221,19 +222,19 @@ function pintaStatus() {
   );
   // saúde do setup: o que falta
   const faltam = s.etapas.filter((e) => !e.pronto);
-  $('saude').replaceChildren(
+  troca($('saude'), 
     total ? el('p', { className: 'sub' }, `${prontas} de ${total} etapas prontas.`) : el('p', { className: 'vazio' }, 'O setup não existe nesta instalação.'),
     faltam.length ? el('ul', { className: 'lista-curta' }, faltam.map((e) => el('li', {}, el('span', {}, chip(e.parcial ? 'parcial' : 'falta', e.parcial ? 'parcial' : 'falta'), ' ', e.nome),
       disponivel('setup-etapa') ? el('button', { className: 'btn sec pequeno', onclick: () => rodaEtapa(e.nome, false) }, 'Rodar') : null))) : total ? el('p', {}, chip('ok', 'tudo pronto')) : null);
   // etapas detalhadas
-  $('etapas').replaceChildren(...s.etapas.map((e) => el('li', { className: 'etapa ' + (e.pronto ? 'ok' : e.parcial ? 'parcial' : '') },
+  troca($('etapas'), ...s.etapas.map((e) => el('li', { className: 'etapa ' + (e.pronto ? 'ok' : e.parcial ? 'parcial' : '') },
     el('div', {}, el('h3', {}, e.nome, chip(e.pronto ? 'ok' : e.parcial ? 'parcial' : 'falta', e.pronto ? 'pronta' : e.parcial ? 'parcial' : 'faltando')), el('p', {}, e.desc), e.contagem ? el('p', { className: 'cont' }, e.contagem) : null),
     el('div', { className: 'lado' }, el('span', {}, `${fmtB(e.bytes)} · ${fmtT(e.geradoEm)}`),
       el('div', { className: 'acoes-linha' }, el('button', { className: 'btn sec pequeno', disabled: !disponivel('setup-etapa'), onclick: () => rodaEtapa(e.nome, false) }, 'Rodar'),
         el('button', { className: 'btn fantasma pequeno', disabled: !disponivel('setup-etapa'), onclick: () => rodaEtapa(e.nome, true) }, 'Refazer'))))));
-  if (!s.etapas.length) $('etapas').replaceChildren(el('li', { className: 'vazio' }, 'Sem a lista de etapas (tools/setup/setup.mjs não está aqui).'));
+  if (!s.etapas.length) troca($('etapas'), el('li', { className: 'vazio' }, 'Sem a lista de etapas (tools/setup/setup.mjs não está aqui).'));
   const maior = Math.max(1, ...s.caches.map((x) => x.bytes));
-  $('caches').replaceChildren(el('p', { className: 'sub' }, `Total: ${fmtB(s.cacheTotal)}`), el('div', { className: 'caches' }, s.caches.map((x) => el('div', { className: 'cache-linha' }, el('code', {}, x.nome), el('span', { className: 'num' }, fmtB(x.bytes)), barraEl(x.bytes, maior)))));
+  troca($('caches'), el('p', { className: 'sub' }, `Total: ${fmtB(s.cacheTotal)}`), el('div', { className: 'caches' }, s.caches.map((x) => el('div', { className: 'cache-linha' }, el('code', {}, x.nome), el('span', { className: 'num' }, fmtB(x.bytes)), barraEl(x.bytes, maior)))));
   $('setupTudo').disabled = !disponivel('setup');
   pintaIni(s.inicializacao);
   pintaProxima();
@@ -244,11 +245,11 @@ function pintaIni(ini) {
   const classe = { rodando: 'parcial', ok: 'ok', erro: 'erro', interrompida: 'erro' }[ini.estado] ?? 'neutro';
   const pre = el('div', { className: 'log' }); pre.style.height = '180px';
   pre.append(...ini.log.slice(-40).map((l) => el('div', { className: tipoLinha(l) }, l)));
-  $('ini').replaceChildren(
+  troca($('ini'), ...[
     el('p', {}, chip(classe, ini.estado), ' ', `Serviço rushdaily-dados · início ${fmtT(ini.inicio)}${ini.fim ? ` · fim ${fmtT(ini.fim)}` : ''}${ini.codigo !== undefined && ini.codigo !== null ? ` · saída ${ini.codigo}` : ''}`),
     ini.args ? el('p', { className: 'desc' }, el('code', {}, ini.args.join(' '))) : null,
     ini.viva ? (ini.progresso ? barraEl(ini.progresso.n, ini.progresso.m) : el('div', { className: 'barra indet' }, el('i'))) : null,
-    pre, el('p', { className: 'desc' }, 'Log completo no homelab: docker compose logs -f rushdaily-dados'));
+    pre, el('p', { className: 'desc' }, 'Log completo no homelab: docker compose logs -f rushdaily-dados')].filter(Boolean));
   pre.scrollTop = pre.scrollHeight;
 }
 function pintaProxima() {
@@ -268,8 +269,8 @@ function pintaProxima() {
 }
 function pintaUltima() {
   const h = histAtual[0];
-  if (!h) { $('ultima').replaceChildren(el('p', { className: 'vazio' }, 'Nenhuma execução ainda.')); return; }
-  $('ultima').replaceChildren(el('p', {}, resultadoChip(h), ' ', el('b', {}, h.titulo)), el('p', { className: 'desc' }, `${fmtT(h.inicio)} · ${fmtD(h.duracaoMs)}`), el('p', { className: 'desc' }, el('code', {}, h.linha)),
+  if (!h) { troca($('ultima'), el('p', { className: 'vazio' }, 'Nenhuma execução ainda.')); return; }
+  troca($('ultima'), el('p', {}, resultadoChip(h), ' ', el('b', {}, h.titulo)), el('p', { className: 'desc' }, `${fmtT(h.inicio)} · ${fmtD(h.duracaoMs)}`), el('p', { className: 'desc' }, el('code', {}, h.linha)),
     resumoEl(h.resumo, h) ?? '', el('button', { className: 'btn sec pequeno', onclick: () => { ir('historico'); verLog(h.id); } }, 'Ver o log'));
   pintaProxima();
 }
@@ -302,7 +303,7 @@ function montaParams() {
   const t = meta.tarefas[$('tarefa').value];
   $('desc').textContent = t.desc;
   $('indisp').hidden = !t.indisponivel; $('indisp').textContent = t.indisponivel ? `Indisponível aqui: ${t.indisponivel}.` : '';
-  $('params').replaceChildren(...t.params.map((p) => CAMPOS[p]()));
+  troca($('params'), ...t.params.map((p) => CAMPOS[p]()));
   $('rodar').disabled = !!t.indisponivel;
 }
 function lerParams() {
@@ -338,7 +339,7 @@ async function buscar(q, abrirPrimeira = false) {
     cartas = r.cartas;
     const falt = [!r.rushDisponivel && 'sem dados do Rush (rode rush-ocg)', !r.classicoDisponivel && 'sem dados do clássico (rode classico)'].filter(Boolean);
     $('cartasInfo').textContent = `${cartas.length === 40 ? '40+' : cartas.length} resultado(s)${falt.length ? ' · ' + falt.join(' · ') : ''}.`;
-    $('resultados').replaceChildren(...cartas.map((c, i) => {
+    troca($('resultados'), ...cartas.map((c, i) => {
       const mini = el('img', { className: 'mini', alt: '', width: 44, height: 64 });
       if (c.mini) imagem(c.fonte === 'rush' ? 'rush-cards-sm' : 'classic-cards-sm', c.id).then((u) => { if (u) mini.src = u; });
       return el('li', {}, el('button', { type: 'button', 'aria-pressed': 'false', onclick: (ev) => detalheCarta(i, ev.currentTarget) }, mini,
@@ -362,7 +363,7 @@ async function detalheCarta(i, botao) {
   const ficha = [['Id', String(c.id)], ['Nome em inglês', c.nameEn || '—'], ['Tipo', tipoCarta(c.type)]];
   if (ehMonstro(c.type)) ficha.push(['Atributo', ATRIBUTOS[c.attribute] ?? '—'], ['Tipo de monstro', TIPOS_RACA[c.race] ?? String(c.race)], ['Nível', String(c.level & 0xff)], ['ATK / DEF', `${c.atk} / ${c.def}`]);
   $('cartaDet').hidden = false;
-  $('cartaDet').replaceChildren(
+  troca($('cartaDet'), 
     el('h2', {}, c.name, chip('neutro', rush ? 'Rush' : 'Clássico'), c.legend ? chip('parcial', 'Lenda') : null, rush ? chip(c.pt ? 'ok' : 'neutro', c.pt ? 'texto em PT' : 'sem PT') : null),
     el('dl', { className: 'dl' }, ficha.flatMap(([k, v]) => [el('dt', {}, k), el('dd', {}, v)])),
     el('div', { className: 'imgs' }, fig(`${pre}-art`, c.arte, 'Arte', rush ? 'Sem arte: a carta sai com o quadro no tom do atributo.' : 'Sem arte baixada.'), fig(`${pre}-cards`, c.montada, rush ? 'Carta montada' : 'Carta pré-desenhada', 'Ainda não montada.')),
@@ -390,11 +391,11 @@ function deckEl(deck, cartas) {
 }
 async function carregaDesafio(data) {
   $('diaData').value = data;
-  $('desafio').replaceChildren(el('p', { className: 'vazio' }, 'Gerando o desafio…'));
+  troca($('desafio'), el('p', { className: 'vazio' }, 'Gerando o desafio…'));
   try {
     const r = await api(`desafio?data=${data}&dias=7`);
     desafioCarregado = data;
-    if (r.erro) { $('desafio').replaceChildren(el('p', { className: 'aviso erro' }, r.erro)); return; }
+    if (r.erro) { troca($('desafio'), el('p', { className: 'aviso erro' }, r.erro)); return; }
     const { dia, proximos, cartas } = r;
     let escolhido = 1;
     const painelRival = el('div');
@@ -408,7 +409,7 @@ async function carregaDesafio(data) {
       onkeydown: (ev) => { if (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft') { escolhido = (escolhido + (ev.key === 'ArrowRight' ? 1 : 3)) % 4; pintaRival(); abas.children[escolhido].focus(); } } }, rv.nome)));
     painelRival.setAttribute('role', 'tabpanel');
     pintaRival();
-    $('desafio').replaceChildren(
+    troca($('desafio'), 
       el('p', { className: 'sub' }, diaLongo(dia.data) + (dia.data === hojeLocal() ? ' (hoje)' : '')),
       el('div', { className: 'confronto' }, el('div', {}, el('span', {}, 'Você'), el('b', {}, dia.jogador.label), el('span', {}, `${fmtN(dia.jogador.lp)} PV · força ${fmtN(dia.jogador.power)}`)), el('span', { className: 'vs' }, 'contra'),
         el('div', {}, el('span', {}, 'Rival'), el('b', {}, dia.rivais[0].label), el('span', {}, `${fmtN(dia.rivais[0].lp)} a ${fmtN(dia.rivais.at(-1).lp)} PV conforme a dificuldade`))),
@@ -417,7 +418,7 @@ async function carregaDesafio(data) {
         el('article', { className: 'painel' }, el('h2', {}, 'Rival por dificuldade'), abas, painelRival)),
       el('article', { className: 'painel' }, el('h2', {}, 'Próximos dias'), el('div', { className: 'tabela' }, el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'Dia'), el('th', {}, 'Confronto'))),
         el('tbody', {}, proximos.map((p) => el('tr', { className: 'clic', tabIndex: 0, onclick: () => carregaDesafio(p.data), onkeydown: (ev) => ev.key === 'Enter' && carregaDesafio(p.data) }, el('td', {}, diaLongo(p.data)), el('td', {}, `${p.jogador} contra ${p.rival}`))))))));
-  } catch (e) { $('desafio').replaceChildren(el('p', { className: 'aviso erro' }, e.message)); }
+  } catch (e) { troca($('desafio'), el('p', { className: 'aviso erro' }, e.message)); }
 }
 $('diaAnt').onclick = () => carregaDesafio(somaDias($('diaData').value || hojeLocal(), -1));
 $('diaProx').onclick = () => carregaDesafio(somaDias($('diaData').value || hojeLocal(), 1));
@@ -450,14 +451,14 @@ async function jogResumo() {
   jogResumoCache = r;
   if (r.configurado === false) {
     $('jog').hidden = true; $('jogConf').hidden = false;
-    $('jogConf').replaceChildren(...(r.conteiner
+    troca($('jogConf'), ...(r.conteiner
       ? ['Estatísticas não configuradas. No ', el('code', {}, '.env'), ' do homelab defina ', el('code', {}, 'ADMIN_TOKEN'), ' (32+ caracteres) e suba de novo: ', el('code', {}, 'docker compose --profile admin up -d'), '. O painel lê o rushdaily-sync pela rede interna.']
       : ['Estatísticas não configuradas. No homelab: defina ', el('code', {}, 'ADMIN_TOKEN'), ' no ', el('code', {}, '.env'), ' do compose, abra o túnel ', el('code', {}, 'ssh -L 4192:127.0.0.1:4192 homelab'),
         ' e suba este admin com ', el('code', {}, 'SYNC_ADMIN_TOKEN=…'), ' (ou grave ', el('code', {}, 'syncAdminToken'), ' em ', el('code', {}, 'tools/setup/cache/admin/config.json'), '). Mais simples: rode o painel no contêiner (veja tools/admin/LEIA-ME.md).']));
     return false;
   }
   $('jogConf').hidden = true; $('jog').hidden = false;
-  $('cartoes').replaceChildren(...[['Chaves', r.totalChaves], ['Ativos hoje', r.ativosHoje], ['Ativos 7 dias', r.ativos7d], ['Ativos 30 dias', r.ativos30d]].map(([nome, v]) => el('div', { className: 'kpi' }, el('b', {}, fmtN(v)), el('span', {}, nome))));
+  troca($('cartoes'), ...[['Chaves', r.totalChaves], ['Ativos hoje', r.ativosHoje], ['Ativos 7 dias', r.ativos7d], ['Ativos 30 dias', r.ativos30d]].map(([nome, v]) => el('div', { className: 'kpi' }, el('b', {}, fmtN(v)), el('span', {}, nome))));
   grafico($('grafAtivos'), r.ativosPorDia, 'ativos'); grafico($('grafNovas'), r.novasPorDia, 'novas');
   return true;
 }
@@ -465,11 +466,11 @@ async function jogLista() {
   const q = new URLSearchParams({ ordem: jog.ordem, dir: jog.dir, pagina: jog.pagina, limite: jog.limite, ...(jog.busca ? { busca: jog.busca } : {}) });
   const r = await api('jogadores/usuarios?' + q);
   jog.total = r.total;
-  $('jogCab').replaceChildren(...COLS.map(([k, nome]) => el('th', { className: 'ord', 'aria-sort': jog.ordem === k ? (jog.dir === 'asc' ? 'ascending' : 'descending') : 'none' },
+  troca($('jogCab'), ...COLS.map(([k, nome]) => el('th', { className: 'ord', 'aria-sort': jog.ordem === k ? (jog.dir === 'asc' ? 'ascending' : 'descending') : 'none' },
     el('button', { type: 'button', onclick: () => ordena(k) }, nome + (jog.ordem === k ? (jog.dir === 'asc' ? ' ▲' : ' ▼') : '')))));
-  $('jogLinhas').replaceChildren(...r.usuarios.map((u) => el('tr', { className: 'clic', tabIndex: 0, onclick: () => jogDetalhe(u.key), onkeydown: (ev) => ev.key === 'Enter' && jogDetalhe(u.key) },
+  troca($('jogLinhas'), ...r.usuarios.map((u) => el('tr', { className: 'clic', tabIndex: 0, onclick: () => jogDetalhe(u.key), onkeydown: (ev) => ev.key === 'Enter' && jogDetalhe(u.key) },
     el('td', { className: 'mono' }, u.key), el('td', {}, fmtT(u.primeiroAcesso)), el('td', {}, fmtT(u.ultimoAcesso)), el('td', { className: 'num' }, fmtN(u.acessos)), el('td', { className: 'num' }, fmtN(u.diasAtivos)), el('td', { className: 'num' }, fmtB(u.bytes)), el('td', { className: 'num' }, String(u.rev)))));
-  if (!r.usuarios.length) $('jogLinhas').replaceChildren(el('tr', {}, el('td', { colSpan: COLS.length }, 'Nenhuma chave.')));
+  if (!r.usuarios.length) troca($('jogLinhas'), el('tr', {}, el('td', { colSpan: COLS.length }, 'Nenhuma chave.')));
   const paginas = Math.max(1, Math.ceil(r.total / jog.limite));
   $('jogPag').textContent = `Página ${jog.pagina} de ${paginas} · ${fmtN(r.total)} chaves`;
   $('jogAnt').disabled = jog.pagina <= 1; $('jogProx').disabled = jog.pagina >= paginas;
@@ -481,7 +482,7 @@ async function jogDetalhe(key) {
     const p = u.progresso;
     const campos = [['Primeiro acesso', fmtT(u.primeiroAcesso)], ['Último acesso', fmtT(u.ultimoAcesso)], ['Acessos', fmtN(u.acessos)], ['Dias ativos', fmtN(u.diasAtivos)], ['Tamanho do dado', fmtB(u.bytes)], ['Rev', String(u.rev)],
       ['Vitórias / derrotas', `${p.vitorias} / ${p.derrotas}`], ['Sequência atual', `${p.sequencia} dia(s)`], ['Cartas distintas (clássico)', fmtN(p.cartas)], ['Decks', fmtN(p.decks)], ['Duelos PvP', fmtN(p.pvp)], ['Peças do Enigma (mês)', fmtN(p.pecasEnigma)], ['Boosters abertos', fmtN(p.boosters)], ['Chave criada', fmtT(u.criadaEm)]];
-    $('jogDet').replaceChildren(el('h2', { className: 'mono' }, `Chave ${u.key}`), el('dl', { className: 'dl' }, campos.flatMap(([k, v]) => [el('dt', {}, k), el('dd', {}, v)])),
+    troca($('jogDet'), el('h2', { className: 'mono' }, `Chave ${u.key}`), el('dl', { className: 'dl' }, campos.flatMap(([k, v]) => [el('dt', {}, k), el('dd', {}, v)])),
       el('p', { className: 'desc' }, `Dias ativos (${u.dias.length}): ${u.dias.slice(0, 120).join(', ') || 'nenhum registrado'}${u.dias.length > 120 ? '…' : ''}`),
       el('button', { className: 'btn sec', onclick: () => { $('jogDet').hidden = true; } }, 'Fechar'));
     $('jogDet').hidden = false; $('jogDet').scrollIntoView({ block: 'nearest' });
@@ -500,12 +501,12 @@ let histSel = null;
 function pintaHistorico() {
   const f = $('histBusca').value.trim().toLowerCase(), r = $('histFiltro').value;
   const lista = histAtual.filter((h) => (!f || `${h.titulo} ${h.linha}`.toLowerCase().includes(f)) && (!r || (r === 'cancelada' ? h.cancelada : r === 'ok' ? !h.cancelada && h.codigo === 0 : !h.cancelada && h.codigo !== 0)));
-  $('hist').replaceChildren(...lista.map((h) => el('li', { className: 'hist-item' + (histSel === h.id ? ' sel' : '') },
+  troca($('hist'), ...lista.map((h) => el('li', { className: 'hist-item' + (histSel === h.id ? ' sel' : '') },
     el('div', {}, el('h3', {}, resultadoChip(h), h.titulo), el('p', {}, `${fmtT(h.inicio)} · ${fmtD(h.duracaoMs)}`), el('p', {}, el('code', {}, h.linha)),
       h.resumo?.tipo === 'testes' ? el('p', {}, `${h.resumo.ok}/${h.resumo.testes} testes ok`) : h.resumo?.tipo === 'simulacao' ? el('p', {}, h.resumo.errosScript ? 'simulação com erros de script' : 'simulação sem erros de script') : null),
     el('div', { className: 'acoes-linha' }, el('button', { className: 'btn sec pequeno', onclick: () => verLog(h.id) }, 'Ver o log'),
       el('button', { className: 'btn fantasma pequeno', disabled: !h.params || !disponivel(h.tarefa), title: !h.params ? 'Execução antiga, sem os parâmetros guardados' : '', onclick: () => executar(h.tarefa, h.params, `Repetir "${h.titulo}" com os mesmos parâmetros?\n${h.linha}`) }, 'Repetir')))));
-  if (!lista.length) $('hist').replaceChildren(el('li', { className: 'vazio' }, histAtual.length ? 'Nada com esse filtro.' : 'Nenhuma execução ainda.'));
+  if (!lista.length) troca($('hist'), el('li', { className: 'vazio' }, histAtual.length ? 'Nada com esse filtro.' : 'Nenhuma execução ainda.'));
 }
 async function verLog(id) {
   try {
@@ -513,7 +514,7 @@ async function verLog(id) {
     histSel = h.id; pintaHistorico();
     $('histDet').hidden = false;
     $('histTitulo').textContent = `· ${h.titulo} (${h.completo ? 'completo' : `últimas ${h.log.length} linhas`})`;
-    $('histResumo').replaceChildren(resumoEl(h.resumo, h) ?? '');
+    troca($('histResumo'), resumoEl(h.resumo, h) ?? '');
     logHist.set(h.log, `${h.tarefa}-${h.id}`);
     $('histDet').scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   } catch (e) { falha(e); }
@@ -526,12 +527,12 @@ async function carregaConfig() {
   const c = await api('config');
   $('nos').value = c.nos; $('meta').value = c.meta;
   const ativas = c.temporadas.filter((s) => s.enabled).length;
-  $('temps').replaceChildren(...c.temporadas.map((s) => el('option', { value: s.season, selected: s.season === ativas }, `${s.season} · ${s.label} (até ${s.until})`)));
+  troca($('temps'), ...c.temporadas.map((s) => el('option', { value: s.season, selected: s.season === ativas }, `${s.season} · ${s.label} (até ${s.until})`)));
   $('temps').disabled = $('aplicarTemps').disabled = !c.temporadas.length || !disponivel('classico');
   $('tempsInfo').textContent = c.temporadas.length ? `Ativas agora: 1..${ativas}. Mudar roda o importador (não edita seasons.json à mão).` : 'Sem dados do clássico (src/data/classic/seasons.json): rode a etapa classico.';
   const versao = (v, arq) => v ? ['Suba ', el('code', {}, 'CACHE_VERSION'), ` de ${v} para ${v + 1} em `, el('code', {}, arq), '.'] : ['Não encontrei ', el('code', {}, arq), ' aqui.'];
-  $('invInfo').replaceChildren(el('p', { className: 'desc' }, 'Clássicas: ', ...versao(c.cacheVersion, 'src/ui/classic-render.js')), el('p', { className: 'desc' }, 'Rush: ', ...versao(c.cacheVersionRush, 'src/ui/rush-render.js')));
-  $('ambiente').replaceChildren(...[['Modo', c.conteiner ? 'Contêiner (token fixo do .env)' : 'Local (token novo a cada início)'], ['Raiz dos dados', meta.modo.raiz], ['Servidor de sync', c.sync.url], ['Estatísticas', c.sync.configurado ? 'configuradas' : 'não configuradas']].flatMap(([k, v]) => [el('dt', {}, k), el('dd', {}, v)]));
+  troca($('invInfo'), el('p', { className: 'desc' }, 'Clássicas: ', ...versao(c.cacheVersion, 'src/ui/classic-render.js')), el('p', { className: 'desc' }, 'Rush: ', ...versao(c.cacheVersionRush, 'src/ui/rush-render.js')));
+  troca($('ambiente'), ...[['Modo', c.conteiner ? 'Contêiner (token fixo do .env)' : 'Local (token novo a cada início)'], ['Raiz dos dados', meta.modo.raiz], ['Servidor de sync', c.sync.url], ['Estatísticas', c.sync.configurado ? 'configuradas' : 'não configuradas']].flatMap(([k, v]) => [el('dt', {}, k), el('dd', {}, v)]));
 }
 $('aplicarTemps').onclick = () => { const n = $('temps').value; executar('classico', { comando: 'build', ate: n }, `Regerar o pool clássico com as temporadas 1..${n}? Roda "import_cards.py build --ate ${n}".`); };
 $('salvarCfg').onclick = async () => {
@@ -555,7 +556,7 @@ $('notificar').onclick = async () => { try { await Notification.requestPermissio
     $('modo').hidden = false; $('modo').textContent = meta.modo.conteiner ? 'Contêiner' : 'Local';
     const grupos = new Map();
     for (const [k, t] of Object.entries(meta.tarefas)) { if (!grupos.has(t.grupo)) grupos.set(t.grupo, []); grupos.get(t.grupo).push(el('option', { value: k }, t.titulo + (t.indisponivel ? ' (indisponível)' : ''))); }
-    $('tarefa').replaceChildren(...[...grupos].map(([g, ops]) => el('optgroup', { label: g }, ops)));
+    troca($('tarefa'), ...[...grupos].map(([g, ops]) => el('optgroup', { label: g }, ops)));
     $('tarefa').value = Object.keys(meta.tarefas).find((k) => !meta.tarefas[k].indisponivel) ?? 'setup';
     $('tarefa').onchange = montaParams; montaParams();
     if (!meta.modo.setup) $('visaoSub').textContent = 'Sem o setup nesta instalação: o painel mostra só o que dá para ler.';

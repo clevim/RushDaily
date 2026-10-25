@@ -300,11 +300,14 @@ function buscarCartas(q) {
 }
 
 // ---- desafio do dia: o mesmo gerador do jogo (src/engine/daily-generator.mjs) sobre src/data/rush/cards.json ----
-let gerador; // módulo, false (indisponível) ou undefined (não carregado)
+let gerador, geradorFalhou = 0; // módulo do jogo; se falhar (setup incompleto), tenta de novo depois de 30 s
 const cacheDesafio = new Map();
 let poolDoCache = null;
 async function desafio(data, dias) {
-  if (gerador === undefined) { try { gerador = await import(pathToFileURL(p('src/engine/daily-generator.mjs')).href); } catch (e) { gerador = false; console.error(`desafio indisponível: ${e.message}`); } }
+  if (!gerador && Date.now() - geradorFalhou > 30000) {
+    const u = pathToFileURL(p('src/engine/daily-generator.mjs')).href + (geradorFalhou ? `?r=${Date.now()}` : '');
+    try { gerador = await import(u); } catch (e) { geradorFalhou = Date.now(); console.error(`desafio indisponível: ${e.message}`); }
+  }
   if (!gerador) return { erro: 'O gerador do desafio (src/engine) ou o motor (src/vendor/ocgcore) não está disponível aqui. Rode o setup (etapa ocgcore).' };
   const pool = dado('src/data/rush/cards.json');
   if (!pool?.length) return { erro: 'Sem src/data/rush/cards.json: rode a etapa rush-ocg do setup.' };
