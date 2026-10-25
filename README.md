@@ -72,7 +72,7 @@ Na tela de decks, copie o link do seu deck (`arena.html?vs=…`) e envie para um
 
 ### Enigma do Milênio
 
-A tela **Enigma** mostra o mês atual em 3D, com um calendário de dias. Cada dia com vitória no desafio diário libera uma peça. Dia sem vitória fica em branco, e o mês não fecha se faltar algum. Com o mês completo, a carga **Coração das Cartas** entra no desafio do dia como uma Skill do EDOPro: uma vez por duelo, na Fase Principal, você escolhe 1 carta do seu Deck e adiciona à mão (e o Enigma do mês recomeça).
+A tela **Enigma** mostra o mês atual em 3D, com um calendário de dias. Cada dia com vitória no desafio diário libera uma peça. Dia sem vitória fica em branco, e o mês não fecha se faltar algum. Com o mês completo, a carga **Coração das Cartas** entra no desafio do dia como uma Skill do EDOPro: uma vez por duelo, na Fase Principal, você toca na miniatura do Enigma na sua placa, ela cresce, brilha e se desfaz, e você escolhe 1 carta do seu Deck para adicionar à mão (e o Enigma do mês recomeça).
 
 ### Arena clássica (treino)
 
