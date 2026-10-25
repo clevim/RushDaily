@@ -2,8 +2,11 @@
 // Entrada da imagem rushdaily-admin (código + ferramentas do setup). O código fica imutável em /opt/rushdaily; os dados
 // gerados (src/vendor, src/data, src/assets das cartas, caches das ferramentas) ficam no volume /dados, que vira a raiz
 // de trabalho: a cada início o código da imagem é copiado para lá e o setup roda sem nenhum desvio de caminho.
-//   dados    roda o setup (idempotente: só baixa/gera o que falta) e sai. Serviço rushdaily-dados, a cada `docker compose up`.
-//            Parâmetros do .env: SETUP_TEMPORADAS (1 a 5) e SETUP_SEM_RENDER=1. Extras aceitos: --force e --so <etapas>.
+//   dados    roda o setup e sai: só baixa/gera o que falta e refaz o que ficou desatualizado (o código que gera a etapa mudou
+//            com a imagem nova; as impressões ficam em /dados/tools/setup/cache/estado.json, que a cópia do código não toca).
+//            Serviço rushdaily-dados, a cada `docker compose up`. Parâmetros do .env: SETUP_TEMPORADAS (1 a 5),
+//            SETUP_SEM_RENDER=1 e SETUP_PARALELO (etapas ao mesmo tempo, 1 a 8; padrão do setup: 4). Extras: --force e --so <etapas>.
+//   verificar  copia o código e mostra o que o setup refaria (setup --verificar), sem baixar nem gerar nada.
 //   painel   sobe o painel admin (tools/admin/server.mjs) sobre o volume. Serviço rushdaily-admin (profile admin).
 import { spawn } from 'node:child_process';
 import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -81,6 +84,11 @@ async function dados(extras) {
   if (!Number.isInteger(temporadas) || temporadas < 1 || temporadas > 5) fim(`SETUP_TEMPORADAS deve ser de 1 a 5 (veio "${process.env.SETUP_TEMPORADAS}").`);
   const args = ['tools/setup/setup.mjs', '--temporadas', String(temporadas)];
   if (/^(1|sim|true)$/i.test(process.env.SETUP_SEM_RENDER || '')) args.push('--sem-render');
+  if (process.env.SETUP_PARALELO) {
+    const n = Number(process.env.SETUP_PARALELO);
+    if (!Number.isInteger(n) || n < 1 || n > 8) fim(`SETUP_PARALELO deve ser de 1 a 8 (veio "${process.env.SETUP_PARALELO}").`);
+    args.push('--paralelo', String(n));
+  }
   for (let i = 0; i < extras.length; i++) { // só o que faz sentido no serviço; nada vai para um shell
     if (extras[i] === '--force') args.push('--force');
     else if (extras[i] === '--so' && /^[a-z-]+(,[a-z-]+)*$/.test(extras[i + 1] ?? '')) args.push('--so', extras[++i]);
@@ -116,6 +124,16 @@ async function dados(extras) {
   process.exit(codigo);
 }
 
+// ---- verificar: o que a próxima subida do rushdaily-dados vai refazer ----
+async function verificar() {
+  if (inicializando()) fim('a inicialização dos dados está rodando neste volume; veja o log dela.');
+  await sincronizar();
+  const temporadas = process.env.SETUP_TEMPORADAS ? ['--temporadas', String(Number(process.env.SETUP_TEMPORADAS) || 1)] : [];
+  const sem = /^(1|sim|true)$/i.test(process.env.SETUP_SEM_RENDER || '') ? ['--sem-render'] : [];
+  const r = spawn('node', ['tools/setup/setup.mjs', '--verificar', ...temporadas, ...sem], { cwd: RAIZ, stdio: 'inherit' });
+  r.on('close', (c) => process.exit(c ?? 1));
+}
+
 // ---- painel ----
 async function painel() {
   if (inicializando()) console.log('inicialização dos dados em andamento: o código já foi copiado por ela.');
@@ -127,5 +145,6 @@ async function painel() {
 
 const [modo, ...extras] = process.argv.slice(2);
 if (modo === 'dados') await dados(extras);
+else if (modo === 'verificar') await verificar();
 else if (modo === 'painel') await painel();
-else fim(`uso: conteiner.mjs dados [--force] [--so etapas] | painel (veio "${modo ?? ''}")`);
+else fim(`uso: conteiner.mjs dados [--force] [--so etapas] | verificar | painel (veio "${modo ?? ''}")`);

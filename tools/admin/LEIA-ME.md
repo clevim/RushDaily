@@ -14,7 +14,7 @@ Abra a URL com token impressa no terminal (`http://127.0.0.1:4190/?t=...`). O to
 
 A imagem `ghcr.io/clevim/rushdaily-admin` (`tools/admin/Dockerfile`) tem o código do projeto e as ferramentas do setup (Node 24, Python com Pillow e numpy, git, curl, ImageMagick 7). Ela serve a dois serviços do `docker-compose.yml`:
 
-- `rushdaily-dados` (sobe sempre, sem porta): copia o código para o volume `rushdaily-dados`, roda o setup lá (idempotente) e sai. É ele que gera os dados do site na primeira subida (veja o README, "Como publicar").
+- `rushdaily-dados` (sobe sempre, sem porta): copia o código para o volume `rushdaily-dados`, roda o setup lá e sai. O setup completa o que falta e refaz sozinho as etapas desatualizadas (o código que as gera mudou com a imagem nova); as impressões ficam em `/dados/tools/setup/cache/estado.json`, que a cópia do código não toca. `SETUP_PARALELO` no `.env` (1 a 8, padrão 4) limita as etapas ao mesmo tempo. Para ver antes o que será refeito: `docker compose run --rm rushdaily-dados verificar`. É ele que gera os dados do site na primeira subida (veja o README, "Como publicar").
 - `rushdaily-admin` (profile `admin`, só sobe quando pedido): o painel, sobre o mesmo volume.
 
 A entrada é `tools/admin/conteiner.mjs`: o código fica imutável em `/opt/rushdaily` e é copiado para `/dados` a cada início (com trava, e removendo arquivos de código que saíram do projeto); o setup e as tarefas rodam em `/dados` sem nenhum desvio de caminho. `tools/classic/puzzle-solutions.json` é juntado em vez de sobrescrito (o setup acrescenta soluções).
@@ -35,7 +35,7 @@ O painel detecta o modo (selo "Contêiner" no topo) e mostra o que funciona ali:
 ## Seções
 
 - **Visão geral:** próxima ação sugerida (rodar o setup ou uma etapa, ver o log de uma falha, rodar os testes), contagens (cartas Rush e em PT, artes e cartas montadas, clássicas, puzzles, scripts), espaço dos caches, jogadores ativos hoje/7 dias, saúde do setup (etapas prontas X/N, com o que falta e botão para rodar) e a última execução com o resumo.
-- **Dados e setup:** cada etapa do `setup.mjs --lista` com estado (pronta/parcial/faltando), contagem, tamanho, data e as ações **Rodar** e **Refazer** (`--force` só nela), mais o setup completo e o espaço dos `tools/*/cache`.
+- **Dados e setup:** cada etapa do `setup.mjs --lista` com estado (pronta/parcial/desatualizada/faltando), contagem, tamanho, data e as ações **Rodar** (ou **Atualizar**, se desatualizada: refaz só o necessário) e **Refazer** (`--force` só nela), mais o setup completo e o espaço dos `tools/*/cache`. "Desatualizada" vem do próprio setup (`setup.mjs --verificar --json`), com o motivo (ex.: `import_rush.py mudou`) e o que o refazer faz; a Visão geral sugere **Atualizar os dados** quando há alguma.
 - **Tarefas:** lista fechada, uma por vez, com fila (até 10) e cancelamento. Log ao vivo (SSE) com filtro por texto, "só erros e avisos" (linhas destacadas), rolagem automática com pausa, copiar e baixar. Ao terminar: resumo legível dos testes (total, ok, falhas e quais) e das simulações (duelos, turnos, vitórias, travados, erros de script), notificação do navegador (ative em Configuração) e o título da aba muda se ela estiver em segundo plano. A tarefa em andamento aparece no topo em qualquer seção, com progresso (linhas `N/M`) e Cancelar.
 - **Cartas:** busca por id ou nome (sem acento) nas cartas Rush (`src/data/rush/cards.json`) e clássicas ativas (`src/data/classic/s*.json`); mostra a ficha, a arte e a carta montada, o que falta (arte, montagem, miniatura) e as ações só daquela carta (baixar a arte, montar/desenhar de novo).
 - **Desafio do dia:** o desafio de qualquer data (padrão: hoje, na data do aparelho, como no jogo), gerado no servidor pelo mesmo `src/engine/daily-generator.mjs`: confronto, seu deck, o rival de cada dificuldade (PV, IA, força e deck) e os próximos 7 dias.
@@ -45,7 +45,7 @@ O painel detecta o modo (selo "Contêiner" no topo) e mostra o que funciona ali:
 
 ## Tarefas (lista fechada)
 
-Setup completo (`--temporadas`, `--sem-render`); setup de uma etapa (com "refazer" = `--force`); importar clássico (`fetch`, `decks`, `build --ate N`, `art`, `puzzles`); artes clássicas em HD; buscar puzzles; render das clássicas; importar Rush (`fetch`, `build`); artes Rush; montar cartas Rush; simulação Rush (`todos`, `ia`, `aleatorio`, `diario`, `niveis`); testes (`npm test`); simulação clássica. Os ids opcionais aceitam até 100 números.
+Setup completo (`--temporadas`, `--sem-render`; refaz só o que está desatualizado); setup de uma etapa (desatualizada: refaz só o necessário; com "refazer" = `--force`); importar clássico (`fetch`, `decks`, `build --ate N`, `art`, `puzzles`); artes clássicas em HD; buscar puzzles; render das clássicas; importar Rush (`fetch`, `build`); artes Rush; montar cartas Rush; simulação Rush (`todos`, `ia`, `aleatorio`, `diario`, `niveis`); testes (`npm test`); simulação clássica. Os ids opcionais aceitam até 100 números.
 
 ## Segurança
 

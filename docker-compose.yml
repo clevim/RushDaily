@@ -32,7 +32,8 @@ services:
     # networks: [default, sync, tunnel]
 
   # Dados do jogo, gerados NO HOMELAB (o pacote do GHCR não leva material de terceiros): roda o setup no volume e sai.
-  # Primeira subida: baixa e desenha tudo (~30 a 60 min, ~1,5 GB no volume); nas seguintes só confere o que falta (minutos).
+  # Primeira subida: baixa e desenha tudo (~20 a 40 min, ~1,5 GB no volume); nas seguintes completa o que falta e refaz só as
+  # etapas cujo código mudou com a imagem nova (impressões em /dados/tools/setup/cache/estado.json).
   # Acompanhar: `docker compose logs -f rushdaily-dados` (ou o painel admin). Refazer uma etapa:
   # `docker compose run --rm rushdaily-dados dados --so rush-cartas --force`. Não publica porta.
   rushdaily-dados:
@@ -52,6 +53,8 @@ services:
       # Temporadas clássicas liberadas (1 a 5) e "1" para não desenhar as cartas (mais rápido; o jogo desenha no navegador).
       SETUP_TEMPORADAS: ${SETUP_TEMPORADAS:-1}
       SETUP_SEM_RENDER: ${SETUP_SEM_RENDER:-0}
+      # Etapas do setup ao mesmo tempo (1 a 8; 1 = uma por vez, como antes). Os limites de cada site valem igual.
+      SETUP_PARALELO: ${SETUP_PARALELO:-4}
     volumes:
       - rushdaily-dados:/dados
     networks: [default] # precisa de internet (GitHub, npm, YGOPRODeck, Yugipedia, Printables)
