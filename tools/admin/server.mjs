@@ -348,7 +348,8 @@ const dataOk = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s ?? '') && !Number.isNaN(Date.
 
 // ---- tradução Rush (tools/rush/traducao/*.json) e artes Rush faltando ----
 // Leitura direta dos JSON; a escrita passa SEMPRE pelo traducao.py aplicar (mesmas verificações da linha de comando).
-// No contêiner o código vem da imagem a cada subida: editar lá se perderia, então a tradução é só leitura.
+// No contêiner o código vem da imagem a cada subida, mas o conteiner.mjs preserva as entradas revisadas no volume; "Baixar
+// revisões" leva essas correções para o repositório (traducao.py aplicar <arquivo> --origem revisada).
 const TRAD = { frases: 'tools/rush/traducao/frases.json', nomes: 'tools/rush/traducao/nomes.json' };
 const ORIGENS = ['automatica', 'revisada', 'manual', 'oficial'];
 const lerTrad = (tipo) => { try { return JSON.parse(readFileSync(p(TRAD[tipo]), 'utf8')); } catch { return {}; } }; // sem cache: muda ao salvar
@@ -367,10 +368,9 @@ function traducaoLista(q) {
   }
   itens.sort((a, b) => (b.usos ?? 0) - (a.usos ?? 0) || a.en.localeCompare(b.en));
   const pagina = Math.max(0, Number.parseInt(q.get('pagina') ?? '0', 10) || 0);
-  return { tipo, total: itens.length, contagem, pagina, itens: itens.slice(pagina * 50, pagina * 50 + 50), somenteLeitura: CONTEINER };
+  return { tipo, total: itens.length, contagem, pagina, itens: itens.slice(pagina * 50, pagina * 50 + 50), conteiner: CONTEINER };
 }
 function traducaoSalvar(q) {
-  if (CONTEINER) throw new Error('No contêiner a tradução é só leitura (o código vem da imagem). Edite no painel local (npm run admin) e faça commit.');
   const tipo = Object.hasOwn(TRAD, q.tipo) ? q.tipo : null;
   const dados = tipo ? lerTrad(tipo) : {};
   if (!tipo || typeof q.en !== 'string' || !Object.hasOwn(dados, q.en)) throw new Error('entrada desconhecida');
@@ -382,6 +382,9 @@ function traducaoSalvar(q) {
   const problemas = (r.stdout || '').split('\n').filter((l) => l.trim().startsWith('-> ')).map((l) => l.trim().slice(3));
   if (r.status !== 0) throw new Error(problemas.join('; ') || (r.stderr || r.stdout || 'falhou').trim().split('\n').pop());
   return { ok: true };
+}
+function traducaoRevisadas() { // formato de lote do traducao.py aplicar
+  return Object.fromEntries(Object.keys(TRAD).map((tipo) => [tipo, Object.fromEntries(Object.entries(lerTrad(tipo)).filter(([, e]) => e.origem === 'revisada').map(([en, e]) => [en, e.pt]))]));
 }
 function artesFaltando() {
   const cards = dado('src/data/rush/cards.json') ?? [];
@@ -491,6 +494,7 @@ createServer(async (req, res) => {
     if (req.method === 'POST' && rota === '/api/traducao') {
       try { return json(res, 200, traducaoSalvar(await lerCorpo(req))); } catch (e) { return json(res, 400, { erro: e.message }); }
     }
+    if (req.method === 'GET' && rota === '/api/traducao-revisadas') return json(res, 200, traducaoRevisadas());
     if (req.method === 'GET' && rota === '/api/artes-faltando') return json(res, 200, { cartas: artesFaltando() });
     if (req.method === 'POST' && rota === '/api/arte') {
       try { return json(res, 200, arteSalvar(await lerCorpo(req, 12_000_000))); } catch (e) { return json(res, 400, { erro: e.message }); }
