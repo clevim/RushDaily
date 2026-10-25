@@ -6,7 +6,8 @@
   python3 -I tools/rush/import_rush.py art [--force] [id ...]   # baixa as artes do Yugipedia -> src/assets/rush-art/<id>.webp
 
 Dados de regra vêm do cards-rush.cdb (o motor lê esses números). Nome e texto em PT-BR vêm de
-tools/card-render/pt-br.json (traduções do desafio diário), casados pelo nome em inglês; sem tradução, fica o inglês.
+tools/card-render/pt-br.json (traduções do desafio diário), casados pelo nome em inglês, e depois da memória de tradução
+em tools/rush/traducao/ (nomes.json e frases.json, ver traducao.py); sem tradução completa, fica o inglês.
 """
 import hashlib
 import json
@@ -124,15 +125,16 @@ def trim(texts):
     return texts
 
 
-def build():
+def pool(skipped=None):
+    """Cartas do pool, em inglês, como saem do cards-rush.cdb: (id, ot, alias, setcode, type, atk, def, level, race,
+    attribute, nome sem " (Rush)", desc, strings). Também usado pelo traducao.py."""
     db = sqlite3.connect(CDB)
     rows = {row[0]: row for row in db.execute('select id, ot, alias, setcode, type, atk, def, level, race, attribute from datas')}
     texts = {row[0]: row[1:] for row in db.execute(f"select id, name, desc, {', '.join(f'str{i}' for i in range(1, 17))} from texts")}
     scripts = {int(path.stem[1:]) for path in (SCRIPTS / 'rush').glob('c*.lua')}
-    pt = translations()
-
-    cards = []
-    skipped = {'sem tipo/escondida': 0, 'ficha/skill': 0, 'arte alternativa': 0, 'sem script': 0}
+    skipped = {} if skipped is None else skipped
+    for key in ('sem tipo/escondida', 'ficha/skill', 'arte alternativa', 'sem script'):
+        skipped.setdefault(key, 0)
     for cid, (_, ot, alias, setcode, kind, atk, defense, level, race, attribute) in sorted(rows.items()):
         if not kind or ot & OT_HIDDEN:
             skipped['sem tipo/escondida'] += 1
@@ -150,12 +152,34 @@ def build():
             continue
         name, desc, *strings = texts.get(cid, ('', '') + ('',) * 16)
         name_en = re.sub(r'\s*\(Rush\)$', '', name or '')
+        yield cid, ot, alias, setcode, kind, atk, defense, level, race, attribute, name_en, (desc or '').replace('\r\n', '\n'), strings
+
+
+def traducao():
+    """tools/rush/traducao.py carregado pelo caminho (o -I tira a pasta do script do sys.path)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('traducao', HERE / 'traducao.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def build():
+    pt = translations()
+    memoria = traducao().Memoria()
+
+    cards = []
+    skipped = {}
+    for cid, ot, alias, setcode, kind, atk, defense, level, race, attribute, name_en, desc, strings in pool(skipped):
+        # Manual (pt-br.json) primeiro; senão a memória de tradução, só com a carta inteira traduzida (nunca meio a meio).
         local = pt.get(norm(name_en), {})
+        if not local.get('desc') and (traduzida := memoria.carta(name_en, desc)):
+            local = {**traduzida, 'name': local.get('name') or traduzida['name']}
         cards.append({
             'id': cid, 'alias': alias, 'setcode': str(setcode), 'type': kind, 'atk': atk, 'def': defense,
             'level': level, 'race': race, 'attribute': attribute,
             'name': local.get('name') or name_en, 'nameEn': name_en,
-            'desc': local.get('desc') or (desc or '').replace('\r\n', '\n'), 'pt': bool(local.get('desc')),
+            'desc': local.get('desc') or desc, 'pt': bool(local.get('desc')),
             **({'legend': True} if ot & OT_LEGEND else {}),
             **({'maximum': piece} if (piece := maximum_piece(name_en, kind)) else {}),
             **({'strings': trimmed} if (trimmed := trim([s or '' for s in strings])) else {}),
