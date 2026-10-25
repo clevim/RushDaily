@@ -1252,7 +1252,7 @@ export function puzzleScene(canvas, { owned = [], total = 38, fresh = null, redu
 /* ---------- Enigma do Milênio procedural (Coração das Cartas na arena) ---------- */
 // Pirâmide de base quadrada com a ponta para baixo, cortada em fatias e quadrantes (as peças que se separam ao ativar),
 // em ouro metálico, com o Olho de Wdjat gravado na face da frente (cor e relevo desenhados em canvas) e a argola no topo.
-// Não depende do modelo do setup (src/assets/puzzle): funciona sempre que houver WebGL.
+// Reserva do modelo da aba Enigma (src/assets/puzzle, do setup): aparece enquanto ele carrega ou quando ele não existe.
 const ENIGMA = { half: 1, top: 0.55, apex: -1.45, depth: 0.86, cuts: [0.55, 0.02, -0.45, -0.88, -1.45] };
 
 /** Face da frente: ouro com o olho. tone: cores (textura) ou cinzas (relevo: escuro = gravado). */
@@ -1366,6 +1366,42 @@ function buildEnigma() {
   };
 }
 
+/**
+ * O Enigma da aba Enigma (modelo do setup, as mesmas peças e o mesmo ouro), no tamanho e na posição da pirâmide
+ * procedural para caber nos mesmos enquadramentos. Cada parte gira em torno do próprio centro; a geometria
+ * continua nas coordenadas do modelo porque o shader do ouro usa a posição original.
+ */
+let puzzleData = null; // o modelo já carregado: a ativação monta o Enigma real sem esperar
+function realEnigma({ meta, pieces: parts, ring }) {
+  const material = puzzleMaterial(meta.shape);
+  const group = new THREE.Group();
+  const model = new THREE.Group();
+  group.add(model);
+  const pieces = [...parts.map((part) => part.positions), ring].map((positions) => {
+    const geometry = geometryOf(positions);
+    geometry.computeBoundingBox();
+    const center = geometry.boundingBox.getCenter(new THREE.Vector3());
+    const holder = new THREE.Group();
+    holder.position.copy(center);
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.copy(center).negate();
+    holder.add(mesh);
+    model.add(holder);
+    return { mesh: holder, home: center.clone(), dir: center.clone().setY(center.y + 0.35).normalize().add(new THREE.Vector3(0, 0, 0.5)).normalize() };
+  });
+  // Mesma altura (ponta à argola) e mesmo centro da procedural.
+  const box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3());
+  const scale = (ENIGMA.top + 0.485 - ENIGMA.apex) / size.y;
+  model.scale.setScalar(scale);
+  model.position.y = (ENIGMA.top + 0.485 + ENIGMA.apex) / 2 - box.getCenter(new THREE.Vector3()).y * scale;
+  return {
+    group, pieces, materials: [material], unit: 1 / scale,
+    tick(time) { material.userData.uniforms.uTime.value = time; },
+    dispose() { model.traverse((node) => node.geometry?.dispose()); material.dispose(); },
+  };
+}
+
 function enigmaStage(renderer) {
   const scene = new THREE.Scene();
   scene.environment = studioEnvironment(renderer);
@@ -1387,19 +1423,32 @@ export function enigmaMini(canvas, { reduced = false } = {}) {
   const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 50);
   camera.position.set(0, 0.5, 5.8);
   camera.lookAt(0, -0.3, 0);
-  const enigma = buildEnigma();
+  // A procedural aparece na hora; o modelo da aba Enigma entra no lugar dela assim que carrega (sem ele, fica a procedural).
+  let enigma = puzzleData ? realEnigma(puzzleData) : buildEnigma();
   scene.add(enigma.group);
+  let disposed = false;
+  if (!puzzleData) {
+    loadPuzzle('src/assets/puzzle/').then((data) => {
+      puzzleData = data;
+      if (disposed) return;
+      scene.remove(enigma.group);
+      enigma.dispose();
+      enigma = realEnigma(data);
+      scene.add(enigma.group);
+    }).catch(() => {});
+  }
   const clock = new THREE.Clock();
   renderer.setAnimationLoop(() => {
     fit(renderer, camera, canvas);
     const time = clock.getElapsedTime();
+    enigma.tick?.(time);
     enigma.group.rotation.y = reduced ? -0.42 : Math.sin(time * 0.7) * 0.62;
     enigma.group.position.y = reduced ? 0 : Math.sin(time * 1.4) * 0.04;
     renderer.render(scene, camera);
   });
   return {
     angle: () => enigma.group.rotation.y,
-    dispose() { renderer.setAnimationLoop(null); enigma.dispose(); renderer.dispose(); },
+    dispose() { disposed = true; renderer.setAnimationLoop(null); enigma.dispose(); renderer.dispose(); },
   };
 }
 
@@ -1416,7 +1465,7 @@ export function enigmaBurst(canvas, { from, angle = 0, onGlow = null, onDone = n
   const glow = new THREE.PointLight(GOLD, 0, 12);
   glow.position.set(0, 0, 3);
   scene.add(glow);
-  const enigma = buildEnigma();
+  const enigma = puzzleData ? realEnigma(puzzleData) : buildEnigma();
   const pivot = new THREE.Group(); // o centro visual da pirâmide (sem a argola) fica no ponto da tela
   enigma.group.position.y = 0.42;
   pivot.add(enigma.group);
@@ -1438,21 +1487,24 @@ export function enigmaBurst(canvas, { from, angle = 0, onGlow = null, onDone = n
     camera.aspect = canvas.clientWidth / canvas.clientHeight || camera.aspect;
     camera.updateProjectionMatrix();
     const ms = performance.now() - began;
+    enigma.tick?.(ms / 1000);
     const grow = ease(Math.min(1, ms / 560));
     pivot.position.lerpVectors(start, new THREE.Vector3(), grow);
     const shine = Math.min(1, Math.max(0, (ms - 560) / 480));
     pivot.scale.setScalar(THREE.MathUtils.lerp(scale0, scale1, grow) * (1 + Math.sin(shine * Math.PI) * 0.08));
     pivot.rotation.y = THREE.MathUtils.lerp(angle, Math.PI * 2, grow) + (ms > 560 ? Math.sin(ms / 140) * 0.05 * (1 - shine) : 0);
     if (ms > 560 && !glowing) { glowing = true; onGlow?.(); }
-    const [gold, face] = enigma.materials;
-    gold.emissiveIntensity = face.emissiveIntensity = 0.5 + Math.sin(Math.min(1, shine * 1.3) * Math.PI / 2) * 2.4;
+    for (const material of enigma.materials) material.emissiveIntensity = 0.5 + Math.sin(Math.min(1, shine * 1.3) * Math.PI / 2) * 2.4;
     glow.intensity = shine * 90;
     const part = Math.min(1, Math.max(0, (ms - 1040) / 720));
     if (part > 0) {
-      for (const material of enigma.materials) { material.transparent = true; material.opacity = 1 - part ** 1.4; }
+      for (const material of enigma.materials) {
+        if (!material.transparent) { material.transparent = true; material.needsUpdate = true; } // o ouro do modelo nasce opaco
+        material.opacity = 1 - part ** 1.4;
+      }
       const e = 1 - (1 - part) ** 2;
       enigma.pieces.forEach(({ mesh, home }, index) => {
-        mesh.position.copy(home).addScaledVector(drifts[index], e * reach / pivot.scale.x);
+        mesh.position.copy(home).addScaledVector(drifts[index], (e * reach * (enigma.unit || 1)) / pivot.scale.x);
         mesh.rotation.set(spins[index].x * e, spins[index].y * e, spins[index].z * e);
       });
       glow.intensity = 90 * (1 - part);
