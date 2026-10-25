@@ -4,6 +4,7 @@
   python3 -I tools/rush/import_rush.py fetch   # baixa cards-rush.cdb (BabelCDB) e os scripts Rush (CardScripts) para cache/
   python3 -I tools/rush/import_rush.py build   # escreve src/data/rush/cards.json e copia os scripts para src/vendor/card-scripts/rush/
   python3 -I tools/rush/import_rush.py art [--force] [--ignis] [id ...]   # baixa as artes do Yugipedia (ou do EDOPro) -> src/assets/rush-art/<id>.webp
+  python3 -I tools/rush/import_rush.py arte-manual <id> <imagem> [--carta]  # arte enviada à mão (admin); --carta recorta a janela de uma carta inteira
 
 Dados de regra vêm do cards-rush.cdb (o motor lê esses números). Nome e texto em PT-BR vêm de
 tools/card-render/pt-br.json (traduções do desafio diário), casados pelo nome em inglês, e depois da memória de tradução
@@ -493,5 +494,13 @@ if __name__ == '__main__':
         build()
     elif command == 'art':
         art(sys.argv[2:])
+    elif command == 'arte-manual' and len(sys.argv) >= 4 and sys.argv[2].isdigit():
+        known = {card['id'] for card in json.loads((OUT / 'cards.json').read_text())}
+        if int(sys.argv[2]) not in known:
+            sys.exit(f'carta {sys.argv[2]} não está no cards.json')
+        ART_OUT.mkdir(parents=True, exist_ok=True)
+        to_webp(Path(sys.argv[3]).read_bytes(), '--carta' in sys.argv, ART_OUT / f'{sys.argv[2]}.webp')
+        write_art_index()
+        print('arte gravada:', ART_OUT / f'{sys.argv[2]}.webp')
     else:
         print(__doc__)

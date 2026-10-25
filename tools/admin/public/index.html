@@ -33,6 +33,8 @@
     <li><a href="#dados" data-s="dados"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5.5" rx="7" ry="2.5"/><path d="M5 5.5v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6M5 11.5v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6"/></svg>Dados e setup</a></li>
     <li><a href="#tarefas" data-s="tarefas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM7 10l3 2-3 2M12 15h5"/></svg>Tarefas</a></li>
     <li><a href="#cartas" data-s="cartas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM9 7h6v5H9zM9 15h6M9 17.5h4"/></svg>Cartas</a></li>
+    <li><a href="#traducao" data-s="traducao"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h10M8 3v2M5 5c1 4 4 7 7 8M11 5c-1 4-4 7-7 8M13 21l4-10 4 10M14.5 17.5h5"/></svg>Tradução Rush</a></li>
+    <li><a href="#artes" data-s="artes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M15 9h.01"/></svg>Artes faltando</a></li>
     <li><a href="#desafio" data-s="desafio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v14H4zM4 10h16M8 3v5M16 3v5M9 14l2 2 4-4"/></svg>Desafio do dia</a></li>
     <li><a href="#jogadores" data-s="jogadores"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5M16 4.8a3.4 3.4 0 0 1 0 6.4M18 14.8c2 .6 3.2 2.3 3.5 5.2"/></svg>Jogadores</a></li>
     <li><a href="#historico" data-s="historico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1M3 4v4h4M12 7.5V12l3 2"/></svg>Histórico</a></li>
@@ -102,6 +104,29 @@
       <ul class="resultados" id="resultados" aria-label="Resultados"></ul>
       <article class="painel carta-det" id="cartaDet" hidden aria-live="polite"></article>
     </div>
+  </section>
+
+  <!-- Tradução Rush -->
+  <section id="s-traducao" class="secao" aria-labelledby="h-trad" hidden>
+    <div class="cab"><h1 id="h-trad" tabindex="-1">Tradução Rush</h1><p class="sub">Frases e nomes da memória de tradução (tools/rush/traducao). Salvar passa pelas mesmas verificações do traducao.py e marca a entrada como revisada; "Aprovar" mantém o texto e só marca como revisada.</p></div>
+    <form class="busca" id="tradForm" role="search">
+      <label class="campo">Tipo<select id="tradTipo"><option value="frases">Frases</option><option value="nomes">Nomes</option></select></label>
+      <label class="campo">Origem<select id="tradOrigem"><option value="">Todas</option><option value="automatica">Automática</option><option value="revisada">Revisada</option><option value="manual">Manual</option><option value="oficial">Oficial</option></select></label>
+      <label class="campo">Busca (inglês ou PT)<input id="tradBusca" type="search" autocomplete="off" maxlength="80"></label>
+      <button class="btn">Filtrar</button>
+    </form>
+    <p class="sub" id="tradInfo" aria-live="polite"></p>
+    <ul class="trad-lista" id="tradLista"></ul>
+    <div class="trad-acoes"><button class="btn sec" id="tradAnt" type="button">Anterior</button><button class="btn sec" id="tradProx" type="button">Próxima</button>
+      <button class="btn" id="tradAplicar" type="button">Aplicar no jogo (refaz o cards.json)</button><button class="btn sec" id="tradMontar" type="button">Montar cartas Rush</button></div>
+  </section>
+
+  <!-- Artes Rush faltando -->
+  <section id="s-artes" class="secao" aria-labelledby="h-artes" hidden>
+    <div class="cab"><h1 id="h-artes" tabindex="-1">Artes Rush faltando</h1><p class="sub">Cartas do pool sem arte (aparecem com o quadro provisório). Baixe de novo (Yugipedia, depois o servidor do EDOPro) ou envie uma imagem: a arte limpa é recortada no quadrado do centro; marque "carta inteira" para recortar a janela de arte de um scan. Depois, monte as cartas.</p></div>
+    <p class="sub" id="artesInfo" aria-live="polite"></p>
+    <div class="trad-acoes"><button class="btn sec" id="artesTodas" type="button">Baixar todas de novo</button><button class="btn sec" id="artesMontar" type="button">Montar cartas Rush</button></div>
+    <ul class="trad-lista" id="artesLista"></ul>
   </section>
 
   <!-- Desafio do dia -->

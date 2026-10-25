@@ -38,7 +38,7 @@ const falha = (e) => aviso(e.message, true);
 const confirmar = (txt) => new Promise((ok) => { $('dlgTxt').textContent = txt; $('dlg').onclose = () => ok($('dlg').returnValue === 'sim'); $('dlg').returnValue = ''; $('dlg').showModal(); });
 
 // ---- navegação ----
-const SECOES = ['visao', 'dados', 'tarefas', 'cartas', 'desafio', 'jogadores', 'historico', 'config'];
+const SECOES = ['visao', 'dados', 'tarefas', 'cartas', 'traducao', 'artes', 'desafio', 'jogadores', 'historico', 'config'];
 const aoMostrar = {};
 let secao = null, pronto = false;
 function mostra(s, foco = true) {
@@ -47,7 +47,7 @@ function mostra(s, foco = true) {
   for (const id of SECOES) $('s-' + id).hidden = id !== s;
   for (const a of document.querySelectorAll('#nav a')) { if (a.dataset.s === s) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); }
   document.querySelector(`#nav a[data-s="${s}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  if (foco) $('h-' + { visao: 'visao', dados: 'dados', tarefas: 'tarefas', cartas: 'cartas', desafio: 'desafio', jogadores: 'jog', historico: 'hist', config: 'cfg' }[s]).focus({ preventScroll: true });
+  if (foco) $('h-' + { visao: 'visao', dados: 'dados', tarefas: 'tarefas', cartas: 'cartas', traducao: 'trad', artes: 'artes', desafio: 'desafio', jogadores: 'jog', historico: 'hist', config: 'cfg' }[s]).focus({ preventScroll: true });
   window.scrollTo(0, 0);
   if (pronto) aoMostrar[s]?.();
 }
@@ -572,3 +572,73 @@ $('notificar').onclick = async () => { try { await Notification.requestPermissio
   pronto = true;
   aoMostrar[secao]?.();
 })();
+
+// ---- tradução Rush ----
+let tradPag = 0, tradTotal = 0, tradSoLeitura = false;
+const ROTULO_ORIGEM = { automatica: 'automática', revisada: 'revisada', manual: 'manual', oficial: 'oficial' };
+async function tradCarrega() {
+  const q = new URLSearchParams({ tipo: $('tradTipo').value, origem: $('tradOrigem').value, busca: $('tradBusca').value, pagina: tradPag });
+  $('tradInfo').textContent = 'Carregando…';
+  try {
+    const r = await api('traducao?' + q);
+    tradTotal = r.total; tradSoLeitura = r.somenteLeitura;
+    const c = r.contagem;
+    $('tradInfo').textContent = `${fmtN(r.total)} encontradas · página ${r.pagina + 1} de ${Math.max(1, Math.ceil(r.total / 50))} · automáticas ${fmtN(c.automatica)}, revisadas ${fmtN(c.revisada)}, manuais ${fmtN(c.manual)}, oficiais ${fmtN(c.oficial)}`
+      + (tradSoLeitura ? ' · contêiner: só leitura (edite no painel local)' : '');
+    $('tradLista').replaceChildren(...r.itens.map((it) => tradItem(r.tipo, it)));
+    $('tradAnt').disabled = tradPag === 0; $('tradProx').disabled = (tradPag + 1) * 50 >= tradTotal;
+  } catch (e) { $('tradInfo').textContent = e.message; }
+}
+function tradItem(tipo, it) {
+  const area = el('textarea', { className: 'trad-pt', rows: tipo === 'nomes' ? 1 : 3, maxLength: 2000, value: it.pt, disabled: tradSoLeitura, 'aria-label': 'Tradução' });
+  const estado = el('span', { className: 'desc' });
+  const salvar = async (texto) => {
+    estado.textContent = 'Salvando…';
+    try { await api('traducao', 'POST', { tipo, en: it.en, pt: texto }); it.origem = 'revisada'; selo.textContent = 'revisada'; estado.textContent = 'Salvo (revisada).'; }
+    catch (e) { estado.textContent = e.message; estado.className = 'desc erro'; }
+  };
+  const selo = el('span', { className: 'selo' }, ROTULO_ORIGEM[it.origem] ?? it.origem);
+  return el('li', { className: 'painel trad-item' },
+    el('p', { className: 'trad-en' }, it.en), area,
+    el('div', { className: 'trad-acoes' }, selo, it.usos != null ? el('span', { className: 'desc' }, `${it.usos} uso(s)`) : null,
+      el('button', { className: 'btn', type: 'button', disabled: tradSoLeitura, onclick: () => salvar(area.value) }, 'Salvar'),
+      el('button', { className: 'btn sec', type: 'button', disabled: tradSoLeitura || it.origem === 'revisada', onclick: () => salvar(it.pt) }, 'Aprovar'), estado));
+}
+$('tradForm').onsubmit = (e) => { e.preventDefault(); tradPag = 0; tradCarrega(); };
+$('tradAnt').onclick = () => { if (tradPag > 0) { tradPag--; tradCarrega(); } };
+$('tradProx').onclick = () => { if ((tradPag + 1) * 50 < tradTotal) { tradPag++; tradCarrega(); } };
+$('tradAplicar').onclick = () => executar('setup-etapa', { etapa: 'rush-ocg' }, 'Refazer o cards.json do Rush com as traduções atuais (setup --so rush-ocg)?');
+$('tradMontar').onclick = $('artesMontar').onclick = () => executar('montar-rush', {}, 'Montar as cartas Rush que mudaram ou faltam (render.mjs)?');
+aoMostrar.traducao = () => { if (!$('tradLista').children.length) tradCarrega(); };
+
+// ---- artes Rush faltando ----
+async function artesCarrega() {
+  $('artesInfo').textContent = 'Carregando…';
+  try {
+    const { cartas: lista } = await api('artes-faltando');
+    $('artesInfo').textContent = lista.length ? `${fmtN(lista.length)} carta(s) sem arte.` : 'Todas as cartas Rush têm arte.';
+    $('artesLista').replaceChildren(...lista.slice(0, 300).map(arteItem));
+  } catch (e) { $('artesInfo').textContent = e.message; }
+}
+function arteItem(c) {
+  const arq = el('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp', 'aria-label': `Imagem para ${c.nameEn}` });
+  const inteira = el('input', { type: 'checkbox' });
+  const estado = el('span', { className: 'desc' });
+  const enviar = async () => {
+    const f = arq.files[0];
+    if (!f) { estado.textContent = 'Escolha uma imagem.'; return; }
+    if (f.size > 8e6) { estado.textContent = 'Imagem acima de 8 MB.'; return; }
+    estado.textContent = 'Enviando…';
+    const dataUrl = await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = no; r.readAsDataURL(f); });
+    try { await api('arte', 'POST', { id: c.id, imagem: dataUrl, carta: inteira.checked }); estado.textContent = 'Arte gravada. Monte as cartas para ver no jogo.'; }
+    catch (e) { estado.textContent = e.message; estado.className = 'desc erro'; }
+  };
+  return el('li', { className: 'painel trad-item' },
+    el('p', {}, el('strong', {}, c.name), ` · ${c.nameEn} · `, el('code', {}, String(c.id))),
+    el('div', { className: 'trad-acoes' },
+      el('button', { className: 'btn sec', type: 'button', onclick: () => executar('artes-rush', { ids: String(c.id), force: true }, `Baixar de novo a arte de "${c.nameEn}"?`) }, 'Baixar de novo'),
+      arq, el('label', {}, inteira, ' carta inteira (scan)'),
+      el('button', { className: 'btn', type: 'button', onclick: enviar }, 'Enviar imagem'), estado));
+}
+$('artesTodas').onclick = () => executar('artes-rush', {}, 'Baixar todas as artes Rush que faltam (Yugipedia e, se falhar, EDOPro)?');
+aoMostrar.artes = artesCarrega;
