@@ -226,7 +226,9 @@ _lock = threading.Lock()
 
 def yugipedia_get(url):
     """GET no Yugipedia via curl (só HTTPS, inclusive nos redirecionamentos), espaçado por MIN_INTERVAL entre todos os pedidos.
-    404/403 não repetem; muitas falhas seguidas param tudo (site fora do ar ou bloqueando)."""
+    404/403 não repetem; muitas falhas seguidas param tudo (site fora do ar ou bloqueando). 404/410 é resposta do site
+    (arquivo que não está ali) e não conta para essa parada: as artes que faltam costumam ser justamente essas."""
+    missing = False
     for attempt in range(4):
         with _lock:
             wait = _last_request[0] + MIN_INTERVAL - time.monotonic()
@@ -238,8 +240,11 @@ def yugipedia_get(url):
             _failures[0] = 0
             return result.stdout
         if result.returncode == 22 and re.search(rb'\b(403|404|410)\b', result.stderr):
+            missing = not re.search(rb'\b403\b', result.stderr)
             break
         time.sleep(2 + attempt * 3)
+    if missing:
+        return None
     with _lock:
         _failures[0] += 1
         if _failures[0] >= 15:
@@ -312,6 +317,16 @@ def match_yaml(cards, yaml):
             found[card['id']] = spells[scores[0][1]]
             used.add(id(spells[scores[0][1]]))
     return found
+
+
+def file_url(filename):
+    """Endereço real do arquivo pela API (quando o caminho calculado no CDN dá 404)."""
+    query = urllib.parse.urlencode({'action': 'query', 'format': 'json', 'prop': 'imageinfo', 'iiprop': 'url', 'titles': f'File:{filename}'})
+    body = yugipedia_get(f'https://yugipedia.com/api.php?{query}')
+    for page in (json.loads(body).get('query', {}).get('pages', {}).values() if body else []):
+        if url := (page.get('imageinfo') or [{}])[0].get('url'):
+            return url
+    return None
 
 
 def check_files(names, known):
@@ -430,9 +445,11 @@ def art(args):
     def work(job):
         card, (filename, crop) = job
         raw = yugipedia_get(cdn(filename))
+        if raw is None and (url := file_url(filename)) and url != cdn(filename):
+            raw = yugipedia_get(url)
         try:
             if raw is None:
-                raise ValueError('download falhou')
+                raise ValueError('download falhou (o arquivo não está no Yugipedia nem pelo endereço da API)')
             to_webp(raw, crop, ART_OUT / f"{card['id']}.webp")
         except Exception as error:  # imagem corrompida ou indisponível: segue com as outras
             failed.append(f"{card['id']} {filename}: {error}")
@@ -444,6 +461,8 @@ def art(args):
         list(workers.map(work, jobs))
     for line in failed[:20]:
         print('falhou:', line)
+    if len(failed) > 20:
+        print(f'... e mais {len(failed) - 20}')
     ids = write_art_index()
     total = len(json.loads((OUT / 'cards.json').read_text()))
     print(f'artes: {len(ids)} de {total} | baixadas agora {len(jobs) - len(failed)} | falharam {len(failed)} | sem fonte {without} -> {ART_OUT}')
