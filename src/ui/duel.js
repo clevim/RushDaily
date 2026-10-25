@@ -187,7 +187,7 @@ function renderHand() {
     const pose = poses.get(key) || defaultPose(data);
     const playable = actionsFor(key).length > 0;
     const stats = isMonster(data) ? `, Nível ${data.level & 0xff}, ATK ${data.atk}, DEF ${data.def}` : '';
-    return `<button class="card hand-card ${playable ? 'playable' : ''} ${pose.set ? 'set-pose' : ''}" style="--i:${index}" type="button" data-loc="${key}" data-gesture aria-label="${escape(`${data.name}${stats}${pose.set ? ', para baixar virada' : ''}${playable ? ', jogável' : ''}`)}">${face(data)}</button>`;
+    return `<button class="card hand-card ${playable ? 'playable' : ''} ${pose.set ? 'set-pose' : ''}" style="--i:${index}" type="button" data-loc="${key}" data-gesture aria-label="${escape(`${data.name}${stats}${pose.set ? ', para baixar virada' : ''}${playable ? ', jogável' : ''}`)}">${pose.set ? back() : face(data)}</button>`;
   }).join('');
   const foeHand = view[FOE].hand.filter(Boolean).length;
   $('#foe-hand').innerHTML = `<span class="foe-backs">${Array.from({ length: Math.min(foeHand, 8) }, () => `<img src="${RUSH_BACK}" alt="">`).join('')}</span><b>${foeHand}</b>`;

@@ -172,7 +172,6 @@ polygon.fly-piece.top { fill: var(--gold-lo); }
 .rush-arena .hand-card:first-child { margin-left: 0; }
 .rush-arena .hand-card:hover, .rush-arena .hand-card:focus-visible { transform: translateY(-10px) scale(1.12) rotate(0); }
 .rush-arena .hand-card.set-pose .rcard { box-shadow: 0 0 0 2px var(--sky), 0 0 16px 2px rgb(79 179 232 / 0.55); }
-.rush-arena .hand-card.set-pose .rcard::after { content: 'Baixar'; position: absolute; left: 50%; bottom: 6%; translate: -50% 0; padding: 2px 6px; border-radius: 3px; background: var(--sky); color: var(--lacquer); font: 800 clamp(0.5rem, calc(var(--w) * 0.12), 0.72rem)/1.1 var(--body); text-transform: uppercase; letter-spacing: 0.04em; }
 
 /* Zonas acesas ao arrastar (pilha e placa também) */
 .rush-arena .zone.filled.mine.drop-ok .face { box-shadow: 0 0 0 3px var(--sky), 0 0 28px 6px rgb(79 179 232 / 0.55); }
