@@ -14,7 +14,7 @@ export const RUSH_BACK = 'src/assets/card-back.svg';
 
 // Subir CACHE_VERSION ao mudar moldura/estilo/dados das cartas: caches de versões antigas são apagados ao abrir.
 const CACHE_PREFIX = 'rushdaily-rush-cards-';
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2;
 const CACHE_NAME = `${CACHE_PREFIX}v${CACHE_VERSION}`;
 const CACHE_MAX = 800;
 const READY_MAX = 400;

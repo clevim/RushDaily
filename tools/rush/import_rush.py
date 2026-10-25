@@ -3,10 +3,12 @@
 
   python3 -I tools/rush/import_rush.py fetch   # baixa cards-rush.cdb (BabelCDB) e os scripts Rush (CardScripts) para cache/
   python3 -I tools/rush/import_rush.py build   # escreve src/data/rush/cards.json e copia os scripts para src/vendor/card-scripts/rush/
-  python3 -I tools/rush/import_rush.py art [--force] [id ...]   # baixa as artes do Yugipedia -> src/assets/rush-art/<id>.webp
+  python3 -I tools/rush/import_rush.py art [--force] [--ignis] [id ...]   # baixa as artes do Yugipedia (ou do EDOPro) -> src/assets/rush-art/<id>.webp
+  python3 -I tools/rush/import_rush.py arte-manual <id> <imagem> [--carta]  # arte enviada à mão (admin); --carta recorta a janela de uma carta inteira
 
 Dados de regra vêm do cards-rush.cdb (o motor lê esses números). Nome e texto em PT-BR vêm de
-tools/card-render/pt-br.json (traduções do desafio diário), casados pelo nome em inglês; sem tradução, fica o inglês.
+tools/card-render/pt-br.json (traduções do desafio diário), casados pelo nome em inglês, e depois da memória de tradução
+em tools/rush/traducao/ (nomes.json e frases.json, ver traducao.py); sem tradução completa, fica o inglês.
 """
 import hashlib
 import json
@@ -43,6 +45,10 @@ ART_PX = 400  # a janela de arte do RushDuelCard é ~376x377 na escala 0.3
 ART_PATTERNS = ['-OW-RD.png', '-DBR-JP-VG-artwork.png', '-G002-JP-VG-artwork.png', '-MADU-EN-VG-artwork.png', '-OW.png', '-TF05-JP-VG-artwork.png']  # padrões de arte limpa do Yugipedia
 SKIP_ART = {'WarriorofZera-OW-RD.png'}  # arte com marca d'água
 SCAN_BOX = (22 / 421, 61 / 614, 376 / 421, 380 / 614)  # janela de arte no scan (x, y, largura, altura), como no render.py
+# Fallback quando o Yugipedia não tem a arte: imagem da carta inteira do servidor do EDOPro (Project Ignis), pelo mesmo id
+# do cards.json. É a carta com moldura Rush: recorta a janela de arte (ajuste IGNIS_BOX se o recorte sair deslocado).
+IGNIS_URL = 'https://pics.projectignis.org:2096/pics/{}.jpg'
+IGNIS_BOX = SCAN_BOX
 MIN_INTERVAL = 0.35  # segundos entre pedidos ao Yugipedia (~3 por segundo, somando os dois downloads em paralelo)
 RACES_EN = ['Warrior', 'Spellcaster', 'Fairy', 'Fiend', 'Zombie', 'Machine', 'Aqua', 'Pyro', 'Rock', 'Winged Beast', 'Plant', 'Insect',
             'Thunder', 'Dragon', 'Beast', 'Beast-Warrior', 'Dinosaur', 'Fish', 'Sea Serpent', 'Reptile', 'Psychic', 'Divine-Beast',
@@ -124,15 +130,16 @@ def trim(texts):
     return texts
 
 
-def build():
+def pool(skipped=None):
+    """Cartas do pool, em inglês, como saem do cards-rush.cdb: (id, ot, alias, setcode, type, atk, def, level, race,
+    attribute, nome sem " (Rush)", desc, strings). Também usado pelo traducao.py."""
     db = sqlite3.connect(CDB)
     rows = {row[0]: row for row in db.execute('select id, ot, alias, setcode, type, atk, def, level, race, attribute from datas')}
     texts = {row[0]: row[1:] for row in db.execute(f"select id, name, desc, {', '.join(f'str{i}' for i in range(1, 17))} from texts")}
     scripts = {int(path.stem[1:]) for path in (SCRIPTS / 'rush').glob('c*.lua')}
-    pt = translations()
-
-    cards = []
-    skipped = {'sem tipo/escondida': 0, 'ficha/skill': 0, 'arte alternativa': 0, 'sem script': 0}
+    skipped = {} if skipped is None else skipped
+    for key in ('sem tipo/escondida', 'ficha/skill', 'arte alternativa', 'sem script'):
+        skipped.setdefault(key, 0)
     for cid, (_, ot, alias, setcode, kind, atk, defense, level, race, attribute) in sorted(rows.items()):
         if not kind or ot & OT_HIDDEN:
             skipped['sem tipo/escondida'] += 1
@@ -150,12 +157,34 @@ def build():
             continue
         name, desc, *strings = texts.get(cid, ('', '') + ('',) * 16)
         name_en = re.sub(r'\s*\(Rush\)$', '', name or '')
+        yield cid, ot, alias, setcode, kind, atk, defense, level, race, attribute, name_en, (desc or '').replace('\r\n', '\n'), strings
+
+
+def traducao():
+    """tools/rush/traducao.py carregado pelo caminho (o -I tira a pasta do script do sys.path)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('traducao', HERE / 'traducao.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def build():
+    pt = translations()
+    memoria = traducao().Memoria()
+
+    cards = []
+    skipped = {}
+    for cid, ot, alias, setcode, kind, atk, defense, level, race, attribute, name_en, desc, strings in pool(skipped):
+        # Manual (pt-br.json) primeiro; senão a memória de tradução, só com a carta inteira traduzida (nunca meio a meio).
         local = pt.get(norm(name_en), {})
+        if not local.get('desc') and (traduzida := memoria.carta(name_en, desc)):
+            local = {**traduzida, 'name': local.get('name') or traduzida['name']}
         cards.append({
             'id': cid, 'alias': alias, 'setcode': str(setcode), 'type': kind, 'atk': atk, 'def': defense,
             'level': level, 'race': race, 'attribute': attribute,
             'name': local.get('name') or name_en, 'nameEn': name_en,
-            'desc': local.get('desc') or (desc or '').replace('\r\n', '\n'), 'pt': bool(local.get('desc')),
+            'desc': local.get('desc') or desc, 'pt': bool(local.get('desc')),
             **({'legend': True} if ot & OT_LEGEND else {}),
             **({'maximum': piece} if (piece := maximum_piece(name_en, kind)) else {}),
             **({'strings': trimmed} if (trimmed := trim([s or '' for s in strings])) else {}),
@@ -201,8 +230,10 @@ _lock = threading.Lock()
 
 
 def yugipedia_get(url):
-    """GET no Yugipedia via curl (só HTTPS, inclusive nos redirecionamentos), espaçado por MIN_INTERVAL entre todos os pedidos.
-    404/403 não repetem; muitas falhas seguidas param tudo (site fora do ar ou bloqueando)."""
+    """GET no Yugipedia (e no servidor de imagens do EDOPro) via curl (só HTTPS, inclusive nos redirecionamentos), espaçado por MIN_INTERVAL entre todos os pedidos.
+    404/403 não repetem; muitas falhas seguidas param tudo (site fora do ar ou bloqueando). 404/410 é resposta do site
+    (arquivo que não está ali) e não conta para essa parada: as artes que faltam costumam ser justamente essas."""
+    missing = False
     for attempt in range(4):
         with _lock:
             wait = _last_request[0] + MIN_INTERVAL - time.monotonic()
@@ -214,8 +245,11 @@ def yugipedia_get(url):
             _failures[0] = 0
             return result.stdout
         if result.returncode == 22 and re.search(rb'\b(403|404|410)\b', result.stderr):
+            missing = not re.search(rb'\b403\b', result.stderr)
             break
         time.sleep(2 + attempt * 3)
+    if missing:
+        return None
     with _lock:
         _failures[0] += 1
         if _failures[0] >= 15:
@@ -290,6 +324,16 @@ def match_yaml(cards, yaml):
     return found
 
 
+def file_url(filename):
+    """Endereço real do arquivo pela API (quando o caminho calculado no CDN dá 404)."""
+    query = urllib.parse.urlencode({'action': 'query', 'format': 'json', 'prop': 'imageinfo', 'iiprop': 'url', 'titles': f'File:{filename}'})
+    body = yugipedia_get(f'https://yugipedia.com/api.php?{query}')
+    for page in (json.loads(body).get('query', {}).get('pages', {}).values() if body else []):
+        if url := (page.get('imageinfo') or [{}])[0].get('url'):
+            return url
+    return None
+
+
 def check_files(names, known):
     """Quais arquivos existem no Yugipedia (API em lotes de 50; resultado guardado em art-sources.json)."""
     names = [name for name in dict.fromkeys(names) if name not in known]
@@ -349,13 +393,13 @@ def art_source(card, entry, sources):
     return None
 
 
-def to_webp(raw, crop, target):
+def to_webp(raw, crop, target, box=SCAN_BOX):
     import io
     from PIL import Image
     with Image.open(io.BytesIO(raw)) as image:
         image = image.convert('RGB')
         if crop:
-            x, y, w, h = SCAN_BOX
+            x, y, w, h = box
             image = image.crop((round(x * image.width), round(y * image.height), round((x + w) * image.width), round((y + h) * image.height)))
         else:  # arte limpa: recorte central quadrado (a moldura usa "cover")
             side = min(image.width, image.height)
@@ -399,17 +443,31 @@ def art(args):
     page_images([title for card in todo if card['id'] not in found for title in (f"{card['nameEn']} (Rush Duel)", card['nameEn'])], sources['pages'])
     ART_SOURCES.write_text(json.dumps(sources, ensure_ascii=False))
 
-    jobs = [(card, source) for card in todo if (source := art_source(card, found.get(card['id']), sources))]
-    without = len(todo) - len(jobs)
-    done, failed = [0], []
+    # Sem fonte no Yugipedia: vai direto para o EDOPro (source None).
+    # --ignis: ignora o Yugipedia (para conferir o recorte do EDOPro: art --force --ignis <id>).
+    jobs = [(card, None if '--ignis' in args else art_source(card, found.get(card['id']), sources)) for card in todo]
+    without = sum(1 for _, source in jobs if source is None)
+    done, failed, ignis = [0], [], [0]
 
     def work(job):
-        card, (filename, crop) = job
-        raw = yugipedia_get(cdn(filename))
+        card, source = job
+        raw, box = None, SCAN_BOX
+        if source:
+            filename, crop = source
+            raw = yugipedia_get(cdn(filename))
+            if raw is None and (url := file_url(filename)) and url != cdn(filename):
+                raw = yugipedia_get(url)
+        else:
+            filename, crop = '(sem fonte no Yugipedia)', True
+        if raw is None:  # fallback: carta inteira do EDOPro, recortada
+            raw = yugipedia_get(IGNIS_URL.format(card['id']))
+            if raw is not None:
+                crop, box = True, IGNIS_BOX
+                ignis[0] += 1
         try:
             if raw is None:
-                raise ValueError('download falhou')
-            to_webp(raw, crop, ART_OUT / f"{card['id']}.webp")
+                raise ValueError('download falhou (nem no Yugipedia nem no servidor do EDOPro)')
+            to_webp(raw, crop, ART_OUT / f"{card['id']}.webp", box)
         except Exception as error:  # imagem corrompida ou indisponível: segue com as outras
             failed.append(f"{card['id']} {filename}: {error}")
         done[0] += 1
@@ -420,9 +478,12 @@ def art(args):
         list(workers.map(work, jobs))
     for line in failed[:20]:
         print('falhou:', line)
+    if len(failed) > 20:
+        print(f'... e mais {len(failed) - 20}')
     ids = write_art_index()
     total = len(json.loads((OUT / 'cards.json').read_text()))
-    print(f'artes: {len(ids)} de {total} | baixadas agora {len(jobs) - len(failed)} | falharam {len(failed)} | sem fonte {without} -> {ART_OUT}')
+    print(f'artes: {len(ids)} de {total} | baixadas agora {len(jobs) - len(failed)} (do EDOPro: {ignis[0]}) | falharam {len(failed)} | '
+          f'sem fonte no Yugipedia {without} -> {ART_OUT}')
 
 
 if __name__ == '__main__':
@@ -433,5 +494,13 @@ if __name__ == '__main__':
         build()
     elif command == 'art':
         art(sys.argv[2:])
+    elif command == 'arte-manual' and len(sys.argv) >= 4 and sys.argv[2].isdigit():
+        known = {card['id'] for card in json.loads((OUT / 'cards.json').read_text())}
+        if int(sys.argv[2]) not in known:
+            sys.exit(f'carta {sys.argv[2]} não está no cards.json')
+        ART_OUT.mkdir(parents=True, exist_ok=True)
+        to_webp(Path(sys.argv[3]).read_bytes(), '--carta' in sys.argv, ART_OUT / f'{sys.argv[2]}.webp')
+        write_art_index()
+        print('arte gravada:', ART_OUT / f'{sys.argv[2]}.webp')
     else:
         print(__doc__)

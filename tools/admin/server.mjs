@@ -345,9 +345,65 @@ async function desafio(data, dias) {
 }
 const dataOk = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s ?? '') && !Number.isNaN(Date.parse(`${s}T12:00:00Z`)) && Math.abs(Date.parse(`${s}T12:00:00Z`) - Date.now()) < 400 * 86400000;
 
+
+// ---- tradução Rush (tools/rush/traducao/*.json) e artes Rush faltando ----
+// Leitura direta dos JSON; a escrita passa SEMPRE pelo traducao.py aplicar (mesmas verificações da linha de comando).
+// No contêiner o código vem da imagem a cada subida: editar lá se perderia, então a tradução é só leitura.
+const TRAD = { frases: 'tools/rush/traducao/frases.json', nomes: 'tools/rush/traducao/nomes.json' };
+const ORIGENS = ['automatica', 'revisada', 'manual', 'oficial'];
+const lerTrad = (tipo) => { try { return JSON.parse(readFileSync(p(TRAD[tipo]), 'utf8')); } catch { return {}; } }; // sem cache: muda ao salvar
+function traducaoLista(q) {
+  const tipo = Object.hasOwn(TRAD, q.get('tipo')) ? q.get('tipo') : 'frases';
+  const dados = lerTrad(tipo);
+  const origem = ORIGENS.includes(q.get('origem')) ? q.get('origem') : '';
+  const busca = (q.get('busca') ?? '').slice(0, 80).toLowerCase();
+  const contagem = Object.fromEntries(ORIGENS.map((o) => [o, 0]));
+  const itens = [];
+  for (const [en, e] of Object.entries(dados)) {
+    contagem[e.origem] = (contagem[e.origem] ?? 0) + 1;
+    if (origem && e.origem !== origem) continue;
+    if (busca && !en.toLowerCase().includes(busca) && !String(e.pt).toLowerCase().includes(busca)) continue;
+    itens.push({ en, pt: e.pt, origem: e.origem, usos: e.usos ?? null });
+  }
+  itens.sort((a, b) => (b.usos ?? 0) - (a.usos ?? 0) || a.en.localeCompare(b.en));
+  const pagina = Math.max(0, Number.parseInt(q.get('pagina') ?? '0', 10) || 0);
+  return { tipo, total: itens.length, contagem, pagina, itens: itens.slice(pagina * 50, pagina * 50 + 50), somenteLeitura: CONTEINER };
+}
+function traducaoSalvar(q) {
+  if (CONTEINER) throw new Error('No contêiner a tradução é só leitura (o código vem da imagem). Edite no painel local (npm run admin) e faça commit.');
+  const tipo = Object.hasOwn(TRAD, q.tipo) ? q.tipo : null;
+  const dados = tipo ? lerTrad(tipo) : {};
+  if (!tipo || typeof q.en !== 'string' || !Object.hasOwn(dados, q.en)) throw new Error('entrada desconhecida');
+  if (typeof q.pt !== 'string' || !q.pt.trim() || q.pt.length > 2000) throw new Error('tradução vazia ou longa demais');
+  const lote = join(DADOS, 'lote-traducao.json');
+  writeFileSync(lote, JSON.stringify({ [tipo]: { [q.en]: q.pt.trim() } }), { mode: 0o600 });
+  const r = spawnSync('python3', ['-I', 'tools/rush/traducao.py', 'aplicar', lote, '--origem', 'revisada'], { cwd: ROOT, encoding: 'utf8', timeout: 60000 });
+  rmSync(lote, { force: true });
+  const problemas = (r.stdout || '').split('\n').filter((l) => l.trim().startsWith('-> ')).map((l) => l.trim().slice(3));
+  if (r.status !== 0) throw new Error(problemas.join('; ') || (r.stderr || r.stdout || 'falhou').trim().split('\n').pop());
+  return { ok: true };
+}
+function artesFaltando() {
+  const cards = dado('src/data/rush/cards.json') ?? [];
+  const dir = p('src/assets/rush-art');
+  return cards.filter((c) => !existsSync(join(dir, `${c.id}.webp`))).map((c) => ({ id: c.id, name: c.name, nameEn: c.nameEn }));
+}
+function arteSalvar(q) {
+  const id = String(q.id ?? '');
+  if (!/^\d{1,10}$/.test(id)) throw new Error('id inválido');
+  const m = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/.exec(q.imagem ?? '');
+  if (!m) throw new Error('imagem: PNG, JPEG ou WebP');
+  const tmp = join(DADOS, `arte-${id}.${m[1]}`);
+  writeFileSync(tmp, Buffer.from(m[2], 'base64'), { mode: 0o600 });
+  const r = spawnSync('python3', ['-I', 'tools/rush/import_rush.py', 'arte-manual', id, tmp, ...(q.carta ? ['--carta'] : [])], { cwd: ROOT, encoding: 'utf8', timeout: 60000 });
+  rmSync(tmp, { force: true });
+  if (r.status !== 0) throw new Error((r.stderr || r.stdout || 'falhou').trim().split('\n').pop());
+  return { ok: true };
+}
+
 // ---- HTTP ----
 const json = (res, cod, obj) => { res.writeHead(cod, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' }); res.end(JSON.stringify(obj)); };
-const lerCorpo = (req) => new Promise((ok, no) => { let b = ''; req.on('data', (d) => { b += d; if (b.length > 20000) { no(new Error('corpo grande')); req.destroy(); } }); req.on('end', () => { try { ok(b ? JSON.parse(b) : {}); } catch { no(new Error('JSON inválido')); } }); });
+const lerCorpo = (req, max = 20000) => new Promise((ok, no) => { let b = ''; req.on('data', (d) => { b += d; if (b.length > max) { no(new Error('corpo grande')); req.destroy(); } }); req.on('end', () => { try { ok(b ? JSON.parse(b) : {}); } catch { no(new Error('JSON inválido')); } }); });
 const PORTAS = [...new Set([PORTA, PORTA_PUBLICA])].join('|');
 const hostOk = (h) => new RegExp(`^(127\\.0\\.0\\.1|localhost):(${PORTAS})$`).test(h ?? ''); // contra DNS rebinding
 const originOk = (o) => !o || new RegExp(`^http://(127\\.0\\.0\\.1|localhost):(${PORTAS})$`).test(o);
@@ -430,6 +486,14 @@ createServer(async (req, res) => {
       } catch {
         return json(res, 502, { configurado: true, erro: CONTEINER ? `Não consegui falar com o servidor de sync em ${base}. O serviço rushdaily-sync está no ar e com ADMIN_TOKEN no .env?` : `Não consegui falar com o servidor de sync em ${base}. O túnel SSH (-L 4192) está aberto?` });
       }
+    }
+    if (req.method === 'GET' && rota === '/api/traducao') return json(res, 200, traducaoLista(url.searchParams));
+    if (req.method === 'POST' && rota === '/api/traducao') {
+      try { return json(res, 200, traducaoSalvar(await lerCorpo(req))); } catch (e) { return json(res, 400, { erro: e.message }); }
+    }
+    if (req.method === 'GET' && rota === '/api/artes-faltando') return json(res, 200, { cartas: artesFaltando() });
+    if (req.method === 'POST' && rota === '/api/arte') {
+      try { return json(res, 200, arteSalvar(await lerCorpo(req, 12_000_000))); } catch (e) { return json(res, 400, { erro: e.message }); }
     }
     if (req.method === 'GET' && rota === '/api/estado') return json(res, 200, estado());
     if (req.method === 'GET' && rota === '/api/historico') {
