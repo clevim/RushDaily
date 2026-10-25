@@ -914,10 +914,12 @@ $('#heart').addEventListener('click', async () => {
   current = null; // segura a mesa enquanto o Enigma explode
   heartSpent = true;
   renderDock();
-  useHeart(playerKey);
   await shatterEnigma();
   current = pending;
+  // A carga só sai depois que o laço grava a ativação na partida (alguns microtasks após respond): se a aba
+  // fechar durante a animação, a carga continua e a Skill ainda pode ser usada.
   respond({ type: R.SELECT_IDLECMD, action: 5, index });
+  setTimeout(() => useHeart(playerKey));
 });
 
 /* ---------- Botões e entrada ---------- */
