@@ -11,6 +11,7 @@
   "scripts": {
     "setup": "node tools/setup/setup.mjs",
     "test": "node --test tests/*.test.mjs",
+    "test:deploy": "node --test tests/daily-generator.test.mjs tests/features.test.mjs tests/ocg-binding.test.mjs tests/rush-cards.test.mjs tests/rush.test.mjs tests/sync-merge.test.mjs tests/sync-server.test.mjs",
     "admin": "node tools/admin/server.mjs",
     "serve": "python3 tools/serve.py 4173",
     "sync": "node server/server.mjs"
