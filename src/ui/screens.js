@@ -376,7 +376,7 @@ function renderPuzzle() {
       <div class="puzzle-stage"><canvas id="puzzle-canvas" aria-label="Enigma do Milênio com ${owned.length} de ${total} peças"></canvas></div>
       <aside class="heart scroll ${charges ? 'on' : ''}">
         <h2>Coração das Cartas</h2>
-        <p>Mês completo, vencido ou recuperado, vira uma carga: no duelo, ela puxa do deck a carta-chave.</p>
+        <p>Mês completo, vencido ou recuperado, vira uma carga: no desafio do dia, 1 vez por duelo, escolha qualquer carta do seu deck e coloque na mão.</p>
         <ol class="calendar" aria-label="Dias de ${monthName(month)}">${Array.from({ length: total }, (_, index) => {
           const state = recovered.includes(index) ? 'recovered' : owned.includes(index) ? 'won' : index < todayIndex ? 'missed' : index === todayIndex ? 'today' : 'later';
           const label = { won: 'vencido', recovered: 'recuperado no puzzle', missed: 'sem vitória, toque para recuperar', today: 'hoje', later: 'ainda não chegou' }[state];
