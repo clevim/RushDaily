@@ -21,9 +21,9 @@ Sem dependências (só Node). Histórico e configuração ficam em `tools/setup/
 - Artes Rush (`import_rush.py art`): baixa do Yugipedia as artes das cartas Rush do motor para `src/assets/rush-art/` (todas as que faltam, ou só os ids; "refazer" = `--force`)
 - Montar cartas Rush (`tools/rush/render.mjs`): desenha as cartas Rush do motor com moldura e arte para `src/assets/rush-cards/` e `rush-cards-sm/` (as que faltam e as que ganharam arte depois, ou só os ids). Rode depois de "Artes Rush"
 - Buscar puzzles (`puzzles --buscar --nos --meta`; padrão vem da configuração salva)
-- Render das clássicas e das Rush (todas as que faltam, ou só os ids)
+- Render das clássicas (todas as que faltam, ou só os ids)
 - Testes (`npm test`) e simulação (`simulate.mjs N T`)
-- Simulação Rush (`tools/rush/simulate.mjs N modo`, modo `todos`, `ia` ou `aleatorio`): IA x IA com decks gerados e bot aleatório com decks sorteados
+- Simulação Rush (`tools/rush/simulate.mjs N modo`, modo `todos`, `ia`, `aleatorio`, `diario` ou `niveis`): IA x IA com decks gerados, bot aleatório com decks sorteados, N dias do desafio do dia (cada dificuldade) ou cada nível da IA contra a IA gulosa do clássico
 
 O log aparece em tempo real (SSE); a barra de progresso lê as linhas `N/M` dos renders. As últimas 30 execuções ficam no histórico (clique para ver o final do log).
 

@@ -2,7 +2,7 @@
 // Script de início do RushDaily: baixa/gera tudo que não é código do projeto (dados, cartas, artes, bibliotecas, Enigma).
 //   npm run setup                         # tudo; pula o que já existe
 //   npm run setup -- --force              # refaz tudo
-//   npm run setup -- --so rush            # só uma etapa (várias: --so three,rush)
+//   npm run setup -- --so rush-ocg        # só uma etapa (várias: --so three,rush-ocg)
 //   npm run setup -- --temporadas 2       # libera as temporadas 1..2 do clássico (padrão 1)
 //   npm run setup -- --sem-render         # não desenha as imagens das cartas (Rush e clássicas)
 //   npm run setup -- --lista              # mostra as etapas
@@ -20,7 +20,7 @@ const CLASSIC = p('tools/classic');
 const RENDER_CL = p('tools/classic/render');
 const ENIGMA_CACHE = p('tools/setup/cache/enigma');
 mkdirSync(p('src/vendor'), { recursive: true });
-const SHA_YGO_CARD = '92462bbd2aa3aa0075ebcc9b633bdc05137fd7ac'; // mesmo commit de tools/card-render/render.py
+const SHA_YGO_CARD = '92462bbd2aa3aa0075ebcc9b633bdc05137fd7ac'; // molduras e fontes do yugioh-card (clássicas e Rush)
 
 // ---- argumentos ----
 const args = process.argv.slice(2);
@@ -134,17 +134,6 @@ const ETAPAS = [
     },
   },
   {
-    nome: 'rush', desc: 'Cartas Rush: Yugipedia/yaml-yugi (escolha e artes) -> src/data/cards.mjs',
-    pronto: () => existe('src/data/cards.mjs'),
-    run() { py('tools/card-render/import_pool.py', 'fetch'); py('tools/card-render/import_pool.py', 'build'); },
-  },
-  {
-    nome: 'rush-render', desc: 'Desenha as frentes Rush em PT-BR (molduras e fontes do rush-hub) -> src/assets/cards/',
-    render: true,
-    pronto: () => false, // render.py já pula as cartas desenhadas
-    run() { py('tools/card-render/render.py', ...(force ? ['--force'] : [])); },
-  },
-  {
     nome: 'classico', desc: 'Pool clássico: YGOPRODeck, BabelCDB, CardScripts, decks e puzzles -> src/data/classic, src/vendor/card-scripts, artes',
     pronto: () => false, // cada passo abaixo se pula sozinho
     run() {
@@ -196,7 +185,7 @@ const ETAPAS = [
     },
   },
   {
-    nome: 'miniaturas', desc: 'Miniaturas webp das cartas (Rush 316 px, clássicas 140 px) -> src/assets/cards-sm, src/assets/classic-cards-sm',
+    nome: 'miniaturas', desc: 'Miniaturas webp das cartas clássicas (140 px) -> src/assets/classic-cards-sm (as Rush saem da rush-cartas)',
     render: true,
     pronto: () => false, // thumbs.py pula as que já existem
     run() { py('tools/setup/thumbs.py', ...(force ? ['--force'] : [])); },

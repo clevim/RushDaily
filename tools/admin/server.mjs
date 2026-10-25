@@ -7,7 +7,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createServer } from 'node:http';
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const p = (...x) => join(ROOT, ...x);
@@ -46,7 +46,7 @@ const ids = (v) => {
 const etapa = (v) => { if (!NOMES.includes(v)) throw new Error(`etapa: use uma de ${NOMES.join(', ')}`); return v; };
 const CLASSICO = ['fetch', 'decks', 'build', 'art', 'puzzles'];
 const RUSH = ['fetch', 'build'];
-const MODOS_SIM_RUSH = ['todos', 'ia', 'aleatorio'];
+const MODOS_SIM_RUSH = ['todos', 'ia', 'aleatorio', 'diario', 'niveis'];
 const IMP = (...r) => ({ cmd: 'python3', args: ['-I', 'tools/classic/import_cards.py', ...r] });
 const cfgArquivo = () => { try { return JSON.parse(readFileSync(join(DADOS, 'config.json'), 'utf8')); } catch { return {}; } };
 const config = () => { const c = cfgArquivo(); return { nos: Number(c.nos) || 10000, meta: Number(c.meta) || 35 }; }; // só o que pode ir ao navegador (o token do sync fica de fora)
@@ -67,8 +67,6 @@ const TAREFAS = {
     montar: (q) => IMP('puzzles', '--buscar', '--nos', String(inteiro(q.nos, 'nos', 100, 1000000, config().nos)), '--meta', String(inteiro(q.meta, 'meta', 1, 200, config().meta))) },
   'render-classico': { titulo: 'Render das clássicas', desc: 'render.mjs: desenha as cartas clássicas (todas as que faltam, ou só os ids dados).', params: ['force', 'ids'],
     montar: (q) => ({ cmd: 'node', args: ['tools/classic/render/render.mjs', ...(q.force ? ['--force'] : []), ...ids(q.ids)] }) },
-  'render-rush': { titulo: 'Render das Rush', desc: 'render.py: desenha as cartas Rush em PT-BR (todas que faltam, ou só os ids).', params: ['force', 'ids'],
-    montar: (q) => ({ cmd: 'python3', args: ['tools/card-render/render.py', ...(q.force ? ['--force'] : []), ...ids(q.ids)] }) },
   rush: { titulo: 'Importar Rush', desc: 'import_rush.py: fetch (baixa cards-rush.cdb do BabelCDB e os scripts Rush do CardScripts), build (gera src/data/rush/cards.json e copia os scripts).', params: ['comandoRush'],
     montar: (q) => {
       if (!RUSH.includes(q.comandoRush)) throw new Error(`comando: ${RUSH.join(', ')}`);
@@ -78,7 +76,7 @@ const TAREFAS = {
     montar: (q) => ({ cmd: 'python3', args: ['-I', 'tools/rush/import_rush.py', 'art', ...(q.force ? ['--force'] : []), ...ids(q.ids)] }) },
   'montar-rush': { titulo: 'Montar cartas Rush', desc: 'tools/rush/render.mjs: desenha as cartas Rush do motor com moldura e arte (as que faltam, as com arte nova, ou só os ids) -> src/assets/rush-cards/.', params: ['force', 'ids'],
     montar: (q) => ({ cmd: 'node', args: ['tools/rush/render.mjs', ...(q.force ? ['--force'] : []), ...ids(q.ids)] }) },
-  'simulacao-rush': { titulo: 'Simulação Rush', desc: 'tools/rush/simulate.mjs N modo: IA x IA com decks gerados e/ou bot aleatório com decks sorteados; conta erros de script e travamentos.', params: ['duelos', 'modoRush'],
+  'simulacao-rush': { titulo: 'Simulação Rush', desc: 'tools/rush/simulate.mjs N modo: IA x IA com decks gerados, bot aleatório com decks sorteados, N dias do desafio diário ou cada nível da IA contra a gulosa do clássico; conta erros de script e travamentos.', params: ['duelos', 'modoRush'],
     montar: (q) => {
       const modo = q.modoRush || 'todos';
       if (!MODOS_SIM_RUSH.includes(modo)) throw new Error(`modo: ${MODOS_SIM_RUSH.join(', ')}`);
@@ -106,7 +104,7 @@ function iniciar() {
   if (atual || !fila.length) return;
   const j = fila.shift();
   const { cmd, args } = j.cmd;
-  atual = { ...j, inicio: Date.now(), log: [], progresso: null, cancelada: false, rushTotal: 0, rushFeitas: 0 };
+  atual = { ...j, inicio: Date.now(), log: [], progresso: null, cancelada: false };
   const filho = spawn(cmd, args, { cwd: ROOT, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PYTHONUNBUFFERED: '1', NO_COLOR: '1' } });
   atual.filho = filho;
   const linha = (texto) => {
@@ -114,8 +112,6 @@ function iniciar() {
     a.log.push(texto); if (a.log.length > 4000) a.log.splice(0, 1000); // ponytail: só as últimas ~4000 linhas ficam na memória
     let m;
     if ((m = texto.match(/(\d+)\s*\/\s*(\d+)/)) && +m[2] > 0 && +m[1] <= +m[2]) a.progresso = { n: +m[1], m: +m[2] };
-    else if ((m = texto.match(/^(\d+) cartas para renderizar/))) { a.rushTotal = +m[1]; a.progresso = { n: 0, m: a.rushTotal }; }
-    else if (a.rushTotal && /^(ok|scan) \d+/.test(texto)) a.progresso = { n: ++a.rushFeitas, m: a.rushTotal };
     enviar({ tipo: 'linha', texto, progresso: a.progresso });
   };
   linha(`$ ${[cmd, ...args].join(' ')}`);
@@ -154,7 +150,6 @@ function tamanho(dir) { // bytes de uma árvore (sem seguir links)
 }
 const jsonDe = (...x) => { try { return JSON.parse(readFileSync(p(...x), 'utf8')); } catch { return null; } };
 const temporadas = () => jsonDe('src/data/classic/seasons.json') ?? [];
-async function poolRush() { try { return (await import(`${pathToFileURL(p('src/data/cards.mjs')).href}?t=${Date.now()}`)).CARD_POOL.length; } catch { return 0; } }
 
 let cacheStatus = { t: 0, v: null };
 async function status() {
@@ -166,22 +161,18 @@ async function status() {
   const cartasCl = arquivos(p('src/assets/classic-cards'), /\.webp$/);
   const puzzles = (jsonDe('src/data/classic/puzzles.json') ?? []).length;
   const luas = arquivos(p('src/vendor/card-scripts/official'), /^c\d+\.lua$/);
-  const rushTotal = await poolRush();
-  const rushImg = arquivos(p('src/assets/cards'), /^\d+\.webp$/);
-  const rushSm = arquivos(p('src/assets/cards-sm'), /\.webp$/);
   const clSm = arquivos(p('src/assets/classic-cards-sm'), /\.webp$/);
   const rushOcg = jsonDe('src/data/rush/cards.json') ?? [];
   const luasRush = arquivos(p('src/vendor/card-scripts/rush'), /^c\d+\.lua$/);
   const rushPt = rushOcg.filter((c) => c.pt).length;
   const rushArte = arquivos(p('src/assets/rush-art'), /^\d+\.webp$/);
   const rushCartas = arquivos(p('src/assets/rush-cards'), /^\d+\.webp$/);
+  const rushSm = arquivos(p('src/assets/rush-cards-sm'), /^\d+\.webp$/);
   const seasonsOk = ts.length > 0 && ts.every((s) => ex(`src/data/classic/s${s.season}.json`));
   const E = {
     three: { pronto: ex('src/vendor/three.module.js'), caminhos: ['src/vendor/three.module.js'] },
     ocgcore: { pronto: ex('src/vendor/ocgcore/index.js') && ex('src/vendor/ocgcore/ocgcore.wasm') && ex('src/vendor/ocgcore/LICENSE.md'), caminhos: ['src/vendor/ocgcore'] },
     yugioh: { pronto: ex('src/vendor/yugioh-card/yugioh-card.js') && ex('src/vendor/yugioh-card/assets/yugioh/font/font-list.json') && ex('src/vendor/yugioh-card/assets/rush-duel/font/font-list.json'), caminhos: ['src/vendor/yugioh-card'] },
-    rush: { pronto: ex('src/data/cards.mjs'), contagem: `${rushTotal} cartas Rush no pool`, caminhos: ['src/data/cards.mjs'] },
-    'rush-render': { pronto: rushTotal > 0 && rushImg >= rushTotal, parcial: rushImg > 0, contagem: `${rushImg}/${rushTotal} cartas Rush desenhadas`, caminhos: ['src/assets/cards'] },
     classico: { pronto: seasonsOk && ex('src/data/classic/puzzles.json') && luas > 0 && artes >= totalClassicas && totalClassicas > 0, parcial: seasonsOk || artes > 0,
       contagem: `artes ${artes}/${totalClassicas} · puzzles validados ${puzzles} · scripts Lua ${luas} · temporadas ativas ${ts.length}`,
       caminhos: ['src/data/classic', 'src/assets/classic-art', 'src/vendor/card-scripts', 'tools/classic/cache'] },
@@ -189,9 +180,9 @@ async function status() {
       contagem: `${rushOcg.length} cartas (${rushPt} em PT · ${rushOcg.filter((c) => c.legend).length} Lenda) · scripts Lua ${luasRush} · cache ${(tamanho(p('tools/rush/cache')) / 1048576).toFixed(1)} MB`,
       caminhos: ['src/data/rush', 'src/vendor/card-scripts/rush', 'tools/rush/cache'] },
     'rush-art': { pronto: rushOcg.length > 0 && rushArte >= rushOcg.length, parcial: rushArte > 0, contagem: `${rushArte}/${rushOcg.length} artes Rush (sem arte: quadro no tom do atributo)`, caminhos: ['src/assets/rush-art'] },
-    'rush-cartas': { pronto: rushOcg.length > 0 && rushCartas >= rushOcg.length, parcial: rushCartas > 0, contagem: `${rushCartas}/${rushOcg.length} cartas Rush montadas (${rushArte} com arte)`, caminhos: ['src/assets/rush-cards', 'src/assets/rush-cards-sm'] },
+    'rush-cartas': { pronto: rushOcg.length > 0 && rushCartas >= rushOcg.length, parcial: rushCartas > 0, contagem: `${rushCartas}/${rushOcg.length} cartas Rush montadas (${rushArte} com arte) · miniaturas ${rushSm}`, caminhos: ['src/assets/rush-cards', 'src/assets/rush-cards-sm'] },
     'classico-render': { pronto: cartasCl > 0 && cartasCl >= artes, parcial: cartasCl > 0, contagem: `${cartasCl} cartas pré-desenhadas (${artes} artes)`, caminhos: ['src/assets/classic-cards'] },
-    miniaturas: { pronto: rushSm > 0 && rushSm >= rushImg && clSm >= cartasCl, parcial: rushSm > 0 || clSm > 0, contagem: `Rush ${rushSm}/${rushImg} · clássicas ${clSm}/${cartasCl}`, caminhos: ['src/assets/cards-sm', 'src/assets/classic-cards-sm'] },
+    miniaturas: { pronto: cartasCl > 0 && clSm >= cartasCl, parcial: clSm > 0, contagem: `clássicas ${clSm}/${cartasCl}`, caminhos: ['src/assets/classic-cards-sm'] },
     enigma: { pronto: ex('src/assets/puzzle/puzzle.bin') && ex('src/assets/puzzle/puzzle.json'), caminhos: ['src/assets/puzzle', 'tools/setup/cache/enigma'] },
     'vendor-avisos': { pronto: ex('src/vendor/CHECKSUMS.txt'), caminhos: ['src/vendor/CHECKSUMS.txt'] },
   };

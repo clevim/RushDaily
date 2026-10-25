@@ -68,14 +68,11 @@ jobs:
         uses: actions/cache@v5
         with:
           path: |
-            tools/card-render/cache
             tools/classic/cache
             tools/rush/cache
             tools/setup/cache
             src/vendor
             src/data
-            src/assets/cards
-            src/assets/cards-sm
             src/assets/classic-art
             src/assets/classic-cards
             src/assets/classic-cards-sm
@@ -83,7 +80,7 @@ jobs:
             src/assets/rush-cards
             src/assets/rush-cards-sm
             src/assets/puzzle
-          key: setup-${{ inputs.temporadas || '1' }}-${{ hashFiles('tools/setup/**', 'tools/classic/import_cards.py', 'tools/rush/import_rush.py', 'tools/classic/CARDSCRIPTS_SHA', 'tools/classic/puzzle-solutions.json', 'tools/classic/render/**', 'tools/card-render/*.py', 'tools/card-render/*.json', 'tools/puzzle/*.py', 'src/ui/classic-card-data.js') }}
+          key: setup-${{ inputs.temporadas || '1' }}-${{ hashFiles('tools/setup/**', 'tools/classic/import_cards.py', 'tools/rush/import_rush.py', 'tools/classic/CARDSCRIPTS_SHA', 'tools/classic/puzzle-solutions.json', 'tools/classic/render/**', 'tools/card-render/*.json', 'tools/rush/render.mjs', 'src/ui/rush-card-data.js', 'tools/puzzle/*.py', 'src/ui/classic-card-data.js') }}
           restore-keys: |
             setup-${{ inputs.temporadas || '1' }}-
 
