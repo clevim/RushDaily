@@ -21,6 +21,7 @@ from concurrent.futures import ThreadPoolExecutor
 import sqlite3
 import subprocess
 import sys
+import threading
 import time
 import urllib.parse
 from pathlib import Path
@@ -58,9 +59,18 @@ def fetch_url(url, target):
 
 def fetch():
     CACHE.mkdir(exist_ok=True)
-    fetch_url(f'{API}?misc=yes', CACHE / 'ygopro-en.json')
-    fetch_url(f'{API}?language=pt', CACHE / 'ygopro-pt.json')
-    fetch_url('https://raw.githubusercontent.com/ProjectIgnis/BabelCDB/master/cards.cdb', CACHE / 'cards.cdb')
+    # Os quatro downloads são independentes: correm juntos (só 2 pedidos ao YGOPRODeck, bem abaixo do limite).
+    with ThreadPoolExecutor(4) as pool:
+        jobs = [pool.submit(fetch_url, f'{API}?misc=yes', CACHE / 'ygopro-en.json'),
+                pool.submit(fetch_url, f'{API}?language=pt', CACHE / 'ygopro-pt.json'),
+                pool.submit(fetch_url, 'https://raw.githubusercontent.com/ProjectIgnis/BabelCDB/master/cards.cdb', CACHE / 'cards.cdb'),
+                pool.submit(fetch_scripts)]
+        for job in jobs:
+            job.result()  # repassa o erro de qualquer um
+    print('cache pronto em', CACHE)
+
+
+def fetch_scripts():
     scripts = CACHE / 'CardScripts'
     # Commit fixo dos scripts (tools/classic/CARDSCRIPTS_SHA): o master passa a usar constantes que o core compilado não conhece.
     sha = (ROOT / 'tools' / 'classic' / 'CARDSCRIPTS_SHA').read_text().strip()
@@ -70,7 +80,6 @@ def fetch():
     if subprocess.run(['git', '-C', str(scripts), 'cat-file', '-e', sha], capture_output=True).returncode:
         subprocess.run(['git', '-C', str(scripts), 'fetch', '-q', '--depth', '1', 'origin', sha], check=True)
     subprocess.run(['git', '-C', str(scripts), 'checkout', '-q', '--detach', sha], check=True)
-    print('cache pronto em', CACHE)
 
 
 def first_release(card):
@@ -267,31 +276,66 @@ DECK_FORMATS = {  # formato do YGOPRODeck -> páginas (a API entrega 20 decks po
 }
 
 
+class Taxa:
+    """Limitador de pedidos por segundo compartilhado entre as threads (o YGOPRODeck aceita até 20/s)."""
+
+    def __init__(self, por_segundo):
+        self.intervalo = 1 / por_segundo
+        self.proximo = 0.0
+        self.trava = threading.Lock()
+
+    def espera(self):
+        with self.trava:
+            agora = time.monotonic()
+            vez = max(agora, self.proximo)
+            self.proximo = vez + self.intervalo
+        if vez > agora:
+            time.sleep(vez - agora)
+
+
+DECKS_POR_SEGUNDO = 12  # alvo bem abaixo do limite de 20/s do YGOPRODeck
+DECKS_LOTE = 16  # páginas pedidas juntas; o lote para na primeira página vazia ou com erro, como antes
+
+
 def decks():
     """Listas de jogadores: só main e extra, para contar quais cartas aparecem juntas."""
     target = CACHE / 'decks.json'
     seen = {d['id']: d for d in json.loads(target.read_text())} if target.exists() else {}
-    for fmt, pages in DECK_FORMATS.items():
-        for page in range(pages):
-            url = f'https://ygoprodeck.com/api/decks/getDecks.php?format={urllib.parse.quote(fmt)}&limit=20&offset={page * 20}'
-            tmp = CACHE / 'page.json'
-            try:
-                fetch_url(url, tmp)
-                batch = json.loads(tmp.read_text())
-            except (RuntimeError, ValueError):
-                break
-            if not isinstance(batch, list) or not batch:
-                break
-            for deck in batch:
-                try:
-                    main = [int(x) for x in json.loads(deck.get('main_deck') or '[]')]
-                    extra = [int(x) for x in json.loads(deck.get('extra_deck') or '[]')]
-                except (TypeError, ValueError, KeyError):
-                    continue
-                if len(main) >= 20:
-                    seen[int(deck['deckNum'])] = {'id': int(deck['deckNum']), 'format': fmt, 'main': main, 'extra': extra}
-            time.sleep(1)  # bem abaixo do limite de 20/s
-        print(fmt, '->', len(seen), 'decks no total', flush=True)
+    taxa = Taxa(DECKS_POR_SEGUNDO)
+
+    def page_of(fmt, page):
+        url = f'https://ygoprodeck.com/api/decks/getDecks.php?format={urllib.parse.quote(fmt)}&limit=20&offset={page * 20}'
+        tmp = CACHE / f'page-{threading.get_ident()}.json'
+        taxa.espera()
+        try:
+            fetch_url(url, tmp)
+            return json.loads(tmp.read_text())
+        except (RuntimeError, ValueError):
+            return None
+        finally:
+            tmp.unlink(missing_ok=True)
+
+    with ThreadPoolExecutor(8) as pool:
+        for fmt, pages in DECK_FORMATS.items():
+            done = False
+            for start in range(0, pages, DECKS_LOTE):
+                # Páginas em paralelo, processadas na ordem: o resultado é o mesmo da versão sequencial.
+                for batch in pool.map(lambda page: page_of(fmt, page), range(start, min(start + DECKS_LOTE, pages))):
+                    if not isinstance(batch, list) or not batch:
+                        done = True
+                        break
+                    for deck in batch:
+                        try:
+                            main = [int(x) for x in json.loads(deck.get('main_deck') or '[]')]
+                            extra = [int(x) for x in json.loads(deck.get('extra_deck') or '[]')]
+                        except (TypeError, ValueError, KeyError):
+                            continue
+                        if len(main) >= 20:
+                            seen[int(deck['deckNum'])] = {'id': int(deck['deckNum']), 'format': fmt, 'main': main, 'extra': extra}
+                if done:
+                    break
+                print(f'{fmt}: páginas {min(start + DECKS_LOTE, pages)}/{pages}', flush=True)
+            print(fmt, '->', len(seen), 'decks no total', flush=True)
     target.write_text(json.dumps(list(seen.values())))
 
 
