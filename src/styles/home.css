@@ -160,7 +160,7 @@ body.launching::after {
   .brief { order: 1; font-size: 0.95rem; max-width: none; } /* o texto longo vai para depois do botão */
   .difficulty { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 0; }
   .difficulty legend { margin-bottom: 6px; }
-  .tier-face { padding: 6px 3px 7px; }
+  .tier-face { grid-template-columns: minmax(0, 1fr); padding: 6px 3px 7px; }
   .tier-name { font-size: 0.85rem; }
   .tier .glove { max-width: 100%; }
   .cta { display: grid; gap: 10px; margin-top: 2px; }
@@ -168,3 +168,10 @@ body.launching::after {
   .deck-rail { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .btn.big { width: calc(100% - 14px); max-width: 100%; margin-inline: 7px; justify-content: center; } /* o corte inclinado não passa da coluna */
 }
+
+/* Deck do dia (Rush): separador do Adicional (Fusões) na grade e PV do rival comparados aos seus */
+.rail-break { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; color: var(--gold); font: 700 0.78rem/1 var(--body); letter-spacing: 0.08em; text-transform: uppercase; }
+.rail-break::before, .rail-break::after { content: ''; height: 1px; flex: 1; background: var(--rule); }
+.rival-stats dd small { display: block; margin-top: 4px; color: var(--ivory-dim); font: 600 0.72rem/1 var(--body); text-align: right; }
+.rival-stats dd { text-align: right; }
+.rival-stats div:last-child dd { font: 700 0.95rem/1.2 var(--body); font-stretch: 85%; color: var(--gold-hi); }

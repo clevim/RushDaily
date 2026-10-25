@@ -61,13 +61,13 @@ function cleanResponse(item) {
 
 /** Valida e limpa um replay já decodificado. Devolve null se algo não bater (entrada não confiável). */
 export function cleanReplay(data) {
-  if (!data || typeof data !== 'object' || data.v !== 1) return null;
+  if (!data || typeof data !== 'object' || ![1, 2].includes(data.v)) return null; // v2: deck embaralhado pela seed
   const text = (value, max) => typeof value === 'string' && value.length <= max;
   if (!text(data.seed, 160) || ![0, 1].includes(data.me) || !text(data.label ?? '', 80) || !(typeof data.date === 'string' && DATE.test(data.date))) return null;
   if (!Array.isArray(data.responses) || data.responses.length > MAX_RESPONSES) return null;
   const responses = data.responses.map(cleanResponse);
   if (responses.includes(null)) return null;
-  const base = { v: 1, kind: data.kind, seed: data.seed, me: data.me, label: data.label || '', date: data.date, responses };
+  const base = { v: data.v, kind: data.kind, seed: data.seed, me: data.me, label: data.label || '', date: data.date, responses };
   if (data.kind === 'puzzle') {
     if (!(typeof data.puzzle === 'string' && /^[a-z0-9-]{1,64}$/.test(data.puzzle))) return null;
     return { ...base, puzzle: data.puzzle };

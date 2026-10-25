@@ -232,8 +232,11 @@ def build(until):
     (OUT / 'seasons.json').write_text(json.dumps(index, ensure_ascii=False, indent=1))
 
     # Scripts: os utilitários da raiz + o de cada carta das temporadas ativas.
-    if SCRIPTS_OUT.exists():
-        shutil.rmtree(SCRIPTS_OUT)
+    # Limpa só o que é do clássico: a pasta rush/ é do tools/rush/import_rush.py.
+    if (SCRIPTS_OUT / 'official').exists():
+        shutil.rmtree(SCRIPTS_OUT / 'official')
+    for old in SCRIPTS_OUT.glob('*.lua'):
+        old.unlink()
     (SCRIPTS_OUT / 'official').mkdir(parents=True)
     for path in scripts.glob('*.lua'):
         shutil.copy2(path, SCRIPTS_OUT / path.name)

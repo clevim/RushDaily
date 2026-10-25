@@ -314,7 +314,7 @@ button { font: inherit; color: inherit; }
   .felt::before { inset: 6px; outline: 0; } /* moldura rente à borda: não disputa espaço com o conteúdo */
   .brand span { display: none; }
   .topbar { gap: 10px; padding-block: 10px; backdrop-filter: none; z-index: 35; } /* sem blur: ele prenderia a barra fixa dentro do topo */
-  .key-chip { margin-left: auto; padding: 7px 10px; }
+  .key-chip { margin-left: auto; min-height: 40px; align-items: center; padding: 7px 10px; } /* alvo de toque de 40 px */
   .key-chip span { display: none; }
   .tabs { display: none; }
   body:has(.bar-nav) { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }

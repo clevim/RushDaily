@@ -358,8 +358,6 @@ html:has(.arena) { overflow: clip; }
   .zoom .card { max-width: 230px; }
 }
 
-.heart-btn::before { background: linear-gradient(160deg, #fff2b8, var(--gold) 40%, #b8690a 70%, #fff2b8); background-size: 200% 200%; animation: heartbeat 2.4s ease-in-out infinite; }
-@keyframes heartbeat { 50% { background-position: 100% 100%; box-shadow: 0 0 30px 4px rgb(var(--gold-rgb) / 0.7); } }
 
 /* Coração das Cartas: o Enigma explode sobre a mesa */
 .enigma-burst { position: fixed; inset: 0; z-index: 44; display: grid; place-items: center; background: radial-gradient(circle, rgb(15 42 37 / 0.6), rgb(2 6 5 / 0.92)); animation: burstIn 0.3s ease-out; }
@@ -382,8 +380,8 @@ body.entering.reveal::before { animation: reveal 0.9s cubic-bezier(0.5, 0, 0.2, 
   35% { opacity: 1; }
   100% { opacity: 0; clip-path: circle(0% at 50% 50%); transform: scale(1.15); }
 }
-body.entering .board, body.entering .tray { opacity: 0; }
-body.entering.reveal .board, body.entering.reveal .tray { opacity: 1; animation: boardIn 0.9s cubic-bezier(0.2, 0.9, 0.1, 1) 0.2s both; }
+body.entering .board, body.entering .rush-table, body.entering .tray { opacity: 0; }
+body.entering.reveal .board, body.entering.reveal .rush-table, body.entering.reveal .tray { opacity: 1; animation: boardIn 0.9s cubic-bezier(0.2, 0.9, 0.1, 1) 0.2s both; }
 @keyframes boardIn { from { opacity: 0; transform: scale(0.94); } }
 
 /* Dicas do primeiro duelo: faixa curta sobre a bandeja, apontando a mão ou o botão de encerrar */

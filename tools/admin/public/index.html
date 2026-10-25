@@ -176,6 +176,8 @@ const CAMPOS = {
   etapa: () => sel('etapa', 'Etapa', etapas.map((e) => [e.nome, `${e.nome}: ${e.desc}`])),
   force: () => chk('force', 'Refazer mesmo se já existir (--force)'),
   comando: () => sel('comando', 'Comando', ['fetch', 'decks', 'build', 'art', 'puzzles'].map((c) => [c, c])),
+  comandoRush: () => sel('comandoRush', 'Comando', [['fetch', 'fetch (baixa BabelCDB e CardScripts)'], ['build', 'build (gera cards.json e copia os scripts)']]),
+  modoRush: () => sel('modoRush', 'Modo', [['todos', 'todos (metade IA, metade aleatório)'], ['ia', 'IA x IA com decks gerados'], ['aleatorio', 'bot aleatório com decks sorteados'], ['diario', 'diario (N dias do desafio do dia)'], ['niveis', 'niveis (cada nível da IA contra a gulosa)']]),
   ate: () => num('ate', 'Temporadas (só para build --ate N)', 1, 5, 1),
   nos: () => num('nos', 'Teto de nós (vazio = configuração salva)', 100, 1000000, ''),
   meta: () => num('meta', 'Meta de puzzles validados (vazio = configuração salva)', 1, 200, ''),

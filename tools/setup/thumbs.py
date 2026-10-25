@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Miniaturas webp das cartas: cards-sm (Rush, 316 px) e classic-cards-sm (clássicas, 140 px).
+"""Miniaturas webp das cartas clássicas: classic-cards-sm (140 px). As Rush saem prontas de tools/rush/render.mjs (rush-cards-sm).
 
-A home e as grades de coleção/decks mostram a carta em 90-150 px; baixar a carta inteira (632x921 / 418x609, 44-98 KB)
+As grades de coleção/decks mostram a carta em 90-150 px; baixar a carta inteira (418x609, 44-98 KB)
 só para isso custa 4-10x mais bytes (e passa pelo túnel). Pula as que já existem e estão mais novas que a original.
 Uso: python3 tools/setup/thumbs.py [--force]
 """
@@ -10,7 +10,7 @@ from pathlib import Path
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
-JOBS = [('src/assets/cards', 'src/assets/cards-sm', 316), ('src/assets/classic-cards', 'src/assets/classic-cards-sm', 140)]
+JOBS = [('src/assets/classic-cards', 'src/assets/classic-cards-sm', 140)]
 force = '--force' in sys.argv
 
 for origem, destino, largura in JOBS:

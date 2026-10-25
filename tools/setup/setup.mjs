@@ -2,7 +2,7 @@
 // Script de início do RushDaily: baixa/gera tudo que não é código do projeto (dados, cartas, artes, bibliotecas, Enigma).
 //   npm run setup                         # tudo; pula o que já existe
 //   npm run setup -- --force              # refaz tudo
-//   npm run setup -- --so rush            # só uma etapa (várias: --so three,rush)
+//   npm run setup -- --so rush-ocg        # só uma etapa (várias: --so three,rush-ocg)
 //   npm run setup -- --temporadas 2       # libera as temporadas 1..2 do clássico (padrão 1)
 //   npm run setup -- --sem-render         # não desenha as imagens das cartas (Rush e clássicas)
 //   npm run setup -- --lista              # mostra as etapas
@@ -20,7 +20,7 @@ const CLASSIC = p('tools/classic');
 const RENDER_CL = p('tools/classic/render');
 const ENIGMA_CACHE = p('tools/setup/cache/enigma');
 mkdirSync(p('src/vendor'), { recursive: true });
-const SHA_YGO_CARD = '92462bbd2aa3aa0075ebcc9b633bdc05137fd7ac'; // mesmo commit de tools/card-render/render.py
+const SHA_YGO_CARD = '92462bbd2aa3aa0075ebcc9b633bdc05137fd7ac'; // molduras e fontes do yugioh-card (clássicas e Rush)
 
 // ---- argumentos ----
 const args = process.argv.slice(2);
@@ -44,6 +44,7 @@ const saida = (cmd, cmdArgs, env = {}) => spawnSync(cmd, cmdArgs, { encoding: 'u
 const py = (script, ...resto) => rodar('python3', [script, ...resto]);
 // O importador clássico usa -I (modo isolado), como no README.
 const classico = (...resto) => rodar('python3', ['-I', 'tools/classic/import_cards.py', ...resto]);
+const rush = (...resto) => rodar('python3', ['-I', 'tools/rush/import_rush.py', ...resto]);
 const existe = (...partes) => existsSync(p(...partes));
 const arquivos = (dir, re) => (existsSync(dir) ? readdirSync(dir).filter((n) => re.test(n)) : []);
 
@@ -121,8 +122,9 @@ const ETAPAS = [
     },
   },
   {
-    nome: 'yugioh', desc: 'yugioh-card (kooriookami, MIT): bundle e molduras reduzidas -> src/vendor/yugioh-card/',
-    pronto: () => existe('src/vendor/yugioh-card/yugioh-card.js') && existe('src/vendor/yugioh-card/assets/yugioh/font/font-list.json'),
+    nome: 'yugioh', desc: 'yugioh-card (kooriookami, MIT): bundle e molduras reduzidas (clássica e Rush) -> src/vendor/yugioh-card/',
+    // A moldura Rush (rush-duel) entrou depois: cache antigo sem ela refaz o bundle.
+    pronto: () => existe('src/vendor/yugioh-card/yugioh-card.js') && existe('src/vendor/yugioh-card/assets/yugioh/font/font-list.json') && existe('src/vendor/yugioh-card/assets/rush-duel/font/font-list.json'),
     run() {
       baixarMolduras();
       npmRender();
@@ -132,17 +134,6 @@ const ETAPAS = [
     },
   },
   {
-    nome: 'rush', desc: 'Cartas Rush: Yugipedia/yaml-yugi (escolha e artes) -> src/data/cards.mjs',
-    pronto: () => existe('src/data/cards.mjs'),
-    run() { py('tools/card-render/import_pool.py', 'fetch'); py('tools/card-render/import_pool.py', 'build'); },
-  },
-  {
-    nome: 'rush-render', desc: 'Desenha as frentes Rush em PT-BR (molduras e fontes do rush-hub) -> src/assets/cards/',
-    render: true,
-    pronto: () => false, // render.py já pula as cartas desenhadas
-    run() { py('tools/card-render/render.py', ...(force ? ['--force'] : [])); },
-  },
-  {
     nome: 'classico', desc: 'Pool clássico: YGOPRODeck, BabelCDB, CardScripts, decks e puzzles -> src/data/classic, src/vendor/card-scripts, artes',
     pronto: () => false, // cada passo abaixo se pula sozinho
     run() {
@@ -150,10 +141,37 @@ const ETAPAS = [
       if (force || !cache('cards.cdb') || !cache('ygopro-pt.json') || !existe('tools/classic/cache/CardScripts/official')) classico('fetch');
       else log('fetch: cache já existe');
       if (force || !cache('decks.json')) classico('decks'); else log('decks: cache já existe');
-      if (force || !existe('src/data/classic', `s${temporadas}.json`) || !existe('src/vendor/card-scripts/index.json')) classico('build', '--ate', String(temporadas));
+      if (force || !existe('src/data/classic', `s${temporadas}.json`) || !existe('src/vendor/card-scripts/index.json') || !existe('src/vendor/card-scripts/official')) classico('build', '--ate', String(temporadas));
       else log(`build: temporadas 1..${temporadas} já geradas`);
       if (force || !existe('src/data/classic/puzzles.json')) classico('puzzles'); else log('puzzles: já gerados');
       classico('art'); // pula as artes já convertidas
+    },
+  },
+  {
+    nome: 'rush-ocg', desc: 'Rush Duel no motor do EDOPro: BabelCDB (cards-rush.cdb) e CardScripts (rush/) -> src/data/rush/cards.json, src/vendor/card-scripts/rush/',
+    pronto: () => existe('src/data/rush/cards.json') && existe('src/vendor/card-scripts/rush/index.json') && existe('src/vendor/card-scripts/constant.lua'),
+    run() {
+      if (force || !existe('tools/rush/cache/cards-rush.cdb') || !existe('tools/rush/cache/CardScripts/rush')) rush('fetch');
+      else log('fetch: cache já existe');
+      rush('build');
+    },
+  },
+  {
+    nome: 'rush-art', desc: 'Artes das cartas Rush do motor: yaml-yugi (nomes dos arquivos) e Yugipedia -> src/assets/rush-art/ (webp 400 px)',
+    pronto: () => false, // o comando pula as artes que já existem
+    run() {
+      // Sem o Yugipedia (fora do ar ou bloqueando) o jogo segue: as cartas saem com o quadro provisório; rode de novo depois.
+      rodar('python3', ['-I', 'tools/rush/import_rush.py', 'art', ...(force ? ['--force'] : [])], { ok: [0, 3] });
+    },
+  },
+  {
+    nome: 'rush-cartas', desc: 'Monta as cartas Rush do motor (moldura do yugioh-card + arte) -> src/assets/rush-cards/, rush-cards-sm/',
+    render: true,
+    pronto: () => false, // render.mjs pula as prontas (refaz as que ganharam arte depois)
+    run() {
+      baixarMolduras();
+      npmRender(true);
+      rodar('node', ['tools/rush/render.mjs', ...(force ? ['--force'] : [])]);
     },
   },
   {
@@ -167,7 +185,7 @@ const ETAPAS = [
     },
   },
   {
-    nome: 'miniaturas', desc: 'Miniaturas webp das cartas (Rush 316 px, clássicas 140 px) -> src/assets/cards-sm, src/assets/classic-cards-sm',
+    nome: 'miniaturas', desc: 'Miniaturas webp das cartas clássicas (140 px) -> src/assets/classic-cards-sm (as Rush saem da rush-cartas)',
     render: true,
     pronto: () => false, // thumbs.py pula as que já existem
     run() { py('tools/setup/thumbs.py', ...(force ? ['--force'] : [])); },
@@ -205,13 +223,13 @@ function avisosVendor() {
   const anda = (dir) => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       const rel = join(dir, e.name);
-      if (e.isDirectory()) { if (!['official', 'assets'].includes(e.name)) anda(rel); } else if (e.name !== 'CHECKSUMS.txt') arquivos.push(rel);
+      if (e.isDirectory()) { if (!['official', 'rush', 'assets'].includes(e.name)) anda(rel); } else if (e.name !== 'CHECKSUMS.txt') arquivos.push(rel);
     }
   };
   anda(p('src/vendor'));
   const sha = existsSync(p('tools/classic/CARDSCRIPTS_SHA')) ? readFileSync(p('tools/classic/CARDSCRIPTS_SHA'), 'utf8').trim() : '?';
   const linhas = arquivos.sort().map((f) => `${createHash('sha256').update(readFileSync(f)).digest('hex')}  ${f.slice(p('src/vendor').length + 1)}`);
-  writeFileSync(p('src/vendor/CHECKSUMS.txt'), `# SHA-256 dos arquivos de src/vendor (sem card-scripts/official e assets/). CardScripts no commit ${sha}.\n# Conferir: cd src/vendor && sha256sum -c --ignore-missing CHECKSUMS.txt\n${linhas.join('\n')}\n`);
+  writeFileSync(p('src/vendor/CHECKSUMS.txt'), `# SHA-256 dos arquivos de src/vendor (sem card-scripts/official, card-scripts/rush e assets/). CardScripts no commit ${sha}.\n# Conferir: cd src/vendor && sha256sum -c --ignore-missing CHECKSUMS.txt\n${linhas.join('\n')}\n`);
   log(`CHECKSUMS.txt: ${linhas.length} arquivos`);
 }
 function npmLibs() {
@@ -234,9 +252,9 @@ function npmRender(comSkia = false) {
 }
 
 function baixarMolduras() {
-  // Só a pasta "yugioh" (molduras e fontes) é usada; o cache tem o mesmo formato que o render.mjs espera.
+  // Só as pastas "yugioh" (clássica) e "rush-duel" (molduras e fontes) são usadas; o cache tem o formato que os render.mjs esperam.
   const repo = p('tools/classic/cache/yugioh-card');
-  baixarRepo('https://github.com/kooriookami/yugioh-card', repo, SHA_YGO_CARD, ['src/assets/yugioh-card/yugioh']);
+  baixarRepo('https://github.com/kooriookami/yugioh-card', repo, SHA_YGO_CARD, ['src/assets/yugioh-card/yugioh', 'src/assets/yugioh-card/rush-duel']);
   const ponte = p('tools/classic/cache/yugioh-card-assets');
   if (!existsSync(ponte)) symlinkSync(join(repo, 'src/assets/yugioh-card'), ponte, 'dir');
 }

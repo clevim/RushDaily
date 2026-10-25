@@ -1,6 +1,4 @@
-import { ARCHETYPES, CARD_POOL } from '../data/cards.mjs';
-import { generateDeck } from '../engine/daily-generator.mjs';
-// Utilidades compartilhadas pelas três páginas.
+// Utilidades compartilhadas pelas páginas.
 const KEY_PATTERN = /^[A-Z0-9]{6}$/;
 
 let keepKey = null; // perfil mantido depois de recusar o ?player= (pergunta uma vez por página)
@@ -66,12 +64,12 @@ export const setWriteHook = (fn) => { writeHook = fn; };
 export function writeJson(key, value) { safeSet(key, JSON.stringify(value, bigOut)); writeHook?.(key); }
 export function removeKey(key) { try { localStorage.removeItem(key); } catch { /* idem */ } }
 
-/** Acabamento foil por carta: LEGEND ouro, monstros fortes prisma, demais estrelas, magia/armadilha gravado. */
+/** Acabamento foil por carta (Rush do cards.json): LENDA ouro, monstros fortes prisma, demais estrelas, magia/armadilha gravado. */
 export function foil(card, variant) {
   if (variant && /^[a-z0-9-]+$/i.test(String(variant))) return `foil-${variant}`;
   if (card.legend) return 'foil-gold';
-  if (card.type !== 'monster') return 'foil-etched';
-  return card.power >= 0.6 ? 'foil-prism' : 'foil-star';
+  if (!(card.type & 1)) return 'foil-etched';
+  return card.atk >= 2000 ? 'foil-prism' : 'foil-star';
 }
 
 export function escape(value) {
@@ -84,10 +82,11 @@ export function settingsFor(playerKey) {
   return { difficulty: 'duelist', reducedMotion: false, ...readJson(`rushdaily-settings:${playerKey}`, {}) };
 }
 
-export function uniqueCards(deck) {
+/** [{ id, count }] na ordem em que cada id aparece primeiro. */
+export function uniqueCards(ids) {
   const counts = new Map();
-  for (const card of deck) counts.set(card.id, { card, count: (counts.get(card.id)?.count || 0) + 1 });
-  return [...counts.values()];
+  for (const id of ids) counts.set(id, (counts.get(id) || 0) + 1);
+  return [...counts].map(([id, count]) => ({ id, count }));
 }
 
 export function toast(message) {
@@ -190,18 +189,20 @@ export function tilt(node, strength = 14) {
   node.addEventListener('pointerleave', () => { Object.assign(target, { x: 0.5, y: 0.5, lift: 0 }); wake(); });
 }
 
-export function inspect(card, front) {
+/** Leitura de uma carta em diálogo: { name, stats, desc, html (a frente), className }. paint(dialog) preenche a imagem. */
+export function inspect({ name, stats = '', desc = '', html, className = '' }, paint = () => {}) {
   const dialog = document.createElement('dialog');
   dialog.className = 'inspect';
-  const stats = card.type === 'monster' ? `Nível ${card.level} · ATK ${card.atk} · DEF ${card.def}` : card.type === 'spell' ? 'Card Mágico' : 'Card de Armadilha';
-  dialog.innerHTML = `<div class="card ${foil(card)} inspect-card"><img src="${front}" alt="${escape(card.name)}"></div>
-    <div class="inspect-copy"><h2>${escape(card.name)}</h2><p class="inspect-stats">${stats}</p><p>${escape(card.desc)}</p>
+  dialog.setAttribute('aria-label', name);
+  dialog.innerHTML = `<div class="card ${className} inspect-card">${html}</div>
+    <div class="inspect-copy"><h2>${escape(name)}</h2><p class="inspect-stats">${escape(stats)}</p><p>${escape(desc)}</p>
     <button class="btn ghost" type="button" data-close>Fechar</button></div>`;
   document.body.append(dialog);
   tilt(dialog.querySelector('.inspect-card'), 18);
   dialog.addEventListener('close', () => dialog.remove());
   dialog.addEventListener('click', (event) => { if (event.target === dialog || event.target.closest('[data-close]')) dialog.close(); });
   dialog.showModal();
+  paint(dialog);
 }
 
 /* ---------- Enigma do Milênio: o calendário do mês ---------- */
@@ -307,81 +308,4 @@ export function glove(rating, max = 4) {
     <path d="M6 14 Q100 2 194 14" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="1"/>
     ${slots}
   </svg>`;
-}
-
-/* ---------- Decks montados (para duelar contra amigos) ---------- */
-
-export { DECK_SIZE } from '../engine/daily-generator.mjs';
-import { DECK_SIZE } from '../engine/daily-generator.mjs';
-const legacyDeckKey = (playerKey) => `rushdaily-deck:${playerKey}`;
-const decksKey = (playerKey) => `rushdaily-decks:${playerKey}`;
-export const collectionKey = (playerKey) => `rushdaily-collection:${playerKey}`;
-const poolById = new Map(CARD_POOL.map((card) => [String(card.id), card]));
-export const cardById = (id) => poolById.get(String(id));
-
-/** Regras do deck: 30 cartas, até 3 cópias, 1 LEGEND por tipo de carta e (se passada) só o que o jogador tem. */
-export function validDeck(ids = [], owned = null) {
-  const problems = [];
-  const counts = {};
-  for (const id of ids) counts[id] = (counts[id] || 0) + 1;
-  if (ids.length !== DECK_SIZE) problems.push(`O deck precisa de ${DECK_SIZE} cartas (tem ${ids.length}).`);
-  if (ids.some((id) => !cardById(id))) problems.push('O deck tem uma carta desconhecida.');
-  for (const [id, count] of Object.entries(counts)) {
-    const card = cardById(id);
-    if (card && count > 3) problems.push(`${card.name}: no máximo 3 cópias.`);
-    if (card && owned && count > (owned[id] || 0)) problems.push(`${card.name}: você só tem ${owned[id] || 0}.`);
-  }
-  for (const type of ['monster', 'spell', 'trap']) {
-    if (ids.filter((id) => cardById(id)?.legend && cardById(id).type === type).length > 1) problems.push(`Só 1 carta LEGEND de ${type === 'monster' ? 'monstro' : type === 'spell' ? 'magia' : 'armadilha'}.`);
-  }
-  if (ids.filter((id) => cardById(id)?.type === 'monster').length < 15) problems.push('Coloque pelo menos 15 monstros.');
-  return { ok: !problems.length, problems };
-}
-
-/**
- * Decks pessoais: { active, list: [{ id, name, cards, updatedAt }] }.
- * O deck único antigo (rushdaily-deck) vira o "Deck 1" na primeira leitura.
- */
-export function readDecks(playerKey) {
-  const saved = readJson(decksKey(playerKey), null);
-  if (saved?.list?.length) return saved;
-  const legacy = readJson(legacyDeckKey(playerKey), []);
-  const decks = { active: 'd1', list: [{ id: 'd1', name: 'Deck 1', cards: legacy, updatedAt: Date.now() }] };
-  writeJson(decksKey(playerKey), decks);
-  removeKey(legacyDeckKey(playerKey));
-  return decks;
-}
-export function writeDecks(playerKey, decks) { writeJson(decksKey(playerKey), decks); }
-/** Deck pedido (por id) ou o principal. */
-export function deckById(playerKey, id) {
-  const { active, list } = readDecks(playerKey);
-  return list.find((deck) => deck.id === id) || list.find((deck) => deck.id === active) || list[0];
-}
-
-/** Link de desafio: "CHAVE|id.id.id..." em base64url. */
-export function encodeDeck(playerKey, ids) {
-  return btoa(`${playerKey}|${ids.join('.')}`).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
-}
-export function decodeDeck(code) {
-  if (!code) return null;
-  try {
-    const [key, list] = atob(code.replaceAll('-', '+').replaceAll('_', '/')).split('|');
-    const ids = list.split('.').filter(Boolean);
-    return /^[A-Z0-9]{6}$/.test(key) && validDeck(ids).ok ? { key, ids } : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Quem nunca jogou recebe um deck inicial (sorteado pela chave) para já poder montar e desafiar. */
-export function ensureStarter(playerKey) {
-  const owned = readJson(collectionKey(playerKey), null);
-  if (owned && Object.keys(owned).length) return owned;
-  const archetype = ARCHETYPES[parseInt(playerKey, 36) % ARCHETYPES.length];
-  const { deck } = generateDeck({ seed: `starter:${playerKey}`, archetype, pool: CARD_POOL });
-  const collection = {};
-  for (const card of deck) collection[card.id] = (collection[card.id] || 0) + 1;
-  writeJson(collectionKey(playerKey), collection);
-  if (!readJson(decksKey(playerKey), null)) writeDecks(playerKey, { active: 'd1', list: [{ id: 'd1', name: 'Deck inicial', cards: deck.map((card) => card.id), updatedAt: Date.now() }] });
-  return collection;
 }
