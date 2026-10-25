@@ -6,6 +6,7 @@
 //            com a imagem nova; as impressões ficam em /dados/tools/setup/cache/estado.json, que a cópia do código não toca).
 //            Serviço rushdaily-dados, a cada `docker compose up`. Parâmetros do .env: SETUP_TEMPORADAS (1 a 5),
 //            SETUP_SEM_RENDER=1 e SETUP_PARALELO (etapas ao mesmo tempo, 1 a 8; padrão do setup: 4). Extras: --force e --so <etapas>.
+//   verificar  copia o código e mostra o que o setup refaria (setup --verificar), sem baixar nem gerar nada.
 //   painel   sobe o painel admin (tools/admin/server.mjs) sobre o volume. Serviço rushdaily-admin (profile admin).
 import { spawn } from 'node:child_process';
 import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -123,6 +124,16 @@ async function dados(extras) {
   process.exit(codigo);
 }
 
+// ---- verificar: o que a próxima subida do rushdaily-dados vai refazer ----
+async function verificar() {
+  if (inicializando()) fim('a inicialização dos dados está rodando neste volume; veja o log dela.');
+  await sincronizar();
+  const temporadas = process.env.SETUP_TEMPORADAS ? ['--temporadas', String(Number(process.env.SETUP_TEMPORADAS) || 1)] : [];
+  const sem = /^(1|sim|true)$/i.test(process.env.SETUP_SEM_RENDER || '') ? ['--sem-render'] : [];
+  const r = spawn('node', ['tools/setup/setup.mjs', '--verificar', ...temporadas, ...sem], { cwd: RAIZ, stdio: 'inherit' });
+  r.on('close', (c) => process.exit(c ?? 1));
+}
+
 // ---- painel ----
 async function painel() {
   if (inicializando()) console.log('inicialização dos dados em andamento: o código já foi copiado por ela.');
@@ -134,5 +145,6 @@ async function painel() {
 
 const [modo, ...extras] = process.argv.slice(2);
 if (modo === 'dados') await dados(extras);
+else if (modo === 'verificar') await verificar();
 else if (modo === 'painel') await painel();
-else fim(`uso: conteiner.mjs dados [--force] [--so etapas] | painel (veio "${modo ?? ''}")`);
+else fim(`uso: conteiner.mjs dados [--force] [--so etapas] | verificar | painel (veio "${modo ?? ''}")`);
