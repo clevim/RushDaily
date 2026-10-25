@@ -1,17 +1,10 @@
-# Pacote de deploy: gera os dados (npm run setup), roda os testes e publica as imagens Docker no GHCR.
-# O homelab só faz `docker compose pull && docker compose up -d` (README, seção "Deploy pelo GitHub Actions").
-#
-# As imagens levam as artes e cartas baixadas pelo setup (material da Konami): deixe os pacotes do GHCR
-# PRIVADOS (Packages › rushdaily › Package settings › Change visibility), mesmo com o repositório público.
+# Pacote de deploy: roda os testes e publica as imagens Docker (só código) no GHCR. Rápido: nada de `npm run setup`
+# completo aqui. Os dados do jogo (cartas, artes, motor, scripts) são gerados no homelab, na primeira subida, pelo serviço
+# rushdaily-dados no volume rushdaily-dados (README, seção "Deploy pelo GitHub Actions").
 name: Pacote de deploy
 
 on:
   workflow_dispatch:
-    inputs:
-      temporadas:
-        description: Temporadas clássicas liberadas (1 a 5)
-        default: '1'
-        required: true
   # Todo push na master gera os pacotes de novo (latest + sha); tags v* também levam a versão.
   push:
     branches: [master]
@@ -29,12 +22,12 @@ env:
   REGISTRY: ghcr.io
   WEB_IMAGE: ghcr.io/clevim/rushdaily
   SYNC_IMAGE: ghcr.io/clevim/rushdaily-sync
+  ADMIN_IMAGE: ghcr.io/clevim/rushdaily-admin
 
 jobs:
   pacote:
     runs-on: ubuntu-24.04
-    # A primeira execução baixa tudo e desenha ~3.600 cartas; as seguintes reaproveitam o cache.
-    timeout-minutes: 300
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
 
@@ -42,58 +35,24 @@ jobs:
         with:
           node-version: 24
 
-      # O setup exige ImageMagick 7 (comando `magick`); o Ubuntu traz o 6. Binário oficial do release do
-      # ImageMagick no GitHub, versão fixa e checksum conferido (para atualizar: baixar, `sha256sum` e trocar os dois).
-      - name: ImageMagick 7
-        env:
-          IM_VERSION: 7.1.2-34
-          IM_SHA256: 6e9edfd35d5f30b57c27533afe003d6085faaf8607b207426f398d11751acf93
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y -q libfuse2t64
-          curl -sfL --proto '=https' -o /tmp/magick "https://github.com/ImageMagick/ImageMagick/releases/download/${IM_VERSION}/ImageMagick-${IM_VERSION}-gcc-x86_64.AppImage"
-          echo "${IM_SHA256}  /tmp/magick" | sha256sum -c -
-          sudo install -m 755 /tmp/magick /usr/local/bin/magick
-          magick -version
-
-      # Pelo apt, no site-packages do sistema: o setup roda `python3 -I`, que ignora o site do usuário
-      # (onde um `pip install` sem root cai), e aí o Pillow some no passo das artes.
-      - name: Dependências do Python (Pillow, numpy)
-        run: |
-          sudo apt-get install -y -q python3-pil python3-numpy
-          python3 -I -c 'import PIL, numpy, sqlite3'
-
-      # Caches das ferramentas (downloads, clones, artes) e os arquivos já gerados em src/: o setup pula o que existe.
-      - name: Cache do setup
+      # Só o que os testes do Rush, do desafio, do motor e da sincronização usam: ocgcore (npm) e o Rush do EDOPro
+      # (BabelCDB e CardScripts, do GitHub). Uns poucos MB, sem ImageMagick, Pillow nem artes. Nada disso entra nas imagens
+      # (o .dockerignore exclui src/vendor e src/data). Os testes do clássico rodam no homelab (painel admin › Testes).
+      - name: Cache dos dados de teste
         uses: actions/cache@v5
         with:
           path: |
-            tools/classic/cache
+            tools/setup/libs/node_modules
             tools/rush/cache
-            tools/setup/cache
             src/vendor
-            src/data
-            src/assets/classic-art
-            src/assets/classic-cards
-            src/assets/classic-cards-sm
-            src/assets/rush-art
-            src/assets/rush-cards
-            src/assets/rush-cards-sm
-            src/assets/puzzle
-          key: setup-${{ inputs.temporadas || '1' }}-${{ hashFiles('tools/setup/**', 'tools/classic/import_cards.py', 'tools/rush/import_rush.py', 'tools/classic/CARDSCRIPTS_SHA', 'tools/classic/puzzle-solutions.json', 'tools/classic/render/**', 'tools/card-render/*.json', 'tools/rush/render.mjs', 'src/ui/rush-card-data.js', 'tools/puzzle/*.py', 'src/ui/classic-card-data.js') }}
-          restore-keys: |
-            setup-${{ inputs.temporadas || '1' }}-
+            src/data/rush
+          key: teste-${{ hashFiles('tools/setup/setup.mjs', 'tools/setup/patch-ocgcore.mjs', 'tools/setup/libs/package-lock.json', 'tools/rush/import_rush.py') }}
 
-      # A entrada do formulário vai por variável de ambiente (nunca interpolada no shell) e é validada.
-      - name: Setup (dados, cartas e bibliotecas de terceiros)
-        env:
-          TEMPORADAS: ${{ inputs.temporadas || '1' }}
-        run: |
-          case "$TEMPORADAS" in [1-5]) ;; *) echo "temporadas inválidas: $TEMPORADAS" >&2; exit 1 ;; esac
-          npm run setup -- --temporadas "$TEMPORADAS"
+      - name: Dados mínimos para os testes
+        run: node tools/setup/setup.mjs --so ocgcore,rush-ocg
 
       - name: Testes
-        run: npm test
+        run: npm run test:deploy
 
       - uses: docker/setup-buildx-action@v3
 
@@ -123,7 +82,18 @@ jobs:
             type=sha,format=short
             type=raw,value=latest
 
+      - name: Etiquetas do admin (ferramentas e dados)
+        id: admin
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.ADMIN_IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=sha,format=short
+            type=raw,value=latest
+
       # Os testes já rodaram acima: o estágio "test" do Dockerfile não é alvo e o BuildKit o pula.
+      # Cache de camadas no GitHub Actions: a camada do apk (Python, ImageMagick) do admin não é refeita a cada push.
       - name: Imagem do site (nginx)
         uses: docker/build-push-action@v6
         with:
@@ -131,6 +101,8 @@ jobs:
           push: true
           tags: ${{ steps.web.outputs.tags }}
           labels: ${{ steps.web.outputs.labels }}
+          cache-from: type=gha,scope=site
+          cache-to: type=gha,scope=site,mode=max
 
       - name: Imagem da sincronização (Node + SQLite)
         uses: docker/build-push-action@v6
@@ -140,3 +112,16 @@ jobs:
           push: true
           tags: ${{ steps.sync.outputs.tags }}
           labels: ${{ steps.sync.outputs.labels }}
+          cache-from: type=gha,scope=sync
+          cache-to: type=gha,scope=sync,mode=max
+
+      - name: Imagem do admin (ferramentas do setup e painel)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: tools/admin/Dockerfile
+          push: true
+          tags: ${{ steps.admin.outputs.tags }}
+          labels: ${{ steps.admin.outputs.labels }}
+          cache-from: type=gha,scope=admin
+          cache-to: type=gha,scope=admin,mode=max

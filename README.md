@@ -127,55 +127,57 @@ Os downloads grandes ficam em `tools/*/cache/`, que o git ignora. O YGOPRODeck p
 
 ## Como publicar
 
-O jogo é estático: um container **nginx** serve a pasta. O `Dockerfile` copia as páginas HTML e `src/` (a pasta `tools/` fica de fora) e o nginx escuta na porta 8080. O único backend é o **servidor de sincronização** (`server/`, Node 24 + SQLite, serviço `rushdaily-sync` no compose), que o nginx encaminha em `/api/` (veja "Sincronização entre aparelhos").
+O jogo é estático: um container **nginx** serve as páginas. Há três imagens, todas **só com código** (nenhuma leva cartas, artes, scripts nem bibliotecas baixadas):
 
-**A imagem é montada depois do `npm run setup`:** como `src/` só tem as imagens, os dados e as bibliotecas depois do setup, rode o setup na máquina de build antes do `docker compose build`. Decisão: o `Dockerfile` **não** ganhou o estágio de setup (o setup leva ~25 min, baixa centenas de MB da internet e precisa de Python, Pillow, ImageMagick e do binário do skia-canvas; não dá para verificar de forma rápida e repetível). Proposta para um build 100% a partir do repositório: um estágio `FROM node:22` com python3, Pillow, numpy, git, curl e imagemagick que copia o repositório, roda `npm run setup` e entrega `src/` ao estágio do nginx (`COPY --from=setup /app/src ...`). Fica simples, mas o build passa a depender da internet e leva o tempo do setup; use `--mount=type=cache` em `tools/classic/cache` e `tools/rush/cache` para não baixar tudo de novo.
+| Imagem | Serviço no compose | Conteúdo |
+|---|---|---|
+| `ghcr.io/clevim/rushdaily` | `rushdaily` | nginx com as páginas, `src/ui`, `src/engine`, estilos e os assets próprios (`Dockerfile`) |
+| `ghcr.io/clevim/rushdaily-sync` | `rushdaily-sync` | Servidor de sincronização, Node 24 + SQLite (`server/Dockerfile`) |
+| `ghcr.io/clevim/rushdaily-admin` | `rushdaily-dados` e `rushdaily-admin` | Código do projeto + ferramentas do setup (Node, Python com Pillow e numpy, git, curl, ImageMagick 7) e o painel admin (`tools/admin/Dockerfile`) |
 
-```bash
-# Build da imagem
-docker compose build
+**Os dados são gerados no homelab, na primeira subida.** O serviço `rushdaily-dados` (imagem do admin) copia o código para o volume `rushdaily-dados`, roda o `npm run setup` lá dentro e sai. Nas subidas seguintes ele roda de novo, mas o setup é idempotente: só confere e completa o que falta. O nginx monta o mesmo volume em `/dados` **somente leitura**; na imagem, `src/vendor`, `src/data/rush`, os JSON de `src/data/classic` e `src/assets/{rush-art,rush-cards,rush-cards-sm,classic-art,classic-cards,classic-cards-sm,puzzle}` são links para lá. Enquanto `src/data/rush/cards.json` não existe no volume, as páginas mostram **"Preparando as cartas"** (`preparando.html`, recarrega sozinha, sem cache); o site não espera o setup para subir.
 
-# Subir o container
-docker compose up -d
+- **Primeira subida:** ~25 a 60 min (downloads com limite de pedidos por segundo e o desenho de ~3.600 cartas) e ~1 a 2 GB no volume (dados, cartas, artes e os caches das ferramentas, que evitam baixar de novo). Com `SETUP_SEM_RENDER=1` no `.env` é bem mais rápido: o jogo desenha as cartas no navegador.
+- **Parâmetros** no `.env`: `SETUP_TEMPORADAS` (1 a 5, padrão 1) e `SETUP_SEM_RENDER` (`1` para não desenhar).
+- **Acompanhar:** `docker compose logs -f rushdaily-dados`, ou a *Visão geral* do painel admin (cartão "Inicialização dos dados").
+- **Refazer uma etapa:** `docker compose run --rm rushdaily-dados dados --so rush-cartas --force` (aceita só `--so` e `--force`), ou *Dados e setup › Refazer* no painel. Para recomeçar do zero: `docker compose down` e `docker volume rm <projeto>_rushdaily-dados`.
+- **Se uma fonte falhar** (Printables, Yugipedia fora do ar): o serviço sai com erro e o site segue com o que já existe. Rode `docker compose up -d rushdaily-dados` de novo; ele retoma de onde parou.
 
-# Testes dentro do build (etapa "test" do Dockerfile, não roda no build normal)
-docker build --target test .
-```
+Para montar as imagens localmente (sem o GHCR): `docker compose build` (e `docker compose up -d`). O `docker build --target test .` roda os testes de deploy num estágio próprio (baixa só o ocgcore e o Rush do EDOPro).
 
-O estágio `test` copia `src/` como está: rode o `npm run setup` antes (os testes do Rush e do desafio diário leem `src/data/rush/` e `src/vendor/card-scripts/rush/`; os do clássico, `src/data/classic/`). A imagem final leva as páginas e `src/` inteiro (dados, `src/vendor/` com os scripts `official/` e `rush/`, e as cartas `src/assets/rush-*` e `classic-*`); `tools/`, `docs/` e os restos do Rush antigo (`src/data/cards.mjs`, `src/assets/cards*`) ficam de fora pelo `.dockerignore`.
-
-O `docker-compose.yml` **não publica porta** no host de propósito. Para teste local, descomente o bloco `ports` com `127.0.0.1:4173:8080`. Nunca use `0.0.0.0`.
+O `docker-compose.yml` **não publica a porta do site** no host de propósito. Para teste local, descomente o bloco `ports` com `127.0.0.1:4173:8080`. Nunca use `0.0.0.0`.
 
 ### Deploy pelo GitHub Actions (recomendado)
 
-O workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) ("Pacote de deploy") faz o trabalho pesado fora do homelab: instala as dependências, roda `npm run setup` (com cache entre execuções), roda `npm test` e publica duas imagens no **GitHub Container Registry**:
-
-| Imagem | Conteúdo |
-|---|---|
-| `ghcr.io/clevim/rushdaily` | O site (nginx com as páginas, dados, cartas e bibliotecas geradas pelo setup) |
-| `ghcr.io/clevim/rushdaily-sync` | O servidor de sincronização (Node 24 + SQLite) |
+O workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) ("Pacote de deploy") é rápido (alguns minutos): baixa só o que os testes de deploy usam (`setup --so ocgcore,rush-ocg`, uns poucos MB do npm e do GitHub, com cache), roda `npm run test:deploy` (Rush, desafio do dia, motor, cartas Rush e sincronização) e publica as três imagens no **GitHub Container Registry**, com cache de camadas. Não roda mais o setup completo nem desenha cartas: isso acontece no homelab. Os testes do clássico (que precisam do pool clássico) rodam no homelab pelo painel admin (*Tarefas › Testes*) ou localmente com `npm test`.
 
 Cada imagem sai com as etiquetas `latest`, o commit curto (`sha-xxxxxxx`) e, quando o disparo é uma tag `v1.2.3`, a versão (`1.2.3`).
 
-1. **Disparar:** todo push na `master` gera os pacotes de novo (`latest` sempre acompanha a `master`). Também dá para disparar em *Actions › Pacote de deploy › Run workflow* (escolha as temporadas, de 1 a 5) ou criando e enviando uma tag `v*`. A primeira execução é longa (baixa tudo e desenha ~3.600 cartas); as seguintes reaproveitam o cache.
-2. **Deixar os pacotes privados (obrigatório):** as imagens levam artes e cartas de terceiros (Konami). Depois da primeira execução, em *Packages › rushdaily* (e *rushdaily-sync*) › *Package settings › Change visibility › Private*.
+1. **Disparar:** todo push na `master` gera os pacotes de novo (`latest` sempre acompanha a `master`). Também dá para disparar em *Actions › Pacote de deploy › Run workflow* ou criando e enviando uma tag `v*`.
+2. **Visibilidade dos pacotes:** as imagens agora só têm código (AGPL-3.0) e assets próprios, então podem ficar públicas. O material da Konami (artes, cartas, dados) fica **só no volume `rushdaily-dados` do homelab**: não copie esse volume para registries nem backups públicos, e ele só sai pelo site, como antes. Se preferir manter os pacotes privados, nada muda além do `docker login` abaixo.
 3. **No homelab:**
 
    ```bash
-   # Uma vez: login no GHCR com um token pessoal (classic) com permissão read:packages
+   # Uma vez (só se os pacotes forem privados): login no GHCR com um token pessoal (classic) com read:packages
    echo "$TOKEN" | docker login ghcr.io -u clevim --password-stdin
 
    # Uma vez: .env ao lado do docker-compose.yml (não vai para o git)
-   echo "ADMIN_TOKEN=$(openssl rand -hex 32)" > .env
+   cat > .env <<EOF
+   ADMIN_TOKEN=$(openssl rand -hex 32)
+   ADMIN_PANEL_TOKEN=$(openssl rand -hex 32)
+   SETUP_TEMPORADAS=1
+   SETUP_SEM_RENDER=0
+   EOF
+   chmod 600 .env
 
-   # A cada atualização
+   # A cada atualização (a primeira subida gera os dados; acompanhe com docker compose logs -f rushdaily-dados)
    docker compose pull
    docker compose up -d
    ```
 
-   O `docker-compose.yml` aponta para `ghcr.io/clevim/rushdaily:latest` e `ghcr.io/clevim/rushdaily-sync:latest`; para uma versão fixa, troque `latest` pela etiqueta desejada. O homelab só precisa do `docker-compose.yml`, do `.env` e da configuração do nginx já embutida na imagem — não precisa do Node, do Python nem do setup.
+   O `docker-compose.yml` aponta para as etiquetas `latest`; para uma versão fixa, troque `latest` pela etiqueta desejada. O homelab só precisa do `docker-compose.yml` e do `.env`.
 
-Se o Printables (modelo do Enigma) bloquear os servidores do GitHub, o setup para com uma mensagem clara; se for o Yugipedia (artes Rush), a etapa `rush-art` avisa e segue, e as cartas saem com o quadro provisório até a próxima execução. Nos dois casos, rode o workflow de novo (ele retoma pelo cache), ou monte a imagem localmente com `docker compose up -d --build` depois do `npm run setup`.
+4. **Painel admin no homelab (opcional):** `docker compose --profile admin up -d` sobe o `rushdaily-admin`, publicado **só** em `127.0.0.1:4190` do host. No seu computador: `ssh -L 4190:127.0.0.1:4190 homelab` e abra `http://127.0.0.1:4190/?t=<ADMIN_PANEL_TOKEN>`. Ele mostra o progresso da inicialização, roda etapas do setup no volume, mostra as cartas, o desafio do dia e os jogadores (lê o `rushdaily-sync` pela rede interna, sem túnel extra). Detalhes e limites de segurança em [`tools/admin/LEIA-ME.md`](tools/admin/LEIA-ME.md).
 
 ### Cloudflare Tunnel (recomendado)
 
@@ -197,10 +199,10 @@ O progresso (coleção, decks, histórico, PvP, boosters, Enigma, Coração das 
 - **Automático:** no primeiro carregamento com internet, o aparelho gera um segredo de 256 bits e reivindica a chave; depois sincroniza ao abrir cada página e 2 s depois de cada mudança. Sem internet o jogo segue normal e sincroniza na próxima vez. Se a chave já foi reivindicada por outro aparelho, *Ajustes* avisa e oferece ligar pelo link ou **gerar uma chave nova** levando o progresso local.
 - **Ajustes:** sincronizar agora, trocar o segredo (os outros aparelhos precisam do link novo), desligar neste aparelho e desligar apagando a cópia do servidor.
 - **Desenvolvimento:** `npm run sync` (servidor em `127.0.0.1:8787`, banco em `server/data/sync.db`) e `npm run serve` (o `tools/serve.py` encaminha `/api/*` para ele; outro endereço em `SYNC_URL`). Sem o `npm run sync` o jogo funciona, só não sincroniza.
-- **Publicação:** o `docker compose up -d --build` já sobe o `rushdaily-sync` (sem porta no host, rede interna `sync` só com o nginx, `read_only`, sem root, volume `sync-data`). Para as estatísticas de acesso, crie `.env` (`ADMIN_TOKEN=…`) ao lado do compose. Backup diário (`VACUUM INTO`, 7 arquivos) em `/data/backup`; recomendado montar essa pasta em outro disco (exemplo comentado no compose; a pasta precisa ser do usuário 1000). Restaurar: parar o serviço, copiar o backup para `/data/sync.db`, apagar `sync.db-wal` e `sync.db-shm`, subir.
+- **Publicação:** o `docker compose up -d` já sobe o `rushdaily-sync` (sem porta no host, rede interna `sync` só com o nginx, `read_only`, sem root, volume `sync-data`). Para as estatísticas de acesso, crie `.env` (`ADMIN_TOKEN=…`) ao lado do compose. Backup diário (`VACUUM INTO`, 7 arquivos) em `/data/backup`; recomendado montar essa pasta em outro disco (exemplo comentado no compose; a pasta precisa ser do usuário 1000). Restaurar: parar o serviço, copiar o backup para `/data/sync.db`, apagar `sync.db-wal` e `sync.db-shm`, subir.
 - **Cloudflare:** crie uma Cache Rule **Bypass** para `/api/*` (a resposta já vem com `no-store`, mas sem cache nenhum na borda é mais seguro); a regra de rate limiting do hostname também cobre `/api/*` (o servidor ainda limita por IP: 60/min, por chave: 30/min e 5 chaves novas por hora por IP). O IP real vem do `CF-Connecting-IP`, aceito pelo nginx só de redes privadas do Docker (troque pelas sub-redes exatas da rede do cloudflared para fechar mais).
 - **Privacidade (LGPD):** com a sincronização ligada, o servidor guarda a chave, o progresso e as datas de acesso (primeiro e último acesso, contagem e dias ativos) — **sem IP, User-Agent, nome ou e-mail**. *Ajustes › Desligar e apagar do servidor* (`DELETE /api/sync/:key`) remove o progresso e todos os registros de acesso dessa chave.
-- **Acompanhamento de acessos (admin):** com `ADMIN_TOKEN` (32+ caracteres, no `.env` ao lado do compose, fora do git) o `rushdaily-sync` abre um segundo listener (8788) só de leitura, publicado **apenas** em `127.0.0.1:4192` do host. Ele não passa pelo nginx nem pelo cloudflared (nunca aponte para ele). O painel `npm run admin` (seção *Jogadores*) consulta essa porta por túnel SSH; veja `tools/admin/LEIA-ME.md`.
+- **Acompanhamento de acessos (admin):** com `ADMIN_TOKEN` (32+ caracteres, no `.env` ao lado do compose, fora do git) o `rushdaily-sync` abre um segundo listener (8788) só de leitura, publicado **apenas** em `127.0.0.1:4192` do host. Ele não passa pelo nginx nem pelo cloudflared (nunca aponte para ele). O painel admin em contêiner (`docker compose --profile admin up -d`, seção *Jogadores*) lê o listener pela rede interna; o `npm run admin` de fora do homelab usa essa porta por túnel SSH. Veja `tools/admin/LEIA-ME.md`.
 - **Admin:** liberar uma chave tomada por engano: `docker compose exec rushdaily-sync node -e "new (require('node:sqlite').DatabaseSync)('/data/sync.db').prepare('DELETE FROM saves WHERE key = ?').run('ABC123')"`.
 
 ### Cache e Cloudflare
@@ -230,6 +232,7 @@ index.html            Desafio do dia (Rush): leque 3D, confronto, dificuldade, d
 duel.html             Arena Rush do desafio do dia (motor do EDOPro, modo Rush)
 screens.html          Coleção, Decks, Booster 3D, Enigma do Milênio, Histórico e Ajustes
 arena.html            Arena clássica (motor do EDOPro): PvP por link, treino, puzzles e replay
+preparando.html       "Preparando as cartas": o nginx mostra no lugar das páginas enquanto o volume de dados não está pronto
 src/
   engine/             Regras e IA, sem DOM nem Three.js
     ocg.mjs           Ponte com o ocgcore (WebAssembly): formatos, duelo, PV por jogador, Skills, limite de turnos
@@ -248,7 +251,8 @@ src/
   vendor/             Three.js, ocgcore-wasm, yugioh-card e scripts das cartas (vêm do setup)
 tools/                setup/ (npm run setup), classic/ (pool, decks, puzzles, render), rush/ (Rush no motor do
                       EDOPro: importador, artes, cartas montadas e simulador), card-render/ (traduções PT das Rush
-                      e versos), admin/ (painel local),
+                      e versos), admin/ (painel admin: local com npm run admin ou em contêiner, e a imagem de ferramentas
+                      que gera os dados no homelab: Dockerfile e conteiner.mjs),
                       puzzle/ (modelo do Enigma), serve.py (servidor de desenvolvimento)
 tests/                node --test tests/*.test.mjs
 ```

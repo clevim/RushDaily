@@ -10,12 +10,22 @@ npm-debug.log
 __pycache__
 **/__pycache__
 *.pyc
-# tools/ fica fora, menos o que o estágio de teste do Dockerfile importa (nada disso vai para a imagem final).
-tools/**
-!tools/setup/patch-ocgcore.mjs
-!tools/classic/puzzle-check.mjs
-!tools/classic/puzzle-solutions.json
-!tools/rush/import_rush.py
+# tools/ entra só na imagem do admin (tools/admin/Dockerfile); caches, clones e node_modules das ferramentas, nunca.
+tools/**/cache
+tools/**/node_modules
+tools/card-render/vendor
+# Dados gerados pelo setup (material de terceiros): nenhuma imagem leva. No homelab vêm do volume rushdaily-dados.
+src/vendor
+src/data/rush
+src/data/classic/*
+!src/data/classic/strings-pt.mjs
+src/assets/rush-art
+src/assets/rush-cards
+src/assets/rush-cards-sm
+src/assets/classic-art
+src/assets/classic-cards
+src/assets/classic-cards-sm
+src/assets/puzzle
 # Restos do desafio diário antigo (pool Rush próprio e frentes do rush-hub): o jogo não usa mais.
 src/data/cards.mjs
 src/assets/cards
@@ -25,7 +35,6 @@ docs
 goat
 PRODUCT.md
 *.md
-!src/vendor/**/*.md
 docker-compose*.yml
 Dockerfile
 .dockerignore
