@@ -25,7 +25,7 @@ Em `tools/rush/traducao/`:
 - `glossario.json`: termos do jogo e nomes de arquétipos, `{ "en": "Graveyard", "pt": "Cemitério", "tipo": "termo"|"arquetipo"|"marcador", "nota": "..." }`.
   Inclui os marcadores do Rush: `[REQUIREMENT]` → `[REQUISITO]`, `[EFFECT]` → `[EFEITO]`, `[CONTINUOUS EFFECT]` → `[EFEITO CONTÍNUO]`,
   `[MULTI-CHOICE EFFECT]` → `[EFEITO DE ESCOLHA MÚLTIPLA]`, Maximum → Máximo, Legend → Lenda. É onde a revisão humana rende mais.
-- `nomes.json`: `{ "<nameEn>": { "pt": "...", "origem": "manual"|"revisada"|"automatica" } }`. Traduzidos ANTES das frases,
+- `nomes.json`: `{ "<nameEn>": { "pt": "...", "origem": "oficial"|"manual"|"revisada"|"automatica" } }`. Traduzidos ANTES das frases,
   porque os efeitos citam cartas pelo nome entre aspas: o texto em PT tem de citar exatamente o nome de `nomes.json`.
 - `frases.json`: a memória de tradução, `{ "<frase em inglês>": { "pt": "...", "origem": "...", "usos": N } }`.
   Chave = frase em inglês exatamente como sai do `desc` (depois da segmentação abaixo).
@@ -48,6 +48,16 @@ O importador clássico já baixa do YGOPRODeck o texto oficial em inglês e em p
 2. Para cada frase Rush, buscar as frases clássicas em inglês mais parecidas (similaridade por palavras/trigramas, sem dependências)
    e mandar 3 a 5 pares EN→PT oficiais como exemplo na tradução. Ex.: "Send ... to the GY" → "Envie ... para o Cemitério".
 3. Extrair do corpus os termos recorrentes para semear o `glossario.json` (Tribute Summon → Invocação-Tributo etc.).
+
+Medido contra os nomes em inglês do BabelCDB clássico:
+
+- **Nomes: 307 cartas Rush sem PT têm exatamente o nome de uma carta clássica** (Seal of the Ancients, Sparks, Mountain,
+  Thousand Knives, Dark Magic Attack, Umi, Forest...). Essas pegam o nome oficial em PT do `ygopro-pt.json` direto, como
+  `origem: oficial` (não passa pela tradução). Os pedaços recorrentes de nomes clássicos (Blue-Eyes, Dark Magician, Dragon,
+  nomes de arquétipos) com tradução oficial semeiam o glossário, para os outros ~2.500 nomes seguirem o mesmo padrão.
+- **Textos: só 46 frases Rush são idênticas a frases clássicas (2% das ocorrências).** Mesmo as versões Rush de cartas clássicas
+  reescrevem o efeito no formato próprio ([REQUIREMENT]/[EFFECT], "Graveyard" por extenso). Para o texto, o clássico é
+  referência de estilo (exemplos parecidos), não fonte de cópia; as 46 idênticas entram como `origem: oficial`.
 
 Importante: o Rush escreve "Graveyard" por extenso e o clássico atual usa "GY"; trate os dois como o mesmo termo.
 O YGOPRODeck é bloqueado no ambiente de nuvem: essa etapa roda na máquina do dono ou no homelab (onde o setup clássico já
