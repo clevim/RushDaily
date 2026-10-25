@@ -10,8 +10,8 @@ import { ATTRIBUTES, RACES, describe } from '../data/classic/strings-pt.mjs';
 import { cardStats, isMonster } from './rush-info.js';
 import { RUSH_BACK, paintRushCards, warmRushCards } from './rush-render.js';
 import { answerCommon, createAsk } from './ocg-ask.js';
-import { daysInMonth, escape, getPlayerKey, heartUnlocked, readJson, reducedMotion, removeKey, settingsFor, today, toast, useHeart, writeJson } from './common.js';
-import { duelScene, puzzleScene } from './scene.js';
+import { escape, getPlayerKey, heartUnlocked, readJson, reducedMotion, removeKey, settingsFor, today, toast, useHeart, writeJson } from './common.js';
+import { duelScene, enigmaBurst, enigmaMini } from './scene.js';
 import { resultGrid } from './share.js';
 import { queueSync, syncNow } from './sync.js';
 
@@ -51,6 +51,7 @@ const saved = savedRaw?.v === 2 ? savedRaw : null;
 const withHeart = saved ? Boolean(saved.heart) : heartUnlocked(playerKey);
 const cardOf = (code) => cards.get(code) || { id: code, name: `Carta ${code}`, type: 0, desc: '', level: 0, atk: 0, def: 0 };
 const scene = duelScene($('#mat'), { reduced: !motion });
+document.body.classList.toggle('calm', !motion); // "reduzir animações" dos Ajustes também para o CSS (brilho do Enigma)
 
 /* ---------- Motor e scripts ---------- */
 
@@ -684,7 +685,7 @@ function renderDock() {
   const battle = prompt?.type === M.SELECT_BATTLECMD;
   $('#to-battle').hidden = !(idle && prompt.to_bp);
   $('#to-end').hidden = !(idle || battle) || !prompt.to_ep;
-  $('#heart').hidden = !(idle && prompt.activates.some(isHeart));
+  renderSkill();
   const hintNode = $('#hint');
   if (duel.state.winner !== null) hintNode.textContent = '';
   else if (idle) hintNode.textContent = 'Arraste da mão para o campo (Invocações ilimitadas). Toque para ler e ver ações; toque duas vezes para alternar entre jogar e baixar.';
@@ -808,31 +809,111 @@ function finish(winner, already) {
 
 /* ---------- Coração das Cartas ---------- */
 
-/** O poder consome o Enigma: ele explode em partes e o jogador recomeça a montar. */
+// Miniatura do Enigma do Milênio na sua placa: pronto (brilha), espera (fora da Fase Principal), usado e sem carga.
+let heartSpent = false;
+let liveEnigma = null;
+const SKILL_NOTE = { ready: 'Pronto: toque para ativar', wait: 'Use na sua Fase Principal', used: 'Usado neste duelo', empty: 'Sem carga: complete o Enigma do mês' };
+function skillState() {
+  if (!withHeart) return 'empty';
+  const prompt = current?.prompt;
+  const idle = prompt?.type === M.SELECT_IDLECMD;
+  if (idle && prompt.activates.some(isHeart)) return 'ready';
+  if (heartSpent || (idle && prompt.player === ME)) { heartSpent = true; return 'used'; } // a Skill é uma vez por duelo: na Principal sem ela, já foi
+  return duel.state.winner !== null ? 'used' : 'wait';
+}
+function renderSkill() {
+  const state = skillState();
+  $('#skill').dataset.state = state;
+  $('#heart').setAttribute('aria-disabled', String(state !== 'ready'));
+  $('#skill-state').textContent = SKILL_NOTE[state];
+}
+/** Miniatura 3D do Enigma (procedural, scene.js); sem WebGL fica o desenho em SVG. */
+function startLiveEnigma() {
+  liveEnigma = enigmaMini($('#skill .enigma-live'), { reduced: !motion });
+  $('#skill').classList.toggle('live', Boolean(liveEnigma));
+}
+// Peças do desenho do Enigma (as mesmas emendas da miniatura): a pirâmide se desfaz nelas quando não há o modelo 3D.
+const ENIGMA_PIECES = [
+  '7.5,15 19.5,15 19.5,27 14.1,27', '19.5,15 44.5,15 44.5,27 19.5,27', '44.5,15 56.5,15 49.9,27 44.5,27',
+  '14.1,27 26,27 26,39 20.7,39', '26,27 38,27 38,39 26,39', '38,27 49.9,27 43.3,39 38,39',
+  '20.7,39 32,39 32,49 26.2,49', '32,39 43.3,39 37.8,49 32,49', '26.2,49 37.8,49 32,59.5', '13,9.5 51,9.5 56.5,15 7.5,15',
+];
+function enigmaFlyer() {
+  const icon = $('#skill .enigma-icon');
+  const eye = icon.querySelector('.enigma-eye').outerHTML;
+  const pieces = ENIGMA_PIECES.map((points, index) => `<polygon class="fly-piece${index === 9 ? ' top' : ''}" points="${points}" fill="url(#fly-front)" />`).join('');
+  return `<svg class="enigma-icon enigma-fly" viewBox="4 1 56 60" aria-hidden="true"><defs><linearGradient id="fly-front" gradientUnits="userSpaceOnUse" x1="10" y1="10" x2="40" y2="60"><stop offset="0" class="stop-hi" /><stop offset="0.55" class="stop-mid" /><stop offset="1" class="stop-deep" /></linearGradient></defs>
+    <ellipse class="enigma-loop fly-piece" cx="32" cy="5.2" rx="4.6" ry="2.6" />${pieces}${eye.replace('class="enigma-eye"', 'class="enigma-eye fly-piece"')}</svg>`;
+}
+
+/**
+ * O poder consome o Enigma: a miniatura da placa cresce até o centro, brilha e se desfaz em peças; depois a Skill ativa.
+ * Em 3D (enigmaBurst) quando há WebGL; senão, as peças do desenho em SVG. ~1,8 s. Com "reduzir animações": só um brilho.
+ */
 async function shatterEnigma() {
-  // Sem o modelo do Enigma (etapa enigma do setup), só o clarão dourado.
-  const model = await fetch('src/assets/puzzle/puzzle.json', { method: 'HEAD' }).then((response) => response.ok, () => false);
-  if (!model) return wait(400);
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const skill = $('#skill');
+  if (!motion) { skill.classList.add('flash'); await sleep(450); skill.classList.remove('flash'); return; }
   const overlay = $('#enigma-burst');
+  const from = $('#heart').getBoundingClientRect();
+  overlay.insertAdjacentHTML('afterbegin', '<div class="enigma-rays" aria-hidden="true"></div>'); // atrás do 3D
+  const rays = overlay.querySelector('.enigma-rays');
+  const glow = () => {
+    overlay.classList.add('glowing');
+    rays.animate([{ opacity: 0, transform: 'translate(-50%, -50%) scale(0.3) rotate(0deg)' }, { opacity: 1, transform: 'translate(-50%, -50%) scale(1) rotate(40deg)' }], { duration: 480, easing: 'ease-out', fill: 'forwards' });
+    scene.burst(GOLD);
+  };
+  overlay.classList.add('flying');
   overlay.hidden = false;
-  return new Promise((resolve) => {
-    let closed = false;
-    const close = (view3d) => { if (closed) return; closed = true; view3d?.dispose?.(); overlay.hidden = true; resolve(); };
-    const view3d = puzzleScene($('#enigma-canvas'), { explode: true, total: daysInMonth(), reduced: !motion, onDone: () => close(view3d) });
-    setTimeout(() => close(view3d), motion ? 4200 : 600); // se o modelo não carregar, não trava a mesa
+  skill.classList.add('spent');
+  const angle = liveEnigma?.angle?.() ?? 0;
+  liveEnigma?.dispose();
+  liveEnigma = null;
+  await new Promise((resolve) => {
+    const burst = enigmaBurst($('#enigma-canvas'), { from, angle, onGlow: glow, onDone: () => { burst.dispose(); resolve(); } });
+    if (!burst) flyPieces(overlay, from, glow).then(resolve); // sem WebGL: o desenho faz o mesmo caminho
   });
+  rays.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, fill: 'forwards' });
+  await sleep(160);
+  overlay.hidden = true;
+  overlay.classList.remove('flying', 'glowing');
+  rays.remove();
+  skill.classList.remove('spent', 'live');
+}
+
+/** Reserva sem WebGL: o desenho cresce até o centro, brilha e as peças se afastam e somem. */
+async function flyPieces(overlay, from, glow) {
+  overlay.insertAdjacentHTML('beforeend', `<div class="enigma-flyer" aria-hidden="true">${enigmaFlyer()}</div>`);
+  const flyer = overlay.querySelector('.enigma-flyer');
+  Object.assign(flyer.style, { left: `${from.left}px`, top: `${from.top}px`, width: `${from.width}px`, height: `${from.height}px` });
+  const size = Math.min(innerWidth, innerHeight) * 0.46;
+  const dx = innerWidth / 2 - (from.left + from.width / 2);
+  const dy = innerHeight / 2 - (from.top + from.height / 2);
+  await flyer.animate([{ transform: 'none' }, { transform: `translate(${dx}px, ${dy}px) scale(${size / from.width})` }], { duration: 560, easing: 'cubic-bezier(.5,0,.15,1)', fill: 'forwards' }).finished;
+  glow();
+  await new Promise((resolve) => setTimeout(resolve, 480));
+  await Promise.all([...flyer.querySelectorAll('.fly-piece')].map((part) => {
+    const box = part.getBBox();
+    const angle = Math.atan2(box.y + box.height / 2 - 32, box.x + box.width / 2 - 32);
+    const reach = 34 + Math.random() * 30;
+    return part.animate([
+      { transform: 'none', opacity: 1 },
+      { transform: `translate(${Math.cos(angle) * reach}px, ${Math.sin(angle) * reach + 10}px) rotate(${(Math.random() - 0.5) * 160}deg) scale(0.7)`, opacity: 0 },
+    ], { duration: 620 + Math.random() * 120, easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'forwards' }).finished;
+  }));
+  flyer.remove();
 }
 
 $('#heart').addEventListener('click', async () => {
   const prompt = current?.prompt;
   const index = prompt?.type === M.SELECT_IDLECMD ? prompt.activates.findIndex(isHeart) : -1;
-  if (index < 0) return;
+  if (index < 0) { toast(`Coração das Cartas: ${SKILL_NOTE[skillState()].replace(/^Pronto: .*/, 'espere a sua vez')}.`); return; }
   const pending = current;
   current = null; // segura a mesa enquanto o Enigma explode
+  heartSpent = true;
   renderDock();
   useHeart(playerKey);
   await shatterEnigma();
-  scene.burst(GOLD);
   current = pending;
   respond({ type: R.SELECT_IDLECMD, action: 5, index });
 });
@@ -896,6 +977,8 @@ $('#foe-name').innerHTML = `Rival <span class="who-key">${escape(match.enemy.lab
 $('#matchup-chip').innerHTML = `${escape(match.player.label)} <i>contra</i> ${escape(match.enemy.label)} · ${escape(settings.label)}`;
 bindGestures();
 render();
+renderSkill();
+startLiveEnigma();
 alignMat();
 warmRushCards([...view[ME].hand, ...view[ME].extra].filter(Boolean).map((card) => cardOf(card.code)));
 // Entrada vinda da home: abre o clarão só depois do primeiro quadro desenhado (com a mesa pronta).

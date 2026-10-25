@@ -45,6 +45,30 @@
         <p class="lp"><span class="lp-value" id="me-lp"></span><span class="lp-label">PV</span></p>
         <div class="lp-bar"><i id="me-bar"></i></div>
         <p class="matchup-chip" id="matchup-chip"></p>
+        <!-- Coração das Cartas: miniatura do Enigma do Milênio (SVG sempre; o modelo 3D por cima quando o setup trouxe) -->
+        <div class="skill" id="skill" data-state="empty">
+          <button class="skill-enigma" id="heart" type="button" aria-label="Ativar Coração das Cartas" aria-describedby="skill-note" aria-disabled="true">
+            <svg class="enigma-icon" viewBox="4 1 56 60" aria-hidden="true">
+              <defs>
+                <linearGradient id="enigma-front" x1="0" y1="0" x2="0.35" y2="1"><stop offset="0" class="stop-hi" /><stop offset="0.55" class="stop-mid" /><stop offset="1" class="stop-deep" /></linearGradient>
+                <linearGradient id="enigma-top" x1="0" y1="0" x2="1" y2="0"><stop offset="0" class="stop-deep" /><stop offset="0.5" class="stop-mid" /><stop offset="1" class="stop-deep" /></linearGradient>
+              </defs>
+              <ellipse class="enigma-loop" cx="32" cy="5.2" rx="4.6" ry="2.6" />
+              <path class="enigma-top" d="M13 9.5h38l5.5 5.5h-49Z" fill="url(#enigma-top)" />
+              <path class="enigma-face" d="M7.5 15h49L32 59.5Z" fill="url(#enigma-front)" />
+              <path class="enigma-seams" d="M14.1 27h35.8M20.7 39h22.6M26.2 49h11.6M19.5 15v12M44.5 15v12M26 27v12M38 27v12M32 39v10" />
+              <path class="enigma-shade" d="M32 15h24.5L32 59.5Z" />
+              <g class="enigma-eye">
+                <path class="eye-brow" d="M19.5 18.6c4.2-2.4 8.4-3.3 12.5-3.3s8.3 0.9 12.5 3.3" />
+                <path class="eye-lid" d="M19.8 24.4c3.8-3.9 8-5.6 12.2-5.6s8.4 1.7 12.2 5.6c-3.8 3.4-8 5-12.2 5s-8.4-1.6-12.2-5Z" />
+                <circle class="eye-iris" cx="32" cy="24.1" r="3.3" />
+                <path class="eye-tear" d="M29.4 29.2c-0.8 2.6-2.6 4.4-5.2 4.9M34.6 29.3l3.2 6.4c0.5 1.1 0 2.2-1.1 2.4" />
+              </g>
+            </svg>
+            <canvas class="enigma-live" aria-hidden="true" hidden></canvas>
+          </button>
+          <p class="skill-note" id="skill-note"><b>Coração das Cartas</b><span id="skill-state">Sem carga</span></p>
+        </div>
       </section>
 
       <aside class="chronicle" aria-label="Corrente e narração">
@@ -67,7 +91,6 @@
         </div>
         <p class="hint" id="hint"></p>
         <div class="dock-actions">
-          <button class="btn heart-btn" id="heart" type="button" aria-label="Coração das Cartas" hidden><span>Coração<span class="wide-only"> das Cartas</span></span></button>
           <button class="btn" id="to-battle" type="button" hidden>Ir para a Batalha</button>
           <button class="btn ghost" id="to-end" type="button" hidden>Encerrar turno</button>
         </div>

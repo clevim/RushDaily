@@ -60,7 +60,7 @@
 .phases[data-owner='enemy'] li[aria-current] { background: linear-gradient(160deg, #ff8a5c, var(--blood) 55%, #7d0f19); color: var(--ivory); border-color: #ff8a92; }
 .rush-arena .log { display: block; max-width: 100%; min-width: 0; justify-self: stretch; min-height: 1.25em; margin: 0; text-align: center; }
 .rush-arena .log span { display: none; }
-.rush-arena .log span:first-child { display: block; color: var(--ivory); font: 600 clamp(0.74rem, 1vw, 0.92rem)/1.25 var(--body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: logIn 0.35s var(--ease-out); }
+.rush-arena .log span:first-child { display: block; width: 100%; max-width: 100%; color: var(--ivory); font: 600 clamp(0.74rem, 1vw, 0.92rem)/1.25 var(--body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: logIn 0.35s var(--ease-out); }
 
 /* Placas dos duelistas */
 .seat { --c: 12px; display: grid; gap: 6px; padding: 12px 16px 14px; transition: box-shadow 0.25s, transform 0.25s var(--ease-snap); }
@@ -76,6 +76,52 @@
 .matchup-chip i { font-style: normal; color: var(--gold); }
 #foe-plate.drop-ok { box-shadow: 0 0 0 2px var(--blood), 0 0 40px 6px rgb(224 48 63 / 0.5); }
 #foe-plate.drop-hover { transform: scale(1.04); }
+
+/* Coração das Cartas: miniatura do Enigma do Milênio na sua placa (desenho próprio; o modelo 3D por cima quando existe) */
+.skill { display: flex; align-items: center; gap: 12px; margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--rule); }
+.skill-enigma { position: relative; flex: none; display: grid; place-items: center; width: 56px; height: 56px; padding: 4px; border: 0; background: none; color: inherit; cursor: pointer; isolation: isolate; transition: transform 0.25s var(--ease-snap), filter 0.3s, opacity 0.3s; }
+.skill-enigma::before { content: ''; position: absolute; inset: 0; z-index: -1; background: radial-gradient(circle at 50% 42%, rgb(var(--gold-rgb) / 0.2), rgb(var(--ink) / 0.55) 72%); clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); box-shadow: inset 0 0 0 1.5px rgb(var(--gold-rgb) / 0.45); }
+.skill-enigma:focus-visible { outline: 3px solid var(--gold-hi); outline-offset: 3px; }
+.enigma-icon { width: 100%; height: 100%; overflow: visible; }
+.enigma-live { position: absolute; inset: -6px; width: calc(100% + 12px); height: calc(100% + 12px); pointer-events: none; }
+.skill.live .enigma-live { display: block !important; }
+.skill.live .enigma-icon { opacity: 0; transition: opacity 0.4s; }
+.enigma-icon .stop-hi { stop-color: var(--gold-hi); }
+.enigma-icon .stop-mid { stop-color: var(--gold); }
+.enigma-icon .stop-deep { stop-color: var(--gold-lo); }
+.enigma-loop { fill: none; stroke: var(--gold); stroke-width: 1.6; }
+.enigma-seams { fill: none; stroke: rgb(70 38 4 / 0.55); stroke-width: 0.8; }
+.enigma-shade { fill: rgb(var(--ink) / 0.16); }
+.eye-lid { fill: #5c3305; stroke: #2e1903; stroke-width: 0.9; }
+.eye-iris { fill: var(--gold-hi); stroke: #2e1903; stroke-width: 0.9; }
+.eye-brow, .eye-tear { fill: none; stroke: #2e1903; stroke-width: 1.7; stroke-linecap: round; }
+.skill-note { display: grid; gap: 2px; margin: 0; min-width: 0; color: var(--ivory-dim); font: 600 0.78rem/1.2 var(--body); }
+.skill-note b { color: var(--gold); font: 700 0.72rem/1 var(--body); letter-spacing: 0.06em; text-transform: uppercase; }
+/* Pronto: brilha e pulsa devagar (parado com "reduzir animações") */
+.skill[data-state='ready'] .enigma-icon { filter: drop-shadow(0 0 6px rgb(var(--gold-rgb) / 0.75)); animation: enigmaPulse 2.4s ease-in-out infinite; }
+.skill[data-state='ready'] .skill-enigma::before { box-shadow: inset 0 0 0 1.5px var(--gold-hi), 0 0 0 1px var(--gold); }
+.skill[data-state='ready'] .skill-note span { color: var(--gold-hi); }
+.skill[data-state='ready'] .skill-enigma:hover { transform: translateY(-2px) scale(1.05); }
+@keyframes enigmaPulse { 50% { filter: drop-shadow(0 0 14px rgb(var(--gold-rgb) / 0.95)) brightness(1.12); transform: scale(1.04); } }
+.calm .skill .enigma-icon { animation: none; }
+@media (prefers-reduced-motion: reduce) { .skill .enigma-icon { animation: none; } }
+/* Espera (fora da Fase Principal), usado e sem carga: apagado */
+.skill[data-state='wait'] .skill-enigma { opacity: 0.7; filter: saturate(0.55); cursor: default; }
+.skill[data-state='used'] .skill-enigma, .skill[data-state='empty'] .skill-enigma { opacity: 0.45; filter: grayscale(1) brightness(0.7); cursor: default; }
+
+/* Ativação: a miniatura voa para o centro (.enigma-flyer), brilha com raios e se desfaz nas peças do desenho */
+.skill.spent .skill-enigma { visibility: hidden; } /* a peça saiu da placa e está no centro */
+.skill.flash .enigma-icon, .skill.flash .enigma-live { filter: drop-shadow(0 0 16px var(--gold)) brightness(1.4); }
+.enigma-burst.flying p { z-index: 2; padding: 8px 18px; background: linear-gradient(90deg, transparent, rgb(2 6 5 / 0.9) 12%, rgb(2 6 5 / 0.9) 88%, transparent); }
+.enigma-burst.flying { background: radial-gradient(circle, rgb(15 42 37 / 0.55), rgb(2 6 5 / 0.92) 75%); }
+.enigma-burst.glowing::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, rgb(255 229 150 / 0.5), transparent 46%); animation: burstIn 0.3s ease-out; pointer-events: none; }
+.enigma-flyer { position: absolute; transform-origin: 50% 50%; will-change: transform; }
+.enigma-flyer svg { display: block; width: 100%; height: 100%; }
+.enigma-burst.glowing .enigma-flyer svg { filter: drop-shadow(0 0 2px var(--gold-hi)) drop-shadow(0 0 6px rgb(var(--gold-rgb) / 0.9)) brightness(1.25); }
+.fly-piece { transform-box: fill-box; transform-origin: 50% 50%; }
+polygon.fly-piece { stroke: rgb(70 38 4 / 0.55); stroke-width: 0.6; }
+polygon.fly-piece.top { fill: var(--gold-lo); }
+.enigma-rays { position: absolute; left: 50%; top: 50%; width: min(150vmin, 1100px); aspect-ratio: 1; opacity: 0; transform: translate(-50%, -50%); border-radius: 50%; background: repeating-conic-gradient(from 0deg, rgb(var(--gold-rgb) / 0.5) 0 5deg, transparent 5deg 15deg); -webkit-mask: radial-gradient(circle, var(--ink-solid) 0 14%, transparent 60%); mask: radial-gradient(circle, var(--ink-solid) 0 14%, transparent 60%); pointer-events: none; }
 
 /* ---------- Zonas ---------- */
 .rush-arena .zone { width: var(--card); height: var(--ch); aspect-ratio: auto; border-radius: 6px; }
@@ -188,11 +234,10 @@
 .float.heal { color: #7dffa4; }
 .result[data-result='draw'] .result-title { background: linear-gradient(160deg, #e9e3d6, #9c9384); -webkit-background-clip: text; background-clip: text; }
 
-/* Dock: Batalha e Encerrar numa linha; o Coração das Cartas (uma vez por duelo) ganha a linha de cima */
+/* Dock: Batalha e Encerrar numa linha quando cabem */
 .rush-arena .tray { grid-template-columns: minmax(220px, min(360px, 25vw)) 1fr minmax(220px, min(360px, 25vw)); }
 .rush-arena .dock-actions { flex-wrap: wrap; }
 .rush-arena .dock .btn { flex: 1 1 auto; padding: 0 12px; font-size: 0.88rem; white-space: nowrap; }
-.rush-arena .dock .heart-btn { flex-basis: 100%; }
 .rush-arena .hint { min-height: calc(3 * 1.3em); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
 /* Computador estreito: os dois botões empilham na coluna da esquerda; a dica (também em "Como jogar") sai para a bandeja
@@ -213,18 +258,16 @@
     --hand: min(20vw, 12.5dvh);
     /* Largura: 5 colunas. Altura: o que sobra para as 4 linhas de cartas depois do topo, das placas, da faixa do meio,
        dos botões e da mão (no tablet em pé é a altura que manda). */
-    --card: min((100vw - 20px - 4 * var(--gap)) / 5.25, (100dvh - 312px - var(--hand) * 1.4) / 5.83);
+    --card: min((100vw - 20px - 4 * var(--gap)) / 5.25, (100dvh - 326px - var(--hand) * 1.4) / 5.83);
   }
   .rush-arena .arena-top { padding: 2px 8px; gap: 8px; }
   .rush-arena .leave { min-width: 44px; min-height: 44px; justify-content: center; } /* alvo de toque: só o logo aparece */
   .rush-arena .dock .btn { min-height: 40px; }
+  .rush-arena .dock { min-height: 40px; } /* sem botões (vez do rival) a mesa não pula */
   .rush-arena .hint { display: none; }
   .rush-arena .tray { grid-template-columns: 1fr; padding-top: 2px; }
-  /* Três botões numa linha: o Coração fica com o nome curto */
   .rush-arena .dock-actions { flex-wrap: nowrap; }
-  .rush-arena .dock .heart-btn { flex-basis: auto; }
   .rush-arena .dock .btn { padding: 0 10px; }
-  .rush-arena .heart-btn .wide-only { display: none; }
   .rush-table { grid-template-columns: 1fr; grid-template-rows: auto auto auto; grid-template-areas: 'foe' 'field' 'me'; align-content: center; gap: 6px; padding: 0 8px; }
   .field { justify-self: center; padding: 5px 6px; }
   .seat { grid-template-columns: auto 1fr auto; align-items: center; column-gap: 10px; row-gap: 3px; padding: 6px 12px; --c: 8px; }
@@ -234,6 +277,11 @@
   .foe-hand { grid-column: 3; grid-row: 1; min-height: 0; }
   .foe-backs { display: none; }
   .matchup-chip { display: none; }
+  .skill { grid-column: 3; grid-row: 1 / span 2; margin: -2px -6px -2px 0; padding: 0; border: 0; }
+  .seat.me .lp-bar { grid-column: 1 / 3; } /* a barra para antes da miniatura, que ocupa as duas linhas */
+  .skill-enigma { width: 44px; height: 44px; padding: 2px; }
+  .enigma-live { inset: 0; width: 100%; height: 100%; } /* dentro do chanfro da placa, sem ser cortada */
+  .skill-note { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* só para leitor de tela */
   .seat.foe, .seat.me { align-self: stretch; }
   .phases li { padding: 3px 7px; font-size: 0.58rem; }
   .rush-arena .log span:first-child { font-size: 0.72rem; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }

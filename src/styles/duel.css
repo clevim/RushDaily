@@ -349,8 +349,6 @@ html:has(.arena) { overflow: clip; }
   .zoom .card { max-width: 230px; }
 }
 
-.heart-btn::before { background: linear-gradient(160deg, #fff2b8, var(--gold) 40%, #b8690a 70%, #fff2b8); background-size: 200% 200%; animation: heartbeat 2.4s ease-in-out infinite; }
-@keyframes heartbeat { 50% { background-position: 100% 100%; box-shadow: 0 0 30px 4px rgb(var(--gold-rgb) / 0.7); } }
 
 /* Coração das Cartas: o Enigma explode sobre a mesa */
 .enigma-burst { position: fixed; inset: 0; z-index: 44; display: grid; place-items: center; background: radial-gradient(circle, rgb(15 42 37 / 0.6), rgb(2 6 5 / 0.92)); animation: burstIn 0.3s ease-out; }

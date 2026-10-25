@@ -1248,3 +1248,217 @@ export function puzzleScene(canvas, { owned = [], total = 38, fresh = null, redu
     },
   };
 }
+
+/* ---------- Enigma do Milênio procedural (Coração das Cartas na arena) ---------- */
+// Pirâmide de base quadrada com a ponta para baixo, cortada em fatias e quadrantes (as peças que se separam ao ativar),
+// em ouro metálico, com o Olho de Wdjat gravado na face da frente (cor e relevo desenhados em canvas) e a argola no topo.
+// Não depende do modelo do setup (src/assets/puzzle): funciona sempre que houver WebGL.
+const ENIGMA = { half: 1, top: 0.55, apex: -1.45, depth: 0.86, cuts: [0.55, 0.02, -0.45, -0.88, -1.45] };
+
+/** Face da frente: ouro com o olho. tone: cores (textura) ou cinzas (relevo: escuro = gravado). */
+function wdjatCanvas(tone) {
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext('2d');
+  if (tone.background) {
+    const fill = context.createLinearGradient(0, 0, size * 0.3, size);
+    tone.background.forEach((color, index) => fill.addColorStop(index / (tone.background.length - 1), color));
+    context.fillStyle = fill;
+  } else context.fillStyle = tone.flat;
+  context.fillRect(0, 0, size, size);
+  // Emendas das peças desenhadas de leve (as fatias reais já abrem frestas)
+  context.lineCap = 'round';
+  context.lineJoin = 'round';
+  context.strokeStyle = tone.line;
+  context.lineWidth = 13;
+  context.beginPath(); // sobrancelha
+  context.moveTo(140, 92);
+  context.quadraticCurveTo(256, 24, 372, 88);
+  context.stroke();
+  context.beginPath(); // pálpebras (amêndoa)
+  context.moveTo(136, 152);
+  context.quadraticCurveTo(256, 62, 376, 152);
+  context.quadraticCurveTo(256, 222, 136, 152);
+  context.closePath();
+  context.fillStyle = tone.lid;
+  context.fill();
+  context.stroke();
+  context.beginPath(); // íris
+  context.arc(256, 146, 34, 0, Math.PI * 2);
+  context.fillStyle = tone.iris;
+  context.fill();
+  context.lineWidth = 10;
+  context.stroke();
+  context.beginPath(); // pupila
+  context.arc(256, 146, 12, 0, Math.PI * 2);
+  context.fillStyle = tone.line;
+  context.fill();
+  context.lineWidth = 13;
+  context.beginPath(); // a lágrima em espiral e a perna reta do Wdjat
+  context.moveTo(226, 198);
+  context.quadraticCurveTo(214, 262, 160, 268);
+  context.quadraticCurveTo(138, 266, 146, 246);
+  context.moveTo(288, 200);
+  context.lineTo(330, 276);
+  context.quadraticCurveTo(334, 296, 312, 298);
+  context.stroke();
+  return canvas;
+}
+
+function enigmaMaterials() {
+  const map = new THREE.CanvasTexture(wdjatCanvas({ background: ['#ffe28e', '#f0b334', '#c27f12', '#7e4806'], line: '#3a2104', lid: '#6d3d07', iris: '#ffe596' }));
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 4;
+  const bump = new THREE.CanvasTexture(wdjatCanvas({ flat: '#9a9a9a', line: '#101010', lid: '#3c3c3c', iris: '#d8d8d8' }));
+  const gold = new THREE.MeshStandardMaterial({ color: 0xf6c04a, metalness: 0.9, roughness: 0.26, emissive: 0x5a3400, emissiveIntensity: 0.5, side: THREE.DoubleSide });
+  const face = new THREE.MeshStandardMaterial({ map, bumpMap: bump, bumpScale: 4, metalness: 0.62, roughness: 0.34, emissive: 0x5a3400, emissiveIntensity: 0.5, side: THREE.DoubleSide });
+  return [gold, face];
+}
+
+/** As peças: fatias horizontais divididas em quatro quadrantes, cada uma com a face da frente (grupo 1) mapeada no olho. */
+function buildEnigma() {
+  const { half, top, apex, depth, cuts } = ENIGMA;
+  const width = (y) => half * (y - apex) / (top - apex);
+  const materials = enigmaMaterials();
+  const group = new THREE.Group();
+  const pieces = [];
+  for (let layer = 0; layer < cuts.length - 1; layer += 1) {
+    const [y0, y1] = [cuts[layer], cuts[layer + 1]];
+    const [s0, s1] = [width(y0), width(y1)];
+    // Nas fatias do olho a frente fica inteira (sem emenda vertical cortando o olho); a ponta se divide em quadrantes.
+    const whole = layer < cuts.length - 2;
+    for (const [sx, sz] of whole ? [[1, 1], [1, -1]] : [[-1, 1], [1, 1], [1, -1], [-1, -1]]) {
+      const x0 = whole ? -1 : 0;
+      const a = [[x0 * s0, y0, 0], [sx * s0, y0, 0], [sx * s0, y0, sz * s0 * depth], [x0 * s0, y0, sz * s0 * depth]];
+      const b = [[x0 * s1, y1, 0], [sx * s1, y1, 0], [sx * s1, y1, sz * s1 * depth], [x0 * s1, y1, sz * s1 * depth]];
+      const quads = [[a[0], a[1], a[2], a[3]], [b[0], b[3], b[2], b[1]], [a[0], a[3], b[3], b[0]], [a[0], b[0], b[1], a[1]], [a[1], b[1], b[2], a[2]], [a[3], a[2], b[2], b[3]]];
+      const center = [...a, ...b].reduce((sum, p) => sum.add(new THREE.Vector3(...p)), new THREE.Vector3()).multiplyScalar(1 / 8);
+      const positions = [];
+      const uvs = [];
+      const geometry = new THREE.BufferGeometry();
+      quads.forEach((quad, index) => {
+        for (const p of [quad[0], quad[1], quad[2], quad[0], quad[2], quad[3]]) {
+          // Fresta entre as peças: cada uma encolhe um pouco para o próprio centro.
+          const v = new THREE.Vector3(...p).sub(center).multiplyScalar(0.965);
+          positions.push(v.x, v.y, v.z);
+          uvs.push((p[0] / half + 1) / 2, (p[1] - apex) / (top - apex));
+        }
+        geometry.addGroup(index * 6, 6, index === 5 && sz > 0 ? 1 : 0);
+      });
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      geometry.computeVertexNormals();
+      const mesh = new THREE.Mesh(geometry, materials);
+      mesh.position.copy(center);
+      group.add(mesh);
+      pieces.push({ mesh, home: center.clone(), dir: center.clone().setY(center.y + 0.35).normalize().add(new THREE.Vector3(0, 0, 0.5)).normalize() });
+    }
+  }
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.055, 12, 36), materials[0]);
+  ring.position.set(0, top + 0.24, 0);
+  group.add(ring);
+  pieces.push({ mesh: ring, home: ring.position.clone(), dir: new THREE.Vector3(0, 1, 0.3).normalize() });
+  return {
+    group, pieces, materials,
+    dispose() { group.traverse((node) => node.geometry?.dispose()); for (const material of materials) { material.map?.dispose(); material.bumpMap?.dispose(); material.dispose(); } },
+  };
+}
+
+function enigmaStage(renderer) {
+  const scene = new THREE.Scene();
+  scene.environment = studioEnvironment(renderer);
+  scene.add(new THREE.HemisphereLight(0xfff1d0, 0x2a1d0c, 1.7));
+  const key = new THREE.DirectionalLight(0xffe2a0, 4.2);
+  key.position.set(-2.5, 3, 5);
+  scene.add(key);
+  const fill = new THREE.DirectionalLight(0x9fe0c8, 0.9);
+  fill.position.set(3, -1, 3);
+  scene.add(fill);
+  return scene;
+}
+
+/** Miniatura viva (botão do Coração das Cartas): balança devagar mostrando o olho; parada com reduced. null sem WebGL. */
+export function enigmaMini(canvas, { reduced = false } = {}) {
+  const renderer = makeRenderer(canvas, 2);
+  if (!renderer) return null;
+  const scene = enigmaStage(renderer);
+  const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 50);
+  camera.position.set(0, 0.5, 5.8);
+  camera.lookAt(0, -0.3, 0);
+  const enigma = buildEnigma();
+  scene.add(enigma.group);
+  const clock = new THREE.Clock();
+  renderer.setAnimationLoop(() => {
+    fit(renderer, camera, canvas);
+    const time = clock.getElapsedTime();
+    enigma.group.rotation.y = reduced ? -0.42 : Math.sin(time * 0.7) * 0.62;
+    enigma.group.position.y = reduced ? 0 : Math.sin(time * 1.4) * 0.04;
+    renderer.render(scene, camera);
+  });
+  return {
+    angle: () => enigma.group.rotation.y,
+    dispose() { renderer.setAnimationLoop(null); enigma.dispose(); renderer.dispose(); },
+  };
+}
+
+/**
+ * Ativação em tela cheia: a miniatura (em `from`, retângulo na tela) cresce até o centro (560 ms), brilha (480 ms)
+ * e se desfaz nas peças (720 ms); onGlow avisa o começo do brilho e onDone, o fim. null sem WebGL.
+ */
+export function enigmaBurst(canvas, { from, angle = 0, onGlow = null, onDone = null }) {
+  const renderer = makeRenderer(canvas, 1.5);
+  if (!renderer) return null;
+  const scene = enigmaStage(renderer);
+  const camera = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.1, 60);
+  camera.position.set(0, 0, 10);
+  const glow = new THREE.PointLight(GOLD, 0, 12);
+  glow.position.set(0, 0, 3);
+  scene.add(glow);
+  const enigma = buildEnigma();
+  const pivot = new THREE.Group(); // o centro visual da pirâmide (sem a argola) fica no ponto da tela
+  enigma.group.position.y = 0.42;
+  pivot.add(enigma.group);
+  scene.add(pivot);
+  const unit = (2 * 10 * Math.tan(THREE.MathUtils.degToRad(15))) / innerHeight; // mundo por pixel no plano z = 0
+  const start = new THREE.Vector3((from.left + from.width / 2 - innerWidth / 2) * unit, -(from.top + from.height / 2 - innerHeight / 2) * unit, 0);
+  const tall = 2.3; // altura da peça inteira (ponta à argola), em unidades
+  const scale0 = (from.height * 0.86 * unit) / tall;
+  const scale1 = (Math.min(innerWidth, innerHeight) * 0.46 * unit) / tall;
+  const spins = enigma.pieces.map(() => new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(5));
+  const drifts = enigma.pieces.map(({ dir }) => dir.clone().add(new THREE.Vector3((Math.random() - 0.5) * 1.6, 0, Math.random() * 0.5)).normalize()); // abre para os lados também
+  const reach = scale1 * 1.7;
+  const began = performance.now();
+  let glowing = false;
+  let done = false;
+  const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+  renderer.setAnimationLoop(() => {
+    fit(renderer, camera, canvas);
+    camera.aspect = canvas.clientWidth / canvas.clientHeight || camera.aspect;
+    camera.updateProjectionMatrix();
+    const ms = performance.now() - began;
+    const grow = ease(Math.min(1, ms / 560));
+    pivot.position.lerpVectors(start, new THREE.Vector3(), grow);
+    const shine = Math.min(1, Math.max(0, (ms - 560) / 480));
+    pivot.scale.setScalar(THREE.MathUtils.lerp(scale0, scale1, grow) * (1 + Math.sin(shine * Math.PI) * 0.08));
+    pivot.rotation.y = THREE.MathUtils.lerp(angle, Math.PI * 2, grow) + (ms > 560 ? Math.sin(ms / 140) * 0.05 * (1 - shine) : 0);
+    if (ms > 560 && !glowing) { glowing = true; onGlow?.(); }
+    const [gold, face] = enigma.materials;
+    gold.emissiveIntensity = face.emissiveIntensity = 0.5 + Math.sin(Math.min(1, shine * 1.3) * Math.PI / 2) * 2.4;
+    glow.intensity = shine * 90;
+    const part = Math.min(1, Math.max(0, (ms - 1040) / 720));
+    if (part > 0) {
+      for (const material of enigma.materials) { material.transparent = true; material.opacity = 1 - part ** 1.4; }
+      const e = 1 - (1 - part) ** 2;
+      enigma.pieces.forEach(({ mesh, home }, index) => {
+        mesh.position.copy(home).addScaledVector(drifts[index], e * reach / pivot.scale.x);
+        mesh.rotation.set(spins[index].x * e, spins[index].y * e, spins[index].z * e);
+      });
+      glow.intensity = 90 * (1 - part);
+    }
+    renderer.render(scene, camera);
+    if (part >= 1 && !done) { done = true; onDone?.(); }
+  });
+  return { dispose() { renderer.setAnimationLoop(null); enigma.dispose(); renderer.dispose(); } };
+}
