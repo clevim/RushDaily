@@ -203,6 +203,7 @@ async function carregaStatus() {
 }
 const disponivel = (t) => meta?.tarefas[t] && !meta.tarefas[t].indisponivel;
 const temporadasAtivas = () => Math.max(1, ultimoStatus?.contagens?.temporadas || 1);
+const situacao = (e) => (e.desatualizada ? ['parcial', 'desatualizada'] : e.pronto ? ['ok', 'pronta'] : e.parcial ? ['parcial', 'parcial'] : ['falta', 'faltando']);
 const rodaEtapa = (nome, force) => executar('setup-etapa', { etapa: nome, force, temporadas: temporadasAtivas() }, force ? `Refazer a etapa "${nome}" (--force)? Apaga e gera de novo o que ela produz.` : `Rodar a etapa "${nome}" do setup?`);
 function pintaStatus() {
   const s = ultimoStatus, c = s.contagens, prontas = s.etapas.filter((e) => e.pronto).length, total = s.etapas.length;
@@ -224,13 +225,14 @@ function pintaStatus() {
   const faltam = s.etapas.filter((e) => !e.pronto);
   troca($('saude'), 
     total ? el('p', { className: 'sub' }, `${prontas} de ${total} etapas prontas.`) : el('p', { className: 'vazio' }, 'O setup não existe nesta instalação.'),
-    faltam.length ? el('ul', { className: 'lista-curta' }, faltam.map((e) => el('li', {}, el('span', {}, chip(e.parcial ? 'parcial' : 'falta', e.parcial ? 'parcial' : 'falta'), ' ', e.nome),
-      disponivel('setup-etapa') ? el('button', { className: 'btn sec pequeno', onclick: () => rodaEtapa(e.nome, false) }, 'Rodar') : null))) : total ? el('p', {}, chip('ok', 'tudo pronto')) : null);
+    faltam.length ? el('ul', { className: 'lista-curta' }, faltam.map((e) => el('li', {}, el('span', {}, chip(...situacao(e)), ' ', e.nome),
+      disponivel('setup-etapa') ? el('button', { className: 'btn sec pequeno', onclick: () => rodaEtapa(e.nome, false) }, e.desatualizada ? 'Atualizar' : 'Rodar') : null))) : total ? el('p', {}, chip('ok', 'tudo pronto')) : null);
   // etapas detalhadas
-  troca($('etapas'), ...s.etapas.map((e) => el('li', { className: 'etapa ' + (e.pronto ? 'ok' : e.parcial ? 'parcial' : '') },
-    el('div', {}, el('h3', {}, e.nome, chip(e.pronto ? 'ok' : e.parcial ? 'parcial' : 'falta', e.pronto ? 'pronta' : e.parcial ? 'parcial' : 'faltando')), el('p', {}, e.desc), e.contagem ? el('p', { className: 'cont' }, e.contagem) : null),
+  troca($('etapas'), ...s.etapas.map((e) => el('li', { className: 'etapa ' + (e.pronto ? 'ok' : e.parcial || e.desatualizada ? 'parcial' : '') },
+    el('div', {}, el('h3', {}, e.nome, chip(...situacao(e))), el('p', {}, e.desc), e.contagem ? el('p', { className: 'cont' }, e.contagem) : null,
+      e.desatualizada ? el('p', { className: 'cont' }, `Desatualizada: ${e.motivo}. Atualizar refaz: ${e.refaz}.`) : null),
     el('div', { className: 'lado' }, el('span', {}, `${fmtB(e.bytes)} · ${fmtT(e.geradoEm)}`),
-      el('div', { className: 'acoes-linha' }, el('button', { className: 'btn sec pequeno', disabled: !disponivel('setup-etapa'), onclick: () => rodaEtapa(e.nome, false) }, 'Rodar'),
+      el('div', { className: 'acoes-linha' }, el('button', { className: 'btn sec pequeno', disabled: !disponivel('setup-etapa'), onclick: () => rodaEtapa(e.nome, false) }, e.desatualizada ? 'Atualizar' : 'Rodar'),
         el('button', { className: 'btn fantasma pequeno', disabled: !disponivel('setup-etapa'), onclick: () => rodaEtapa(e.nome, true) }, 'Refazer'))))));
   if (!s.etapas.length) troca($('etapas'), el('li', { className: 'vazio' }, 'Sem a lista de etapas (tools/setup/setup.mjs não está aqui).'));
   const maior = Math.max(1, ...s.caches.map((x) => x.bytes));
@@ -261,6 +263,8 @@ function pintaProxima() {
   if (s.inicializacao?.viva) return mostra('Inicialização dos dados em andamento', 'O serviço rushdaily-dados está gerando os dados no volume. As tarefas ficam bloqueadas até ele terminar.');
   if (atual) return mostra(`Rodando: ${atual.titulo}`, 'Acompanhe o log na seção Tarefas.', el('button', { className: 'btn sec', onclick: () => ir('tarefas') }, 'Ver o log'));
   if (faltam.length > 2 && disponivel('setup')) return mostra(`Faltam ${faltam.length} etapas do setup`, faltam.map((e) => e.nome).join(', '), el('button', { className: 'btn', onclick: () => executar('setup', { temporadas: temporadasAtivas() }, 'Rodar o setup completo? Baixa e gera tudo o que falta (pode levar bastante tempo).') }, 'Rodar o setup completo'));
+  const velhas = faltam.filter((e) => e.desatualizada);
+  if (velhas.length && disponivel('setup')) return mostra(`Dados desatualizados: ${velhas.map((e) => e.nome).join(', ')}`, `O código que gera esses dados mudou (${velhas[0].nome}: ${velhas[0].motivo}). O setup refaz só o que mudou e o que depende disso.`, el('button', { className: 'btn', onclick: () => executar('setup', { temporadas: temporadasAtivas() }, 'Rodar o setup? Refaz só as etapas desatualizadas (e completa o que faltar).') }, 'Atualizar os dados'));
   if (faltam.length && disponivel('setup-etapa')) return mostra(`Etapa pendente: ${faltam[0].nome}`, faltam[0].desc, el('button', { className: 'btn', onclick: () => rodaEtapa(faltam[0].nome, false) }, `Rodar ${faltam[0].nome}`));
   if (ult && !ult.cancelada && ult.codigo !== 0) return mostra(`A última tarefa terminou com erro: ${ult.titulo}`, `Saída ${ult.codigo ?? ult.sinal} em ${fmtT(ult.inicio)}.`, el('button', { className: 'btn sec', onclick: () => { ir('historico'); verLog(ult.id); } }, 'Ver o log'));
   const teste = histAtual.find((h) => h.tarefa === 'teste');

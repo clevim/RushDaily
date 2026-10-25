@@ -65,9 +65,9 @@ const syncAdmin = () => { const c = cfgArquivo(); return { url: (process.env.SYN
 
 // requer: arquivos que a tarefa usa (relativos à raiz); py: precisa do python3. Sem eles a tarefa aparece desabilitada, com o motivo.
 const TAREFAS = {
-  setup: { titulo: 'Setup completo', grupo: 'Setup', desc: 'npm run setup: baixa/gera tudo que ainda falta (pula o que já existe).', params: ['temporadas', 'semRender'], requer: ['tools/setup/setup.mjs'],
+  setup: { titulo: 'Setup completo', grupo: 'Setup', desc: 'npm run setup: baixa/gera tudo que ainda falta (pula o que já existe) e refaz só o que ficou desatualizado.', params: ['temporadas', 'semRender'], requer: ['tools/setup/setup.mjs'],
     montar: (q) => ({ cmd: 'node', args: ['tools/setup/setup.mjs', '--temporadas', String(inteiro(q.temporadas, 'temporadas', 1, NUM_TEMPORADAS, 1)), ...(q.semRender ? ['--sem-render'] : [])] }) },
-  'setup-etapa': { titulo: 'Setup de uma etapa', grupo: 'Setup', desc: 'setup --so <etapa>; com "refazer", usa --force só nessa etapa.', params: ['etapa', 'force', 'temporadas'], requer: ['tools/setup/setup.mjs'],
+  'setup-etapa': { titulo: 'Setup de uma etapa', grupo: 'Setup', desc: 'setup --so <etapa> (desatualizada: refaz só o necessário); com "refazer", usa --force só nessa etapa.', params: ['etapa', 'force', 'temporadas'], requer: ['tools/setup/setup.mjs'],
     montar: (q) => ({ cmd: 'node', args: ['tools/setup/setup.mjs', '--so', etapa(q.etapa), '--temporadas', String(inteiro(q.temporadas, 'temporadas', 1, NUM_TEMPORADAS, 1)), ...(q.force ? ['--force'] : [])] }) },
   classico: { titulo: 'Importar clássico', grupo: 'Clássico', desc: 'import_cards.py: fetch (baixa APIs), decks, build (gera temporadas), art (artes), puzzles.', params: ['comando', 'ate'], requer: ['tools/classic/import_cards.py'], py: true,
     montar: (q) => {
@@ -234,6 +234,13 @@ function tamanho(dir) { // bytes de uma árvore (sem seguir links)
   anda(dir); return t;
 }
 
+// Etapas desatualizadas (o código que gera os dados mudou): o próprio setup diz, sem rodar nada (setup.mjs --verificar --json).
+function verificacao() {
+  if (!temSetup) return {};
+  const r = spawnSync('node', [p('tools/setup/setup.mjs'), '--verificar', '--json'], { encoding: 'utf8', timeout: 20000 });
+  try { return Object.fromEntries(JSON.parse(r.stdout).etapas.map((e) => [e.nome, e])); } catch { return {}; }
+}
+
 let cacheStatus = { t: 0, v: null };
 function status() {
   if (cacheStatus.v && Date.now() - cacheStatus.t < 4000) return cacheStatus.v;
@@ -270,9 +277,12 @@ function status() {
     enigma: { pronto: ex('src/assets/puzzle/puzzle.bin') && ex('src/assets/puzzle/puzzle.json'), caminhos: ['src/assets/puzzle', 'tools/setup/cache/enigma'] },
     'vendor-avisos': { pronto: ex('src/vendor/CHECKSUMS.txt'), caminhos: ['src/vendor/CHECKSUMS.txt'] },
   };
+  const V = verificacao();
   const etapas = ETAPAS.map((e) => {
     const d = E[e.nome] ?? { pronto: false, caminhos: [] };
-    return { nome: e.nome, desc: e.desc, pronto: !!d.pronto, parcial: !d.pronto && !!d.parcial, contagem: d.contagem ?? '', bytes: d.caminhos.reduce((a, c) => a + tamanho(p(c)), 0), geradoEm: Math.max(0, ...d.caminhos.map((c) => mtime(c))) || null };
+    const velha = V[e.nome]?.estado === 'desatualizada';
+    return { nome: e.nome, desc: e.desc, pronto: !!d.pronto && !velha, parcial: !d.pronto && !!d.parcial, desatualizada: velha, motivo: velha ? V[e.nome].motivos.join(', ') : '', refaz: V[e.nome]?.refaz ?? '',
+      contagem: d.contagem ?? '', bytes: d.caminhos.reduce((a, c) => a + tamanho(p(c)), 0), geradoEm: Math.max(0, ...d.caminhos.map((c) => mtime(c))) || null };
   });
   const caches = [];
   try { for (const d of readdirSync(p('tools'), { withFileTypes: true })) if (d.isDirectory() && existsSync(p('tools', d.name, 'cache'))) caches.push({ nome: `tools/${d.name}/cache`, bytes: tamanho(p('tools', d.name, 'cache')) }); } catch { /* sem tools/ */ }
