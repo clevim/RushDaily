@@ -15,6 +15,11 @@ tools/**
 !tools/setup/patch-ocgcore.mjs
 !tools/classic/puzzle-check.mjs
 !tools/classic/puzzle-solutions.json
+!tools/rush/import_rush.py
+# Restos do desafio diário antigo (pool Rush próprio e frentes do rush-hub): o jogo não usa mais.
+src/data/cards.mjs
+src/assets/cards
+src/assets/cards-sm
 server/data
 docs
 goat
