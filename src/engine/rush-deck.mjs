@@ -31,15 +31,16 @@ const mentions = (card, word) => new RegExp(`\\b${word.replace(/[-\s]/g, '[-\\s]
 const citedRaces = (card) => Object.values(RACE_NAMES).filter((name) => mentions(card, name));
 const citedAttributes = (card) => Object.values(ATTRIBUTE_NAMES).filter((name) => new RegExp(`\\b${name}\\b`).test(textOf(card)));
 
-/** Cotas do deck de 40 (escalam para outros tamanhos): curva baixa, poucos de 1 e 2 Sacrifícios e 17 Magias/Armadilhas. */
+/** Cotas do deck de 40 (escalam para outros tamanhos): curva baixa, poucos de 1 e 2 Sacrifícios e 14 Magias/Armadilhas
+ * (com 17 a mão enchia de Magias/Armadilhas sem uso). Magias de Fusão ficam fora da cota: só entram pela lógica de Fusão. */
 function quotas(format) {
   const scale = format.main / 40;
   return [
-    { key: 'low', monster: true, test: (c) => isMonster(c) && level(c) <= 4, n: Math.round(16 * scale) },
+    { key: 'low', monster: true, test: (c) => isMonster(c) && level(c) <= 4, n: Math.round(19 * scale) },
     { key: 'mid', monster: true, test: (c) => isMonster(c) && level(c) >= 5 && level(c) <= 6, n: Math.round(4 * scale) },
     { key: 'high', monster: true, test: (c) => isMonster(c) && level(c) >= 7, n: Math.round(3 * scale) },
-    { key: 'spell', monster: false, test: (c) => Boolean(c.type & TYPE.SPELL), n: Math.round(9 * scale) },
-    { key: 'trap', monster: false, test: (c) => Boolean(c.type & TYPE.TRAP), n: Math.round(8 * scale) },
+    { key: 'spell', monster: false, test: (c) => Boolean(c.type & TYPE.SPELL) && !/Fusion/i.test(c.nameEn ?? ''), n: Math.round(8 * scale) },
+    { key: 'trap', monster: false, test: (c) => Boolean(c.type & TYPE.TRAP), n: Math.round(6 * scale) },
   ];
 }
 
