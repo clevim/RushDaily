@@ -235,7 +235,9 @@ const ETAPAS = [
   },
   {
     nome: 'rush-ocg', desc: 'Rush Duel no motor do EDOPro: BabelCDB (cards-rush.cdb) e CardScripts (rush/) -> src/data/rush/cards.json, src/vendor/card-scripts/rush/',
-    fontes: ['tools/rush/import_rush.py', CARDSCRIPTS_SHA, 'tools/card-render/pt-br.json', 'tools/card-render/pool-en.json'], versao: 1,
+    fontes: ['tools/rush/import_rush.py', CARDSCRIPTS_SHA, 'tools/card-render/pt-br.json', 'tools/card-render/pool-en.json',
+      // Memória de tradução (tools/rush/traducao.py): traduzir ou corrigir uma frase refaz o cards.json e as cartas montadas.
+      'tools/rush/traducao.py', 'tools/rush/traducao/glossario.json', 'tools/rush/traducao/nomes.json', 'tools/rush/traducao/frases.json'], versao: 1,
     cedo: true, // as artes Rush (a etapa mais longa) esperam por ela
     refaz: 'build (fetch só se o CARDSCRIPTS_SHA mudou)',
     pronto: () => existe('src/data/rush/cards.json') && existe('src/vendor/card-scripts/rush/index.json') && existe('src/vendor/card-scripts/constant.lua'),
