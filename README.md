@@ -13,7 +13,7 @@ Jogo web de cartas de **Yu-Gi-Oh!**, feito por fã, sem fins comerciais. Tem um 
 - **Motor do EDOPro:** o desafio Rush e as partidas clássicas rodam no ocgcore, o núcleo do EDOPro compilado para WebAssembly, com os scripts das cartas do ProjectIgnis/CardScripts.
 - **PvP assíncrono por link:** você envia o seu deck por um link; quem abre o link joga contra ele, com o deck pilotado pela IA. Não há servidor de partidas.
 - **Enigma do Milênio:** um quebra-cabeça 3D mensal. Cada vitória diária dá uma peça; o mês completo libera a carga Coração das Cartas.
-- **Cartas desenhadas no navegador:** as cartas clássicas usam a moldura oficial e recebem texto em português.
+- **Cartas desenhadas no navegador:** as clássicas e as Rush usam as molduras do yugioh-card e recebem nome e texto em português quando há tradução.
 
 Não há cadastro. Sua **chave** (por exemplo `READM1`) identifica o perfil no navegador, e o progresso fica salvo no `localStorage` daquele navegador.
 
@@ -92,7 +92,7 @@ Depois, abra **http://127.0.0.1:4173**. Para testar outra chave, use `?player=SU
 
 **Requisitos:** Node.js 22+, npm, Python 3 com Pillow e numpy, git, curl e ImageMagick 7 (comando `magick`). O setup confere tudo no começo e diz o que instalar (por exemplo `pacman -S python-pillow python-numpy imagemagick` ou `apt install python3-pil python3-numpy imagemagick`). O projeto não tem etapa de build; o navegador carrega os módulos direto.
 
-**Tempo e espaço (TEMPO_MEDIDO):** ESPACO_MEDIDO. A maior parte do tempo vai para os downloads (artes das cartas, que respeitam o limite de 20 pedidos por segundo do YGOPRODeck) e para desenhar as imagens.
+**Tempo e espaço:** a primeira execução leva cerca de 25 min e baixa algumas centenas de MB. A maior parte do tempo vai para os downloads (artes das cartas, que respeitam o limite de 20 pedidos por segundo do YGOPRODeck e cerca de 3 por segundo no Yugipedia) e para desenhar as imagens.
 
 **Opções** (`npm run setup -- <opções>`):
 
@@ -111,25 +111,25 @@ O setup é idempotente: o que já existe é pulado, e se uma etapa falhar basta 
 | Etapa | Baixa de onde | Gera | Licença / observação |
 |---|---|---|---|
 | `three` | npm `three@0.170.0` | `src/vendor/three.module.js` | MIT |
+| `qrcode` | npm `qrcode-generator@2.0.4` | `src/vendor/qrcode/` (QR do link de ligar aparelho) | MIT |
 | `ocgcore` | npm `ocgcore-wasm@0.1.6` | `src/vendor/ocgcore/`, com o patch do parser (`tools/setup/patch-ocgcore.mjs`: parser de consulta, COUNTERS, mensagem ilegível e SORT_CARD; falha se alguma âncora não bater, e `tests/ocg-binding.test.mjs` confere) | Wrapper MIT; núcleo EDOPro AGPL-3.0 |
 | `yugioh` | npm `yugioh-card` + repositório kooriookami/yugioh-card (só `src/assets/yugioh-card/yugioh` e `rush-duel`) | `src/vendor/yugioh-card/` (bundle com `YugiohCard` e `RushDuelCard`, molduras clássica e Rush reduzidas a 30%; do Rush só a fonte dos números, nome e texto usam as fontes latinas da clássica) | MIT |
-| `rush` | yaml-yugi (`rush.json`) e Yugipedia (artes e scans das cartas Rush) | `src/data/cards.mjs` (usa `pool-en.json` e `pt-br.json` do repositório) | Artes da Konami |
-| `rush-render` | repositório JLtheking2/rush-hub (molduras, ícones e fontes) e o selo LEGEND do yugioh-card, em `tools/card-render/cache/` | `src/assets/cards/*.webp` | rush-hub sem licença declarada; ver pendências |
 | `classico` | YGOPRODeck (dados en/pt, decks de jogadores e artes recortadas), BabelCDB, ProjectIgnis/CardScripts e ProjectIgnis/Puzzles | `src/data/classic/`, `src/vendor/card-scripts/`, `src/assets/classic-art/` | Dados e artes da Konami; scripts AGPL-3.0 |
 | `rush-ocg` | BabelCDB (`cards-rush.cdb`) e ProjectIgnis/CardScripts (pasta `rush/` e utilitários da raiz, mesmo commit do clássico), em `tools/rush/cache/` | `src/data/rush/cards.json`, `src/vendor/card-scripts/rush/` (usa `pt-br.json` e `pool-en.json` do repositório para o texto em PT) | Dados da Konami; scripts AGPL-3.0 |
 | `rush-art` | yaml-yugi (`rush.json`, do raw.githubusercontent.com, em `tools/rush/cache/`) e Yugipedia (artes limpas ou recorte do scan) | `src/assets/rush-art/<id>.webp` (400 px) e `index.json` | Artes da Konami. Se o Yugipedia não responder, avisa e segue: as cartas saem com o quadro provisório |
 | `rush-cartas` | (usa as molduras da etapa `yugioh` e as artes da `rush-art`) | `src/assets/rush-cards/*.webp` (418x609), `rush-cards-sm/` (140 px) e `rush-cards/index.json` | Derivadas de itens acima |
 | `classico-render` | (usa as molduras da etapa `yugioh` e as artes da etapa `classico`) | `src/assets/classic-cards/*.webp` (miniaturas pré-desenhadas) | Derivadas de itens acima |
+| `miniaturas` | (local) | `src/assets/classic-cards-sm/` (140 px, para as grades de coleção e decks; as miniaturas Rush saem da `rush-cartas`) | Derivadas de itens acima |
 | `vendor-avisos` | (local) | `src/vendor/LICENSE-three.txt`, `yugioh-card/LICENSE`, `ocgcore/COPYING-AGPL-3.0` e `src/vendor/CHECKSUMS.txt` (SHA-256) | Roda sempre; barata |
 | `enigma` | API pública do Printables (modelo 517699, 39 arquivos STL, sem login) | `src/assets/puzzle/` | CC BY-NC-SA, crédito na tela do Enigma |
 
-Os downloads grandes ficam em `tools/*/cache/`, que o git ignora. O YGOPRODeck pede que as imagens sejam baixadas e hospedadas por você; é isso que o setup faz, a no máximo cerca de 16 pedidos por segundo. Os repositórios do GitHub são baixados por commit fixo (rush-hub, yugioh-card e os CardScripts, este em `tools/classic/CARDSCRIPTS_SHA`), e o `curl` do importador só aceita HTTPS e arquivos de até 100 MB, então o resultado é reprodutível.
+Os downloads grandes ficam em `tools/*/cache/`, que o git ignora. O YGOPRODeck pede que as imagens sejam baixadas e hospedadas por você; é isso que o setup faz, a no máximo cerca de 16 pedidos por segundo. Os repositórios do GitHub são baixados por commit fixo (yugioh-card e os CardScripts, este em `tools/classic/CARDSCRIPTS_SHA`), e o `curl` do importador só aceita HTTPS e arquivos de até 100 MB, então o resultado é reprodutível.
 
 ## Como publicar
 
 O jogo é estático: um container **nginx** serve a pasta. O `Dockerfile` copia as páginas HTML e `src/` (a pasta `tools/` fica de fora) e o nginx escuta na porta 8080. O único backend é o **servidor de sincronização** (`server/`, Node 24 + SQLite, serviço `rushdaily-sync` no compose), que o nginx encaminha em `/api/` (veja "Sincronização entre aparelhos").
 
-**A imagem é montada depois do `npm run setup`:** como `src/` só tem as imagens, os dados e as bibliotecas depois do setup, rode o setup na máquina de build antes do `docker compose build`. Decisão: o `Dockerfile` **não** ganhou o estágio de setup (o setup leva ~25 min, baixa centenas de MB da internet e precisa de Python, Pillow, ImageMagick e do binário do skia-canvas; não dá para verificar de forma rápida e repetível). Proposta para um build 100% a partir do repositório: um estágio `FROM node:22` com python3, Pillow, numpy, git, curl e imagemagick que copia o repositório, roda `npm run setup` e entrega `src/` ao estágio do nginx (`COPY --from=setup /app/src ...`). Fica simples, mas o build passa a depender da internet e leva o tempo do setup; use `--mount=type=cache` em `tools/classic/cache` e `tools/card-render/cache` para não baixar tudo de novo.
+**A imagem é montada depois do `npm run setup`:** como `src/` só tem as imagens, os dados e as bibliotecas depois do setup, rode o setup na máquina de build antes do `docker compose build`. Decisão: o `Dockerfile` **não** ganhou o estágio de setup (o setup leva ~25 min, baixa centenas de MB da internet e precisa de Python, Pillow, ImageMagick e do binário do skia-canvas; não dá para verificar de forma rápida e repetível). Proposta para um build 100% a partir do repositório: um estágio `FROM node:22` com python3, Pillow, numpy, git, curl e imagemagick que copia o repositório, roda `npm run setup` e entrega `src/` ao estágio do nginx (`COPY --from=setup /app/src ...`). Fica simples, mas o build passa a depender da internet e leva o tempo do setup; use `--mount=type=cache` em `tools/classic/cache` e `tools/rush/cache` para não baixar tudo de novo.
 
 ```bash
 # Build da imagem
@@ -141,6 +141,8 @@ docker compose up -d
 # Testes dentro do build (etapa "test" do Dockerfile, não roda no build normal)
 docker build --target test .
 ```
+
+O estágio `test` copia `src/` como está: rode o `npm run setup` antes (os testes do Rush e do desafio diário leem `src/data/rush/` e `src/vendor/card-scripts/rush/`; os do clássico, `src/data/classic/`). A imagem final leva as páginas e `src/` inteiro (dados, `src/vendor/` com os scripts `official/` e `rush/`, e as cartas `src/assets/rush-*` e `classic-*`); `tools/`, `docs/` e os restos do Rush antigo (`src/data/cards.mjs`, `src/assets/cards*`) ficam de fora pelo `.dockerignore`.
 
 O `docker-compose.yml` **não publica porta** no host de propósito. Para teste local, descomente o bloco `ports` com `127.0.0.1:4173:8080`. Nunca use `0.0.0.0`.
 
@@ -173,7 +175,7 @@ Cada imagem sai com as etiquetas `latest`, o commit curto (`sha-xxxxxxx`) e, qua
 
    O `docker-compose.yml` aponta para `ghcr.io/clevim/rushdaily:latest` e `ghcr.io/clevim/rushdaily-sync:latest`; para uma versão fixa, troque `latest` pela etiqueta desejada. O homelab só precisa do `docker-compose.yml`, do `.env` e da configuração do nginx já embutida na imagem — não precisa do Node, do Python nem do setup.
 
-Se o Printables (modelo do Enigma) ou o Yugipedia (cartas Rush) bloquearem os servidores do GitHub, o setup para com uma mensagem clara; rode o workflow de novo (ele retoma pelo cache) ou monte a imagem localmente com `docker compose up -d --build` depois do `npm run setup`.
+Se o Printables (modelo do Enigma) bloquear os servidores do GitHub, o setup para com uma mensagem clara; se for o Yugipedia (artes Rush), a etapa `rush-art` avisa e segue, e as cartas saem com o quadro provisório até a próxima execução. Nos dois casos, rode o workflow de novo (ele retoma pelo cache), ou monte a imagem localmente com `docker compose up -d --build` depois do `npm run setup`.
 
 ### Cloudflare Tunnel (recomendado)
 
@@ -244,8 +246,9 @@ src/
   data/               Dados gerados pelo setup (exceto classic/strings-pt.mjs, editado à mão)
   assets/             Logo, versos e ícones do projeto; cartas, artes e Enigma vêm do setup
   vendor/             Three.js, ocgcore-wasm, yugioh-card e scripts das cartas (vêm do setup)
-tools/                setup/ (npm run setup), classic/ (pool, decks, puzzles, render), card-render/ (Rush),
-                      rush/ (Rush no motor do EDOPro: importador e simulador),
+tools/                setup/ (npm run setup), classic/ (pool, decks, puzzles, render), rush/ (Rush no motor do
+                      EDOPro: importador, artes, cartas montadas e simulador), card-render/ (traduções PT das Rush
+                      e versos), admin/ (painel local),
                       puzzle/ (modelo do Enigma), serve.py (servidor de desenvolvimento)
 tests/                node --test tests/*.test.mjs
 ```
@@ -257,7 +260,7 @@ Regras de dependência entre as pastas:
 - `src/ui` manda comandos para o motor e desenha o estado que ele devolve; não reimplementa regra de jogo.
 - `src/styles` não tem lógica de jogo.
 - `tests` exercita os motores sem navegador sempre que possível.
-- Contratos compartilhados: `classic-store.js` (coleção, decks, validação e link de desafio), `classic-render.js` (`classicImg`, `paintCards`, `classicCardUrl`) e `rush-render.js` (`rushImg`, `paintRushCards`, `rushCardUrl`, `warmRushCards`, `RUSH_BACK`). Mudar uma assinatura exige atualizar todos os usuários.
+- Contratos compartilhados: `classic-store.js` (coleção, decks, validação e link de desafio), `classic-render.js` (`classicImg`, `paintCards`, `classicCardUrl`) `rush-render.js` (`rushImg`, `paintRushCards`, `rushCardUrl`, `warmRushCards`, `RUSH_BACK`) e `ocg-ask.js` (perguntas do motor, usadas pelas duas arenas). Mudar uma assinatura exige atualizar todos os usuários.
 
 ## Regerar dados e cartas
 
@@ -280,16 +283,19 @@ O `npm run setup` chama os comandos abaixo. Para regerar só uma parte, rode a p
 - `art [--force] [id ...]`: baixa as artes das cartas Rush para `src/assets/rush-art/<id>.webp` (400 px) e grava `index.json` com os ids que têm arte. Casa cada carta do `cards.json` com o yaml-yugi (`rush.json`, baixado do raw.githubusercontent.com para `tools/rush/cache/`) pelo nome em inglês; os nomes que o BabelCDB traduziu diferente são casados pelos atributos do monstro (ATK, DEF, nível, atributo e tipo, quando únicos) e as Magias/Armadilhas pelo nome mais parecido. A arte vem do Yugipedia (CDN `ms.yugipedia.com`, caminho pelo md5 do nome do arquivo), na ordem: ilustração limpa do yaml-yugi, arte limpa achada pela API (mesmos padrões do `import_pool.py`) e recorte da janela de arte do scan; cartas fora do yaml-yugi tentam a imagem da página "<nome> (Rush Duel)". Só HTTPS, ~3 pedidos por segundo, pula as que já existem e relata quantas faltam e quantas ficaram sem fonte. As fontes achadas ficam em `tools/rush/cache/art-sources.json` (`--force` refaz tudo).
 - `node tools/rush/render.mjs [--force] [id ...]`: monta as cartas pré-desenhadas (`src/assets/rush-cards/`, 418x609, e `rush-cards-sm/`, 140 px) com o mesmo desenho do navegador (`src/ui/rush-card-data.js`). Refaz sozinho as cartas cuja arte chegou depois; mudou o desenho, use `--force` (e suba `CACHE_VERSION` em `src/ui/rush-render.js`).
 - `node tools/rush/simulate.mjs 600 [todos|ia|aleatorio]`: duelos da IA com decks gerados e de um bot aleatório com decks sorteados; conta erros de script e travamentos.
+- `node tools/rush/simulate.mjs N diario [cartas]`: N dias do desafio do dia em cada dificuldade (o jogador é pilotado pela IA elite): turnos, quem vence, como acaba e erros de script. `cartas` troca o tamanho do deck (padrão 40) para testar formatos menores.
+- `node tools/rush/simulate.mjs N niveis`: cada nível da IA do Rush contra a IA gulosa do clássico, com os mesmos decks e trocando de lado; mede o ganho de cada nível.
 
-**Desenho das cartas Rush do motor** (`src/ui/rush-render.js`): usa a pré-desenhada quando existe (listada em `rush-cards/index.json`; as miniaturas pequenas usam `rush-cards-sm`); senão desenha no navegador com o `RushDuelCard` do yugioh-card, com a arte de `rush-art/` ou, sem ela, um quadro no tom do atributo com o selo dourado do verso. Nome e texto em PT quando a carta tem tradução (`pt: true`), senão em inglês; tipos, rótulos de Magia/Armadilha e a linha de tipo sempre em PT; selo LEGEND nas Lendas e ATK MAX na peça central do Máximo. Cache no navegador como o clássico (`CACHE_VERSION`). As frentes antigas do desafio diário (`src/assets/cards/`, ids da Konami, molduras do rush-hub) não são usadas aqui: as 3.232 cartas saem no mesmo desenho, sem depender das molduras e fontes sem licença do rush-hub. Pelo painel admin: **Artes Rush** e depois **Montar cartas Rush**.
+**Desenho das cartas Rush do motor** (`src/ui/rush-render.js`): usa a pré-desenhada quando existe (listada em `rush-cards/index.json`; as miniaturas pequenas usam `rush-cards-sm`); senão desenha no navegador com o `RushDuelCard` do yugioh-card, com a arte de `rush-art/` ou, sem ela, um quadro no tom do atributo com o selo dourado do verso. Nome e texto em PT quando a carta tem tradução (`pt: true`), senão em inglês; tipos, rótulos de Magia/Armadilha e a linha de tipo sempre em PT; selo LEGEND nas Lendas e ATK MAX na peça central do Máximo. Cache no navegador como o clássico (`CACHE_VERSION`). As 3.232 cartas saem no mesmo desenho, só com as molduras e fontes do yugioh-card (MIT). Pelo painel admin: **Artes Rush** e depois **Montar cartas Rush**.
 
 O formato fica em `FORMATS.rush` (`src/engine/ocg.mjs`): regras do Rush pelo próprio ocgcore (`MODE_RUSH`: campo de 3 colunas, compra até 5, Invocações ilimitadas), 8000 PV, mão inicial de 4, deck de 40 e scripts da pasta `rush/`. As zonas válidas do campo estão em `RUSH_ZONES`.
 
-**Cartas Rush** (`tools/card-render/`):
+**Traduções e versos** (`tools/card-render/`):
 
-- `python3 tools/card-render/import_pool.py fetch` e depois `build`: escolhe as cartas e gera `src/data/cards.mjs`.
-- `python3 tools/card-render/render.py [--force] [id ...]`: desenha as frentes em PT-BR (precisa de Pillow; baixa sozinho as molduras e fontes do rush-hub para `tools/card-render/cache/`).
+- `pt-br.json` (nome e texto em PT, pelo id da Konami) e `pool-en.json` (o nome em inglês de cada id) são lidos pelo `import_rush.py build` para pôr as cartas Rush em português. Editados à mão.
 - `python3 tools/card-render/back.py src/assets [feltro|rubi|safira]`: gera os versos (já estão no repositório).
+
+O pool Rush antigo do desafio diário (`import_pool.py`, `render.py`, `src/data/cards.mjs` e as frentes de `src/assets/cards/` com as molduras do rush-hub) saiu: o jogo usa só o pool do motor (`src/data/rush/cards.json`). Num clone antigo, essas pastas podem ser apagadas.
 
 **Outros:**
 
@@ -302,13 +308,13 @@ O formato fica em `FORMATS.rush` (`src/engine/ocg.mjs`): regras do Rush pelo pr�
 O `.gitignore` deixa de fora tudo que o setup popula:
 
 - **Bibliotecas de terceiros** (`src/vendor/three.module.js`, `ocgcore/`, `yugioh-card/`, `card-scripts/`).
-- **Dados gerados** (`src/data/cards.mjs`, `src/data/rush/`, `src/data/classic/*`, menos `strings-pt.mjs`, que é editado à mão; `tools/classic/puzzle-solutions.json`).
-- **Imagens de cartas e artes** (`src/assets/cards/`, `classic-art/`, `classic-cards/`, `rush-art/`, `rush-cards/`, `rush-cards-sm/`): artes da Konami ou derivadas de molduras de terceiros, sem licença para publicação no repositório.
+- **Dados gerados** (`src/data/rush/`, `src/data/classic/*`, menos `strings-pt.mjs`, que é editado à mão; `tools/classic/puzzle-solutions.json`).
+- **Imagens de cartas e artes** (`src/assets/classic-art/`, `classic-cards/`, `classic-cards-sm/`, `rush-art/`, `rush-cards/`, `rush-cards-sm/`): artes da Konami ou derivadas de molduras de terceiros, sem licença para publicação no repositório.
 - **Modelo do Enigma** (`src/assets/puzzle/`): CC BY-NC-SA, baixado do Printables.
 - **Caches e dependências** (`tools/**/cache/`, `node_modules`): downloads, clones e bases de dados, regeráveis.
 - **Lixo de sistema** (`.DS_Store`, `*.log`, `.hallmark/`, `__pycache__/`).
 
-Ficam no repositório: código, HTML, CSS, testes, documentação, traduções (`pt-br.json`, `strings-pt.mjs`), a seleção de cartas Rush (`pool-en.json`), o logo, os versos `.svg` e as capturas de `docs/imagens/`. A pasta antiga `tools/card-render/vendor/` não é mais usada e pode ser apagada.
+Ficam no repositório: código, HTML, CSS, testes, documentação, traduções (`pt-br.json`, `strings-pt.mjs`), os nomes em inglês das traduções Rush (`pool-en.json`), o logo, os versos `.svg` e as capturas de `docs/imagens/`. As pastas antigas `tools/card-render/vendor/`, `tools/card-render/cache/`, `src/data/cards.mjs` e `src/assets/cards*/` não são mais usadas e podem ser apagadas.
 
 ## Créditos
 
@@ -316,7 +322,6 @@ Ficam no repositório: código, HTML, CSS, testes, documentação, traduções (
 - **Scripts das cartas clássicas e Rush:** ProjectIgnis/CardScripts.
 - **Dados e artes:** YGOPRODeck (API e imagens), BabelCDB.
 - **Molduras das cartas clássicas e das Rush do motor, e selo LEGEND:** yugioh-card, de kooriookami (MIT).
-- **Molduras, ícones e fontes das cartas Rush:** rush-hub, de JLtheking2, com molduras de AlixSep.
 - **Enigma do Milênio:** "Millennium Puzzle Remix", de TechSpiderbot (Printables), a partir do enigma de Sho Tozuka. Crédito também exibido na tela do Enigma.
 - **Three.js** (MIT) para as cenas 3D.
 - **Fontes:** Archivo e Dela Gothic One (Google Fonts, OFL).
@@ -355,14 +360,11 @@ Os arquivos de terceiros **não estão no repositório**: o `npm run setup` baix
 | Three.js r170 | `src/vendor/three.module.js` | MIT (`LICENSE-three.txt`) |
 | qrcode-generator 2.0.4 (QR de ligar aparelho) | `src/vendor/qrcode/` | MIT (`LICENSE`) |
 | Modelo 3D "Millennium Puzzle Remix" (TechSpiderbot, Printables 517699) | `src/assets/puzzle/` | CC BY-NC-SA 4.0 — crédito na tela do Enigma, uso não comercial; as peças convertidas seguem a mesma licença |
-| Molduras, ícones e fontes do rush-hub (cartas Rush) | `tools/card-render/cache/` (só para gerar as imagens) | Sem licença declarada — usados localmente para desenhar as cartas |
-| Fontes Matrix, Stone Serif, Eurostile e Amiri (cartas Rush) | idem | Comerciais/não declaradas — **trocar por fontes livres está nas pendências** |
 | Archivo e Dela Gothic One | Google Fonts | OFL-1.1 |
-| Artes e imagens das cartas (Rush e clássicas) e textos oficiais | `src/assets/cards*/`, `classic-*/`, `rush-*/`, `src/data/` | © Konami e detentores — usados como conteúdo de fã, sem licença; remoção a pedido |
+| Artes e imagens das cartas (Rush e clássicas) e textos oficiais | `src/assets/classic-*/`, `rush-*/`, `src/data/` | © Konami e detentores — usados como conteúdo de fã, sem licença; remoção a pedido |
 | Capturas em `docs/imagens/` | este repositório | mostram artes e molduras de terceiros: mesmas condições da linha acima |
 
 ### Pendências legais conhecidas
 
-1. Trocar as fontes comerciais das cartas Rush por fontes livres e revisar as molduras do rush-hub.
-2. Confirmar com o autor do modelo do Enigma o uso das peças convertidas (CC BY-NC-SA).
-3. Hospedar as fontes do Google no próprio site (privacidade).
+1. Confirmar com o autor do modelo do Enigma o uso das peças convertidas (CC BY-NC-SA).
+2. Hospedar as fontes do Google no próprio site (privacidade).
