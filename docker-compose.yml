@@ -1,7 +1,8 @@
 services:
   rushdaily:
-    # Imagem publicada pelo workflow "Pacote de deploy" (GHCR, privada): `docker compose pull && docker compose up -d`.
-    # Para montar localmente depois do `npm run setup`: `docker compose up -d --build`.
+    # Imagem publicada pelo workflow "Pacote de deploy" (GHCR): `docker compose pull && docker compose up -d`.
+    # Só código: os dados (cartas, artes, motor, scripts) vêm do volume rushdaily-dados, montado somente leitura.
+    # Enquanto o rushdaily-dados não gerou os dados (primeira subida), as páginas mostram "Preparando as cartas".
     image: ghcr.io/clevim/rushdaily:latest
     build:
       context: .
@@ -16,6 +17,11 @@ services:
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
+    volumes:
+      - rushdaily-dados:/dados:ro
+    depends_on:
+      rushdaily-dados:
+        condition: service_started # não espera o setup terminar: o site sobe já e mostra "preparando"
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/healthz"]
       interval: 30s
@@ -24,6 +30,31 @@ services:
     networks: [default, sync]
     # Para o cloudflared alcançar, entre na rede dele também (exemplo):
     # networks: [default, sync, tunnel]
+
+  # Dados do jogo, gerados NO HOMELAB (o pacote do GHCR não leva material de terceiros): roda o setup no volume e sai.
+  # Primeira subida: baixa e desenha tudo (~30 a 60 min, ~1,5 GB no volume); nas seguintes só confere o que falta (minutos).
+  # Acompanhar: `docker compose logs -f rushdaily-dados` (ou o painel admin). Refazer uma etapa:
+  # `docker compose run --rm rushdaily-dados dados --so rush-cartas --force`. Não publica porta.
+  rushdaily-dados:
+    image: ghcr.io/clevim/rushdaily-admin:latest
+    build:
+      context: .
+      dockerfile: tools/admin/Dockerfile
+    command: ["dados"]
+    restart: "no"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      # Temporadas clássicas liberadas (1 a 5) e "1" para não desenhar as cartas (mais rápido; o jogo desenha no navegador).
+      SETUP_TEMPORADAS: ${SETUP_TEMPORADAS:-1}
+      SETUP_SEM_RENDER: ${SETUP_SEM_RENDER:-0}
+    volumes:
+      - rushdaily-dados:/dados
+    networks: [default] # precisa de internet (GitHub, npm, YGOPRODeck, Yugipedia, Printables)
 
   # Sincronização entre aparelhos (server/server.mjs, Node 24 + SQLite). Só o nginx alcança, pela rede interna "sync".
   rushdaily-sync:
@@ -48,23 +79,60 @@ services:
       timeout: 3s
       retries: 3
     # Estatísticas de acesso (só ligam com ADMIN_TOKEN, de 32+ caracteres, no arquivo .env ao lado deste compose,
-    # fora do git: `echo "ADMIN_TOKEN=$(openssl rand -base64 36 | tr -d '/+=\n')" > .env && chmod 600 .env`).
+    # fora do git: `echo "ADMIN_TOKEN=$(openssl rand -hex 32)" >> .env && chmod 600 .env`).
     environment:
       ADMIN_TOKEN: ${ADMIN_TOKEN:-}
     ports:
-      # Porta de estatísticas SÓ no loopback do host (acesso por `ssh -L 4192:127.0.0.1:4192 homelab`).
+      # Porta de estatísticas SÓ no loopback do host (para o `npm run admin` de fora, por `ssh -L 4192:127.0.0.1:4192 homelab`).
       # NUNCA troque por 0.0.0.0 nem aponte o cloudflared/nginx para ela: não tem login além do token.
       - "127.0.0.1:4192:8788"
-    # Publicar porta exige uma rede que não seja "internal"; por isso a rede "admin". Efeito colateral: o container
-    # passa a poder sair para a internet (não precisa; o `sync` continua sendo a única rede que o nginx enxerga).
+    # Publicar porta exige uma rede que não seja "internal"; por isso a rede "admin" (onde também fica o painel em contêiner).
+    # Efeito colateral: o container passa a poder sair para a internet (não precisa; o `sync` continua sendo a única rede
+    # que o nginx enxerga).
     networks: [sync, admin]
+
+  # Painel admin (tools/admin/server.mjs) sobre o volume de dados. Só sobe quando pedido:
+  #   docker compose --profile admin up -d      (e para parar: docker compose --profile admin stop rushdaily-admin)
+  # Acesso SÓ pelo túnel SSH: `ssh -L 4190:127.0.0.1:4190 homelab` e http://127.0.0.1:4190/?t=<ADMIN_PANEL_TOKEN>.
+  # Quem tem o token roda as tarefas do setup no volume: nunca publique em 0.0.0.0 nem aponte o cloudflared para ela.
+  rushdaily-admin:
+    image: ghcr.io/clevim/rushdaily-admin:latest
+    build:
+      context: .
+      dockerfile: tools/admin/Dockerfile
+    profiles: [admin]
+    command: ["painel"]
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      # 32+ caracteres no .env: `echo "ADMIN_PANEL_TOKEN=$(openssl rand -hex 32)" >> .env`. Sem ele o painel não sobe.
+      ADMIN_PANEL_TOKEN: ${ADMIN_PANEL_TOKEN:-}
+      # Estatísticas dos jogadores pela rede interna, com o mesmo ADMIN_TOKEN do rushdaily-sync (o token não vai ao navegador).
+      SYNC_ADMIN_URL: http://rushdaily-sync:8788
+      SYNC_ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+    volumes:
+      - rushdaily-dados:/dados
+    ports:
+      - "127.0.0.1:4190:4190"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:4190/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    networks: [admin] # alcança o rushdaily-sync:8788 e a internet (as tarefas baixam dados); não enxerga o nginx
 
 networks:
   sync:
     internal: true # sem saída para a internet
-  admin: {} # só para publicar a porta de estatísticas em 127.0.0.1
+  admin: {} # publica 127.0.0.1:4192 (estatísticas) e 127.0.0.1:4190 (painel)
   # tunnel:
   #   external: true
 
 volumes:
   sync-data:
+  rushdaily-dados:

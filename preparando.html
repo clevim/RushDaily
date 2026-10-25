@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="30">
+<meta name="robots" content="noindex">
+<title>RushDaily · preparando</title>
+<!-- Mostrada pelo nginx enquanto o serviço rushdaily-dados ainda não gerou os dados no volume (primeira subida). -->
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; min-height: 100dvh; display: grid; place-items: center; padding: 24px; box-sizing: border-box;
+    background: radial-gradient(ellipse at top, #12362f, #06130f 70%); color: #f4ecdc; font: 400 1rem/1.5 'Segoe UI', system-ui, sans-serif; text-align: center; }
+  main { max-width: 34rem; }
+  img { width: 72px; height: auto; margin: 0 auto 16px; display: block; }
+  h1 { margin: 0 0 8px; font: 900 1.6rem/1.2 'Arial Black', sans-serif; color: #f5b21a; }
+  p { margin: 8px 0; color: #b8ad97; }
+  .barra { height: 8px; border-radius: 999px; background: #0a0807; border: 1px solid rgb(245 178 26 / .3); overflow: hidden; margin: 20px auto 0; max-width: 18rem; }
+  .barra i { display: block; width: 35%; height: 100%; background: linear-gradient(90deg, #9a5b0b, #ffe596); animation: vai 1.4s infinite ease-in-out; }
+  @keyframes vai { 0% { margin-left: -35%; } 100% { margin-left: 100%; } }
+  @media (prefers-reduced-motion: reduce) { .barra i { animation: none; margin-left: 0; } }
+</style>
+</head>
+<body>
+<main>
+  <img src="src/assets/logo-mark.png" alt="">
+  <h1>Preparando as cartas</h1>
+  <p>O RushDaily está baixando e montando os dados do jogo pela primeira vez. Isso leva alguns minutos (as cartas desenhadas, um pouco mais).</p>
+  <p>Esta página recarrega sozinha.</p>
+  <div class="barra" aria-hidden="true"><i></i></div>
+</main>
+</body>
+</html>
