@@ -92,7 +92,7 @@ Depois, abra **http://127.0.0.1:4173**. Para testar outra chave, use `?player=SU
 
 **Requisitos:** Node.js 22+, npm, Python 3 com Pillow e numpy, git, curl e ImageMagick 7 (comando `magick`). O setup confere tudo no começo e diz o que instalar (por exemplo `pacman -S python-pillow python-numpy imagemagick` ou `apt install python3-pil python3-numpy imagemagick`). O projeto não tem etapa de build; o navegador carrega os módulos direto.
 
-**Tempo e espaço:** a primeira execução leva cerca de 25 min e baixa algumas centenas de MB. A maior parte do tempo vai para os downloads (artes das cartas, que respeitam o limite de 20 pedidos por segundo do YGOPRODeck e cerca de 3 por segundo no Yugipedia) e para desenhar as imagens.
+**Tempo e espaço:** a primeira execução leva cerca de 20 a 25 min e baixa algumas centenas de MB. As etapas independentes rodam em paralelo (até 4 ao mesmo tempo, respeitando a ordem de quem depende de quem): o clássico (YGOPRODeck), o Rush (BabelCDB e as artes do Yugipedia), o Enigma (Printables) e as bibliotecas correm juntos, e os desenhos das cartas saem assim que as dependências terminam. O mais demorado são as artes Rush (~3 pedidos por segundo no Yugipedia) e o desenho das cartas; os decks de jogadores do YGOPRODeck saem em cerca de 1 min (~12 pedidos por segundo, abaixo do limite de 20). Duas etapas do mesmo site nunca rodam juntas.
 
 **Opções** (`npm run setup -- <opções>`):
 
@@ -100,11 +100,28 @@ Depois, abra **http://127.0.0.1:4173**. Para testar outra chave, use `?player=SU
 |---|---|
 | `--lista` | Mostra as etapas. |
 | `--so <etapa>[,<etapa>]` | Roda só essas etapas (nomes na tabela abaixo). |
-| `--temporadas N` | Libera as temporadas 1 a N do clássico (padrão 1). |
+| `--temporadas N` | Libera as temporadas 1 a N do clássico (padrão: as já liberadas, ou 1). |
 | `--sem-render` | Pula o desenho das imagens das cartas (Rush e clássicas). O jogo abre, mas sem as imagens pré-desenhadas. |
-| `--force` | Refaz as etapas mesmo já prontas. |
+| `--force` | Refaz as etapas mesmo já prontas (tudo, inclusive os downloads). |
+| `--verificar` | Não roda nada: mostra cada etapa como pronta, desatualizada (e por quê) ou faltando, e o que o setup faria. Com `--json`, a mesma coisa para máquinas (o painel admin usa). |
+| `--paralelo N` | Até N etapas ao mesmo tempo (padrão 4). |
+| `--sequencial` | Uma etapa por vez, na ordem da lista (o comportamento antigo; o mesmo que `--paralelo 1`). |
 
-O setup é idempotente: o que já existe é pulado, e se uma etapa falhar basta rodar de novo.
+O setup é idempotente: o que já existe é pulado, e se uma etapa falhar basta rodar de novo (as que dependem dela esperam, as outras terminam). A saída de cada etapa vem prefixada com o nome dela (`[rush-ocg] ...`).
+
+**Regeração automática.** Cada etapa declara as fontes do repositório que determinam o que ela gera (ex.: `rush-ocg` → `import_rush.py`, `CARDSCRIPTS_SHA`, `pt-br.json` e `pool-en.json`; `rush-cartas` → `tools/rush/render.mjs` e `src/ui/rush-card-data.js`), as opções que mudam a saída (temporadas, commit fixado do yugioh-card), uma `versao` e as etapas de que depende. Ao terminar cada etapa, o setup grava a impressão disso tudo em `tools/setup/cache/estado.json` (fora do git). Na próxima execução, se a impressão mudou, a etapa está **desatualizada**: o setup avisa por quê (`[rush-ocg] import_rush.py mudou: refazendo`) e refaz só ela e o que depende dela (em cascata: `rush-ocg` → `rush-cartas`; `classico` → `classico-render` → `miniaturas`; `yugioh` → as duas de desenho). O refazer de cada etapa evita o que é caro sem necessidade:
+
+| Etapa desatualizada | Refaz |
+|---|---|
+| `three`, `qrcode`, `ocgcore` | copia de novo (e o patch); `npm install` só se o `package-lock` mudou |
+| `yugioh` | bundle e molduras; o clone só se o commit fixado mudou |
+| `classico` | `build` e `puzzles`; `fetch` só se o `CARDSCRIPTS_SHA` mudou; decks e artes ficam no cache |
+| `rush-ocg` | `build`; `fetch` só se o `CARDSCRIPTS_SHA` mudou |
+| `rush-art` | baixa todas as artes de novo, só quando a `versao` dela sobe (não tem fontes: seriam ~20 min no Yugipedia) |
+| `rush-cartas`, `classico-render`, `miniaturas` | desenham tudo de novo (`--force` delas) |
+| `enigma` | converte de novo (os STL ficam no cache) |
+
+Num clone (ou volume) que já tinha os dados antes deste registro existir, o setup **adota** a impressão atual sem refazer nada. Mudou algo que não está numa fonte listada (ex.: uma regra de outro arquivo) e quer forçar a regeração de uma etapa em todo lugar: suba a `versao` dela em `tools/setup/setup.mjs`; para uma vez só, numa máquina, use `--so <etapa> --force`.
 
 ### O que cada etapa baixa
 
@@ -135,10 +152,11 @@ O jogo é estático: um container **nginx** serve as páginas. Há três imagens
 | `ghcr.io/clevim/rushdaily-sync` | `rushdaily-sync` | Servidor de sincronização, Node 24 + SQLite (`server/Dockerfile`) |
 | `ghcr.io/clevim/rushdaily-admin` | `rushdaily-dados` e `rushdaily-admin` | Código do projeto + ferramentas do setup (Node, Python com Pillow e numpy, git, curl, ImageMagick 7) e o painel admin (`tools/admin/Dockerfile`) |
 
-**Os dados são gerados no homelab, na primeira subida.** O serviço `rushdaily-dados` (imagem do admin) copia o código para o volume `rushdaily-dados`, roda o `npm run setup` lá dentro e sai. Nas subidas seguintes ele roda de novo, mas o setup é idempotente: só confere e completa o que falta. O nginx monta o mesmo volume em `/dados` **somente leitura**; na imagem, `src/vendor`, `src/data/rush`, os JSON de `src/data/classic` e `src/assets/{rush-art,rush-cards,rush-cards-sm,classic-art,classic-cards,classic-cards-sm,puzzle}` são links para lá. Enquanto `src/data/rush/cards.json` não existe no volume, as páginas mostram **"Preparando as cartas"** (`preparando.html`, recarrega sozinha, sem cache); o site não espera o setup para subir.
+**Os dados são gerados no homelab, na primeira subida.** O serviço `rushdaily-dados` (imagem do admin) copia o código para o volume `rushdaily-dados`, roda o `npm run setup` lá dentro e sai. Nas subidas seguintes ele roda de novo: completa o que falta e **refaz sozinho o que ficou desatualizado** com a imagem nova (mudou o importador, a tradução, o desenho das cartas ou um commit fixado: só a etapa afetada e as que dependem dela; veja "Regeração automática" em Primeira execução). As impressões ficam no próprio volume (`/dados/tools/setup/cache/estado.json`), que a cópia do código não toca. O nginx monta o mesmo volume em `/dados` **somente leitura**; na imagem, `src/vendor`, `src/data/rush`, os JSON de `src/data/classic` e `src/assets/{rush-art,rush-cards,rush-cards-sm,classic-art,classic-cards,classic-cards-sm,puzzle}` são links para lá. Enquanto `src/data/rush/cards.json` não existe no volume, as páginas mostram **"Preparando as cartas"** (`preparando.html`, recarrega sozinha, sem cache); o site não espera o setup para subir.
 
-- **Primeira subida:** ~25 a 60 min (downloads com limite de pedidos por segundo e o desenho de ~3.600 cartas) e ~1 a 2 GB no volume (dados, cartas, artes e os caches das ferramentas, que evitam baixar de novo). Com `SETUP_SEM_RENDER=1` no `.env` é bem mais rápido: o jogo desenha as cartas no navegador.
-- **Parâmetros** no `.env`: `SETUP_TEMPORADAS` (1 a 5, padrão 1) e `SETUP_SEM_RENDER` (`1` para não desenhar).
+- **Primeira subida:** ~20 a 40 min (downloads com limite de pedidos por segundo e o desenho de ~3.600 cartas) e ~1 a 2 GB no volume (dados, cartas, artes e os caches das ferramentas, que evitam baixar de novo). Com `SETUP_SEM_RENDER=1` no `.env` é bem mais rápido: o jogo desenha as cartas no navegador.
+- **Parâmetros** no `.env`: `SETUP_TEMPORADAS` (1 a 5, padrão 1), `SETUP_SEM_RENDER` (`1` para não desenhar) e `SETUP_PARALELO` (etapas ao mesmo tempo, 1 a 8, padrão 4).
+- **Atualizar os dados depois de mudar o código:** publique a imagem nova e rode `docker compose pull && docker compose up -d`; o `rushdaily-dados` refaz só o que mudou. Para ver antes o que vai ser refeito: `docker compose run --rm rushdaily-dados verificar` (ou *Dados e setup* no painel, que marca as etapas desatualizadas com o motivo). Para forçar uma etapa em toda instalação, suba a `versao` dela em `tools/setup/setup.mjs`.
 - **Acompanhar:** `docker compose logs -f rushdaily-dados`, ou a *Visão geral* do painel admin (cartão "Inicialização dos dados").
 - **Refazer uma etapa:** `docker compose run --rm rushdaily-dados dados --so rush-cartas --force` (aceita só `--so` e `--force`), ou *Dados e setup › Refazer* no painel. Para recomeçar do zero: `docker compose down` e `docker volume rm <projeto>_rushdaily-dados`.
 - **Se uma fonte falhar** (Printables, Yugipedia fora do ar): o serviço sai com erro e o site segue com o que já existe. Rode `docker compose up -d rushdaily-dados` de novo; ele retoma de onde parou.
