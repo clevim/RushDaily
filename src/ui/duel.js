@@ -515,7 +515,9 @@ function bindGestures() {
     const key = node.dataset.loc;
     // Fora da vez de responder (animações, vez do rival) só dá para ler a carta.
     press = { key, node, x: event.clientX, y: event.clientY, moved: false, held: false, ghost: null, idle: !current };
-    if (!press.idle) press.timer = setTimeout(() => { press.held = true; onHold(key); }, HOLD_MS);
+    const pressed = press;
+    // Segurar troca a pose e redesenha a mão: se o dedo seguir arrastando, o fantasma sai da carta nova, não da que sumiu.
+    if (!press.idle) press.timer = setTimeout(() => { pressed.held = true; onHold(key); pressed.node = document.querySelector(`.hand-card[data-loc="${key}"]`) || pressed.node; }, HOLD_MS);
   });
   document.addEventListener('pointermove', (event) => {
     if (!press || press.idle) return;
