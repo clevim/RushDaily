@@ -22,7 +22,8 @@ export function getPlayerKey() {
   safeSet('rushdaily-player-key', generated);
   return generated;
 }
-export const newPlayerKey = () => crypto.randomUUID().replaceAll('-', '').slice(0, 6).toUpperCase();
+// getRandomValues e não randomUUID: este só existe em contexto seguro, e por http (ex.: http://ip-da-lan:4173) a página quebrava.
+export const newPlayerKey = () => Array.from(crypto.getRandomValues(new Uint8Array(3)), (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
 
 // Link de ligação de aparelho: index.html?player=K#sync=SEGREDO. O segredo sai da barra de endereço na hora.
 function takeSyncLink(playerKey) {

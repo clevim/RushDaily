@@ -262,7 +262,7 @@ function renderHand() {
     return `<button class="card hand-card ${playable ? 'playable' : ''} ${pose.set ? 'facedown set-pose' : ''}" style="--i:${index}" type="button" data-loc="${key}" data-gesture aria-label="${escape(cardOf(card.code).name)}${pose.set ? ', para baixar' : ''}">${cardFace(cardOf(card.code))}</button>`;
   }).join('');
   const foeHand = view[FOE].hand.filter(Boolean).length;
-  $('#foe-hand').innerHTML = `${cardBack()}<b>${foeHand}</b>`;
+  $('#foe-hand').innerHTML = `<span class="fan">${cardBack().repeat(Math.min(foeHand, 7))}</span><b>${foeHand}</b>`;
   $('#foe-hand').setAttribute('aria-label', `Mão do rival: ${foeHand} cartas`);
 }
 

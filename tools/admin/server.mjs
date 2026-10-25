@@ -63,6 +63,11 @@ const TAREFAS = {
       if (!CLASSICO.includes(q.comando)) throw new Error(`comando: ${CLASSICO.join(', ')}`);
       return IMP(q.comando, ...(q.comando === 'build' ? ['--ate', String(inteiro(q.ate, 'ate', 1, NUM_TEMPORADAS, 1))] : []));
     } },
+  'artes-hd': { titulo: 'Artes em alta resolução', desc: 'import_cards.py art: baixa a arte nativa (até 640px). Com "refazer" troca as antigas de 320px; ids opcionais; limite opcional (0 = sem limite). Lento: ~2 pedidos/s.', params: ['ids', 'refazerArte', 'limiteArtes'],
+    montar: (q) => {
+      const lista = ids(q.ids), limite = inteiro(q.limiteArtes, 'limite', 0, 5000, 0);
+      return IMP('art', ...(lista.length ? ['--ids', lista.join(',')] : []), ...(limite ? ['--limite', String(limite)] : []), ...(q.refazerArte ? ['--hd'] : []));
+    } },
   'puzzles-buscar': { titulo: 'Buscar puzzles (busca de soluções)', desc: 'puzzles --buscar com teto de nós e meta; usa a configuração salva se vazio. Pesado.', params: ['nos', 'meta'],
     montar: (q) => IMP('puzzles', '--buscar', '--nos', String(inteiro(q.nos, 'nos', 100, 1000000, config().nos)), '--meta', String(inteiro(q.meta, 'meta', 1, 200, config().meta))) },
   'render-classico': { titulo: 'Render das clássicas', desc: 'render.mjs: desenha as cartas clássicas (todas as que faltam, ou só os ids dados).', params: ['force', 'ids'],
@@ -171,6 +176,7 @@ async function status() {
   const seasonsOk = ts.length > 0 && ts.every((s) => ex(`src/data/classic/s${s.season}.json`));
   const E = {
     three: { pronto: ex('src/vendor/three.module.js'), caminhos: ['src/vendor/three.module.js'] },
+    qrcode: { pronto: ex('src/vendor/qrcode/qrcode.mjs') && ex('src/vendor/qrcode/LICENSE'), caminhos: ['src/vendor/qrcode'] },
     ocgcore: { pronto: ex('src/vendor/ocgcore/index.js') && ex('src/vendor/ocgcore/ocgcore.wasm') && ex('src/vendor/ocgcore/LICENSE.md'), caminhos: ['src/vendor/ocgcore'] },
     yugioh: { pronto: ex('src/vendor/yugioh-card/yugioh-card.js') && ex('src/vendor/yugioh-card/assets/yugioh/font/font-list.json') && ex('src/vendor/yugioh-card/assets/rush-duel/font/font-list.json'), caminhos: ['src/vendor/yugioh-card'] },
     classico: { pronto: seasonsOk && ex('src/data/classic/puzzles.json') && luas > 0 && artes >= totalClassicas && totalClassicas > 0, parcial: seasonsOk || artes > 0,
