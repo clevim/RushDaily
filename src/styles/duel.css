@@ -373,8 +373,8 @@ body.entering.reveal::before { animation: reveal 0.9s cubic-bezier(0.5, 0, 0.2, 
   35% { opacity: 1; }
   100% { opacity: 0; clip-path: circle(0% at 50% 50%); transform: scale(1.15); }
 }
-body.entering .board, body.entering .tray { opacity: 0; }
-body.entering.reveal .board, body.entering.reveal .tray { opacity: 1; animation: boardIn 0.9s cubic-bezier(0.2, 0.9, 0.1, 1) 0.2s both; }
+body.entering .board, body.entering .rush-table, body.entering .tray { opacity: 0; }
+body.entering.reveal .board, body.entering.reveal .rush-table, body.entering.reveal .tray { opacity: 1; animation: boardIn 0.9s cubic-bezier(0.2, 0.9, 0.1, 1) 0.2s both; }
 @keyframes boardIn { from { opacity: 0; transform: scale(0.94); } }
 
 /* Dicas do primeiro duelo: faixa curta sobre a bandeja, apontando a mão ou o botão de encerrar */

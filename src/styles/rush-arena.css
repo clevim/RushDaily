@@ -42,7 +42,7 @@
 .zones-grid { display: contents; }
 
 /* Faixa do meio: fases do turno numa chapa inclinada + narração */
-.midline { grid-area: 3 / 1 / 4 / 6; display: grid; justify-items: center; gap: 4px; padding: 4px 0; min-width: 0; }
+.midline { grid-area: 3 / 1 / 4 / 6; display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 4px; padding: 4px 0; min-width: 0; }
 .phases { display: flex; margin: 0; padding: 0; list-style: none; transform: skewX(-14deg); box-shadow: 0 6px 18px -8px var(--ink-solid); }
 .phases li {
   padding: 4px clamp(8px, 1.1vw, 16px);
@@ -152,7 +152,8 @@
 .link-n { position: relative; z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; background: var(--foil); color: var(--lacquer); font: 400 0.9rem/1 var(--display); clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); }
 .link.theirs .link-n { background: linear-gradient(160deg, #ff8a92, var(--blood) 55%, #7d0f19); color: var(--ivory); }
 .link-card .rcard { width: 40px; }
-.link-name { min-width: 0; font: 700 0.8rem/1.15 var(--body); color: var(--ivory); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.link-name { display: grid; gap: 2px; min-width: 0; font: 700 0.8rem/1.15 var(--body); color: var(--ivory); }
+.link-name b { font-weight: 700; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .link-name small { display: block; color: var(--ivory-dim); font-weight: 600; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; }
 .link.solving .link-card .rcard { box-shadow: 0 0 0 2px var(--gold-hi), 0 0 18px 4px rgb(var(--gold-rgb) / 0.7); animation: solving 0.8s ease-in-out infinite; }
 .link.solving small { color: var(--gold-hi); }
@@ -187,11 +188,18 @@
 .float.heal { color: #7dffa4; }
 .result[data-result='draw'] .result-title { background: linear-gradient(160deg, #e9e3d6, #9c9384); -webkit-background-clip: text; background-clip: text; }
 
-/* Dock: até três botões numa linha */
-.rush-arena .dock-actions { flex-wrap: nowrap; }
-.rush-arena .dock .btn { flex: 1; padding: 0 12px; white-space: nowrap; }
+/* Dock: Batalha e Encerrar numa linha; o Coração das Cartas (uma vez por duelo) ganha a linha de cima */
+.rush-arena .tray { grid-template-columns: minmax(220px, min(360px, 25vw)) 1fr minmax(220px, min(360px, 25vw)); }
+.rush-arena .dock-actions { flex-wrap: wrap; }
+.rush-arena .dock .btn { flex: 1 1 auto; padding: 0 12px; font-size: 0.88rem; white-space: nowrap; }
+.rush-arena .dock .heart-btn { flex-basis: 100%; }
 .rush-arena .hint { min-height: calc(3 * 1.3em); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
+/* Computador estreito: os dois botões empilham na coluna da esquerda; a dica (também em "Como jogar") sai para a bandeja
+   não crescer por cima da placa. */
+@media (min-width: 861px) and (max-width: 1320px) {
+  .rush-arena .hint { display: none; }
+}
 /* Notebook baixo */
 @media (min-width: 861px) and (max-height: 760px) {
   .rush-arena .hint { display: none; }
@@ -203,11 +211,20 @@
   .rush-arena {
     --gap: 5px;
     --hand: min(20vw, 12.5dvh);
-    --card: min((100vw - 20px - 4 * var(--gap)) / 5.25, (100dvh - 236px - var(--hand) * 1.25) / 6.25);
+    /* Largura: 5 colunas. Altura: o que sobra para as 4 linhas de cartas depois do topo, das placas, da faixa do meio,
+       dos botões e da mão (no tablet em pé é a altura que manda). */
+    --card: min((100vw - 20px - 4 * var(--gap)) / 5.25, (100dvh - 312px - var(--hand) * 1.4) / 5.83);
   }
-  .rush-arena .arena-top { padding: 4px 8px; gap: 8px; }
+  .rush-arena .arena-top { padding: 2px 8px; gap: 8px; }
+  .rush-arena .leave { min-width: 44px; min-height: 44px; justify-content: center; } /* alvo de toque: só o logo aparece */
+  .rush-arena .dock .btn { min-height: 40px; }
   .rush-arena .hint { display: none; }
-  .rush-arena .tray { padding-top: 2px; }
+  .rush-arena .tray { grid-template-columns: 1fr; padding-top: 2px; }
+  /* Três botões numa linha: o Coração fica com o nome curto */
+  .rush-arena .dock-actions { flex-wrap: nowrap; }
+  .rush-arena .dock .heart-btn { flex-basis: auto; }
+  .rush-arena .dock .btn { padding: 0 10px; }
+  .rush-arena .heart-btn .wide-only { display: none; }
   .rush-table { grid-template-columns: 1fr; grid-template-rows: auto auto auto; grid-template-areas: 'foe' 'field' 'me'; align-content: center; gap: 6px; padding: 0 8px; }
   .field { justify-self: center; padding: 5px 6px; }
   .seat { grid-template-columns: auto 1fr auto; align-items: center; column-gap: 10px; row-gap: 3px; padding: 6px 12px; --c: 8px; }
@@ -226,14 +243,18 @@
   .zone.fzone.empty::after { font-size: 0.46rem; }
   .chronicle { display: contents; }
   .story { display: none; }
-  .chain { position: fixed; z-index: 12; top: 48px; left: 8px; right: 8px; grid-template-columns: auto 1fr; align-items: center; gap: 8px; padding: 8px 10px; }
+  /* Corrente: faixa na linha do meio do tapete, no lugar das fases e da narração (que voltam quando ela fecha).
+     Não cobre as placas nem a mão; passa só um pouco por cima da borda das zonas de monstro. */
+  .chain { grid-area: field; align-self: center; position: relative; z-index: 12; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; padding: 5px 10px; box-shadow: inset 0 0 0 1px rgb(var(--gold-rgb) / 0.5), 0 10px 24px -8px var(--ink-solid); }
+  .rush-table:has(.chain:not([hidden])) .midline { visibility: hidden; }
   .chain-title { font-size: 0.8rem; }
-  .chain-links { grid-auto-flow: column; grid-auto-columns: minmax(120px, 1fr); overflow-x: auto; gap: 6px; }
+  .chain-links { grid-auto-flow: column; grid-auto-columns: minmax(118px, 1fr); overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; gap: 6px; }
   .chain-links::before { display: none; }
-  .link { grid-template-columns: 22px 30px 1fr; gap: 5px; }
+  .link { grid-template-columns: 22px 24px 1fr; gap: 5px; }
   .link-n { width: 22px; height: 22px; font-size: 0.72rem; }
-  .link-card .rcard { width: 30px; }
-  .link-name { font-size: 0.7rem; -webkit-line-clamp: 1; }
+  .link-card .rcard { width: 24px; }
+  .link-name { font-size: 0.7rem; }
+  .link-name b { -webkit-line-clamp: 1; }
   .rush-arena .zoom { grid-template-columns: 1fr; align-content: start; padding-top: 16px; overflow: auto; }
   .rush-arena .zoom .card { width: min(60vw, 250px); }
   .zoom-text { max-height: none; font-size: 0.92rem; }

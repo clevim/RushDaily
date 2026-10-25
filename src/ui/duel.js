@@ -284,7 +284,7 @@ function renderChain() {
   box.hidden = !chain.length;
   $('#chain-links').innerHTML = chain.map((link, index) => `<li class="link ${link.controller === ME ? 'mine' : 'theirs'} ${link.state}">
       <span class="link-n">${index + 1}</span><span class="link-card">${face(cardOf(link.code))}</span>
-      <span class="link-name">${escape(cardOf(link.code).name)}<small>${link.state === 'solving' ? 'resolvendo' : link.state === 'done' ? 'resolvida' : link.state === 'negated' ? 'negada' : link.controller === ME ? 'você' : 'rival'}</small></span></li>`).join('');
+      <span class="link-name"><b>${escape(cardOf(link.code).name)}</b><small>${link.state === 'solving' ? 'resolvendo' : link.state === 'done' ? 'resolvida' : link.state === 'negated' ? 'negada' : link.controller === ME ? 'você' : 'rival'}</small></span></li>`).join('');
   paintRushCards(box);
 }
 const chainNote = () => (chain.length ? `Corrente aberta: ${chain.map((link, index) => `${index + 1}. ${escape(cardOf(link.code).name)} (${link.controller === ME ? 'você' : 'rival'})`).join(' · ')}` : '');

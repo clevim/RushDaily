@@ -152,9 +152,12 @@ body.launching::after {
   .stage { height: min(26vh, 220px); }
   .challenge { gap: 14px; }
   .brief { order: 1; font-size: 0.95rem; } /* o texto longo vai para depois do botão */
-  .difficulty { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-  .tier-face { grid-template-columns: minmax(0, 1fr); padding: 6px 6px 7px; }
-  .tier .glove { max-width: 130px; }
+  /* As quatro dificuldades numa linha só: sobra altura para o botão aparecer acima da barra inferior. */
+  .difficulty { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .difficulty legend { margin-bottom: 6px; }
+  .tier-face { grid-template-columns: minmax(0, 1fr); padding: 6px 4px 7px; }
+  .tier-name { font-size: 0.84rem; }
+  .matchup { font-size: clamp(1.7rem, calc(88cqi / (var(--len, 12) * 0.62)), 3.4rem); }
   .deck-rail { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .btn.big { width: 100%; }
 }
