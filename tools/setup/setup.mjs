@@ -60,20 +60,27 @@ function baixarRepo(url, destino, commit, pastas) {
 }
 
 // ---- dependências ----
-function dependencias() {
+// O que cada etapa exige: com --so, só confere as das etapas pedidas (ex.: `--so ocgcore,rush-ocg` no workflow não pede ImageMagick nem Pillow).
+const DEPS = {
+  three: ['npm'], qrcode: ['npm'], ocgcore: ['npm'], yugioh: ['npm', 'git', 'magick'],
+  classico: ['python3', 'pillow', 'sqlite3', 'git', 'curl'], 'rush-ocg': ['python3', 'sqlite3', 'git', 'curl'], 'rush-art': ['python3', 'pillow', 'curl'],
+  'rush-cartas': ['npm', 'git'], 'classico-render': ['npm', 'git'], miniaturas: ['python3', 'pillow'], enigma: ['python3', 'numpy'], 'vendor-avisos': [],
+};
+function dependencias(etapas) {
   const faltas = [];
-  const exige = (nome, ok, dica) => { if (!ok) faltas.push(`${nome}: ${dica}`); };
+  const pede = new Set(etapas.flatMap((nome) => DEPS[nome] ?? Object.values(DEPS).flat()));
+  const exige = (nome, chave, ok, dica) => { if (pede.has(chave) && !ok()) faltas.push(`${nome}: ${dica}`); };
   const versao = (cmd) => saida(cmd, ['--version']);
   const node = Number(process.versions.node.split('.')[0]);
-  exige('Node.js 22+', node >= 22, `versão atual ${process.versions.node}. Instale o Node 22 ou mais novo (https://nodejs.org).`);
-  exige('npm', versao('npm').status === 0, 'vem com o Node.js.');
-  exige('python3', versao('python3').status === 0, 'pacman -S python | apt install python3');
-  exige('Pillow', saida('python3', ['-c', 'import PIL']).status === 0, 'pacman -S python-pillow | apt install python3-pil | pip install Pillow');
-  exige('numpy (Enigma)', saida('python3', ['-c', 'import numpy']).status === 0, 'pacman -S python-numpy | apt install python3-numpy | pip install numpy');
-  exige('sqlite3 (módulo do Python)', saida('python3', ['-c', 'import sqlite3']).status === 0, 'o Python precisa vir com sqlite3 (apt install libsqlite3-dev e reinstale o Python, ou use o pacote da distribuição).');
-  exige('git', versao('git').status === 0, 'pacman -S git | apt install git');
-  exige('curl', versao('curl').status === 0, 'pacman -S curl | apt install curl');
-  exige('ImageMagick (comando magick)', versao('magick').status === 0, 'pacman -S imagemagick | apt install imagemagick (versão 7, com o comando "magick")');
+  if (node < 22) faltas.push(`Node.js 22+: versão atual ${process.versions.node}. Instale o Node 22 ou mais novo (https://nodejs.org).`);
+  exige('npm', 'npm', () => versao('npm').status === 0, 'vem com o Node.js.');
+  exige('python3', 'python3', () => versao('python3').status === 0, 'pacman -S python | apt install python3');
+  exige('Pillow', 'pillow', () => saida('python3', ['-c', 'import PIL']).status === 0, 'pacman -S python-pillow | apt install python3-pil | pip install Pillow');
+  exige('numpy (Enigma)', 'numpy', () => saida('python3', ['-c', 'import numpy']).status === 0, 'pacman -S python-numpy | apt install python3-numpy | pip install numpy');
+  exige('sqlite3 (módulo do Python)', 'sqlite3', () => saida('python3', ['-c', 'import sqlite3']).status === 0, 'o Python precisa vir com sqlite3 (apt install libsqlite3-dev e reinstale o Python, ou use o pacote da distribuição).');
+  exige('git', 'git', () => versao('git').status === 0, 'pacman -S git | apt install git');
+  exige('curl', 'curl', () => versao('curl').status === 0, 'pacman -S curl | apt install curl');
+  exige('ImageMagick (comando magick)', 'magick', () => versao('magick').status === 0, 'pacman -S imagemagick | apt install imagemagick (versão 7, com o comando "magick")');
   if (faltas.length) fim(`faltam dependências:\n  - ${faltas.join('\n  - ')}`);
   log('dependências ok');
 }
@@ -304,7 +311,7 @@ if (so) for (const nome of so) if (!ETAPAS.some((e) => e.nome === nome)) fim(`et
 const inicio = Date.now();
 console.log(`RushDaily: setup${force ? ' (--force)' : ''}, temporadas 1..${temporadas}${semRender ? ', sem render' : ''}\n`);
 console.log('[0] dependências');
-dependencias();
+dependencias(ETAPAS.map((e) => e.nome).filter((nome) => (!so || so.includes(nome)) && !(semRender && ETAPAS.find((e) => e.nome === nome).render)));
 
 const resumo = [];
 for (const [i, etapa] of ETAPAS.entries()) {
