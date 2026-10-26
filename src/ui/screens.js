@@ -290,15 +290,19 @@ const tierDifficulties = (id) => listDifficulties().filter((item) => DIFFICULTY_
 
 async function renderReward() {
   const sceneModule = loadScene(); // baixa o Three.js enquanto o resto da tela é montado
-  const rewardKey = `rushdaily-reward:${playerKey}:${date}`;
-  const boosterKey = `rushdaily-classic-booster:${playerKey}:${date}`;
+  // 1º booster do dia (com peça) ou o 2º ("dia~2", vitória em outra dificuldade, sem peça): o pendente vem primeiro.
+  const second = `${date}~2`;
+  const has = (prefix, day) => readJson(`${prefix}:${playerKey}:${day}`, null);
+  const day = has('rushdaily-reward', date) || !(has('rushdaily-reward', second) || has('rushdaily-classic-booster', second)) ? date : second;
+  const rewardKey = `rushdaily-reward:${playerKey}:${day}`;
+  const boosterKey = `rushdaily-classic-booster:${playerKey}:${day}`;
   const pending = readJson(rewardKey, null);
   const opened = readJson(boosterKey, null);
   const locked = !pending?.pending && !opened;
   const result = opened ? { tier: 'common', layout: 'arc', ...opened, cards: opened.cards.filter((entry) => byId(entry.id)) }
     : locked ? null : openBooster(pending.seed, { owned: readCollection(playerKey), pity: readJson(pityKey(playerKey), 0), difficulty: pending.difficulty });
   const reduced = settingsFor(playerKey).reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const wonToday = readJson('rushdaily-history', {})[playerKey]?.[date] === 'win';
+  const wonToday = day === date && readJson('rushdaily-history', {})[playerKey]?.[date] === 'win'; // a peça só vem no 1º booster
   const tierName = result ? TIER_NAME[result.tier] || 'Booster' : 'Booster';
   root.innerHTML = `${head(locked ? 'Booster do dia' : opened ? `${tierName} de hoje` : 'Booster liberado',
     locked ? 'Vença o duelo de hoje para liberar 5 cartas.'

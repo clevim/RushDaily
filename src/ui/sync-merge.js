@@ -23,6 +23,8 @@ const TIERS = ['common', 'silver', 'gold', 'galaxy'];
 
 const isObj = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const isDay = (text) => typeof text === 'string' && /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(text);
+// Booster/recompensa: o dia, ou "dia~2" para o 2º booster (vitória em outra dificuldade, sem peça).
+const isSlot = (text) => typeof text === 'string' && isDay(text.replace(/~2$/, ''));
 const isMonth = (text) => typeof text === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(text);
 const isCardId = (id) => /^[1-9]\d{0,9}$/.test(String(id)) && Number(id) <= 2 ** 31 - 1;
 const int = (value, max) => (Number.isSafeInteger(value) && value >= 0 && value <= max ? value : null);
@@ -76,8 +78,8 @@ export function normalize(data) {
     lp: int(duel.lp, 1e6),
     ...(str(duel.replay, REPLAY_MAX, /^[A-Za-z0-9_-]+$/) ? { replay: duel.replay } : {}),
   }));
-  out.boosters = Object.fromEntries(entries(src.boosters).filter(([day]) => isDay(day)).map(([day, value]) => [day, booster(value)]).filter(([, value]) => value));
-  out.rewards = Object.fromEntries(entries(src.rewards).filter(([day, value]) => isDay(day) && isObj(value) && value.pending === true && str(value.seed, 80))
+  out.boosters = Object.fromEntries(entries(src.boosters).filter(([day]) => isSlot(day)).map(([day, value]) => [day, booster(value)]).filter(([, value]) => value));
+  out.rewards = Object.fromEntries(entries(src.rewards).filter(([day, value]) => isSlot(day) && isObj(value) && value.pending === true && str(value.seed, 80))
     .map(([day, value]) => [day, { seed: value.seed, difficulty: str(value.difficulty, 20) || 'duelist', pending: true }]));
   out.collection = Object.fromEntries(entries(src.collection).filter(([id, count]) => isCardId(id) && int(count, 999) !== null && count > 0));
   out.foils = Object.fromEntries(entries(src.foils).filter(([id]) => isCardId(id)).map(([id, list]) => [id, [...new Set(Array.isArray(list) ? list.filter((foil) => FOILS.includes(foil)) : [])]]).filter(([, list]) => list.length));
@@ -192,7 +194,7 @@ export function mergeProgress(localData, remoteData, now = Date.now()) {
 const parse = (storage, key, fallback) => { try { return JSON.parse(storage.getItem(key)) ?? fallback; } catch { return fallback; } };
 const put = (storage, key, value) => storage.setItem(key, JSON.stringify(value));
 const keysOf = (storage) => Array.from({ length: storage.length }, (_, index) => storage.key(index)).filter(Boolean);
-const byDay = (storage, prefix) => Object.fromEntries(keysOf(storage).filter((key) => key.startsWith(prefix) && isDay(key.slice(prefix.length))).map((key) => [key.slice(prefix.length), parse(storage, key, null)]));
+const byDay = (storage, prefix) => Object.fromEntries(keysOf(storage).filter((key) => key.startsWith(prefix) && isSlot(key.slice(prefix.length))).map((key) => [key.slice(prefix.length), parse(storage, key, null)]));
 
 export function readProgress(storage, playerKey) {
   const settings = parse(storage, `rushdaily-settings:${playerKey}`, {});

@@ -7,7 +7,7 @@ import { decide } from '../engine/ocg-ai.mjs';
 import { buildDeck, seeded } from '../engine/classic-deck.mjs';
 import { ATTRIBUTES, RACES, describe } from '../data/classic/strings-pt.mjs';
 import { cardBack, cardFace, cardStats } from './classic-card.js';
-import { PVP_FORMAT, decodeDeck, deckById, ensureStarter, loadDeckHints, loadSeasonPool, readCollection, validDeck } from './classic-store.js';
+import { PVP_FORMAT, decodeDeck, deckById, ensureStarter, loadDeckHints, loadSeasonPool, readCollection, readDecks, validDeck } from './classic-store.js';
 import { paintCards, warmCards } from './classic-render.js';
 import { escape, getPlayerKey, longDate, monthName, monthOf, puzzleFor, readJson, recoverDay, reducedMotion, today, toast, writeJson } from './common.js';
 import { decodeReplay, encodeReplay } from './share.js';
@@ -98,6 +98,17 @@ if (isPuzzle) {
     rival = vsCode ? decodeDeck(vsCode) : null;
     if (vsCode && !rival) await halt('Link de desafio inválido', 'Não consegui ler o deck do rival neste link. Peça outro a quem desafiou você.', 'screens.html?screen=deck', 'Ir para os decks');
     if (rival && !validDeck(rival, cards).ok) await halt('Deck do rival inválido', `O deck deste link não segue as regras da temporada: ${validDeck(rival, cards).problems[0]}`, 'screens.html?screen=deck', 'Ir para os decks');
+    // Desafio de amigo com mais de um deck: pergunta qual usar (só antes de começar; a partida salva segue com o dela).
+    const choices = readDecks(playerKey).list.filter((deck) => validDeck(deck, cards, readCollection(playerKey)).ok);
+    if (rival && !params.has('deck') && choices.length > 1 && !readJson(`rushdaily-classic-game:${playerKey}:vs-${hashOf(vsCode)}:${date}`, null)) {
+      const pick = (deck) => { const query = new URLSearchParams(location.search); query.set('deck', deck.id); return `arena.html?${query}`; };
+      $('#result-kicker').textContent = `Desafio de ${rival.key}`;
+      $('#result-title').textContent = 'Escolha seu deck';
+      $('#result-copy').textContent = 'Qual deck você leva para este duelo?';
+      $('#result .result-actions').innerHTML = choices.map((deck) => `<a class="btn ${deck.id === readDecks(playerKey).active ? '' : 'ghost'}" href="${pick(deck)}">${escape(deck.name)}</a>`).join('');
+      $('#result').showModal();
+      await new Promise(() => {});
+    }
     // Deck do jogador inválido: volta aos decks dizendo o motivo.
     const myCheck = myDeck ? validDeck(myDeck, cards, readCollection(playerKey)) : { ok: false, problems: ['monte um deck primeiro.'] };
     if (!myCheck.ok) {
@@ -203,6 +214,7 @@ function slot(controller, location, sequence, card, place, extraClass = '') {
     if (was !== undefined && was !== def) classes.push('spin'); // giro de 90° ao trocar de posição
     if (controller === ME && actionsFor(key).some((item) => item.action === 2)) classes.push('can-pos'); // ainda pode mudar de posição
   }
+  if (controller === ME && actionsFor(key).some((item) => item.action === 5)) classes.push('can-act'); // efeito ativável agora (vem do prompt do motor)
   const label = hidden ? (spell ? 'Carta baixada do rival' : 'Monstro virado do rival') : `${data.name}${isFaceDown(card) ? ', virada' : ''}`;
   const materials = card.overlayCards?.length ? `<span class="xyz-mats">${card.overlayCards.length}</span>` : '';
   return `<div class="${classes.join(' ')}" data-loc="${key}" ${place}>
@@ -265,7 +277,8 @@ function renderHand() {
     const key = locKey(ME, L.HAND, card.sequence);
     const pose = { set: Boolean(poses.get(key)?.set) };
     const playable = actionsFor(key).length > 0;
-    return `<button class="card hand-card ${playable ? 'playable' : ''} ${pose.set ? 'facedown set-pose' : ''}" style="--i:${index}" type="button" data-loc="${key}" data-gesture aria-label="${escape(cardOf(card.code).name)}${pose.set ? ', para baixar' : ''}">${pose.set ? cardBack() : cardFace(cardOf(card.code))}</button>`;
+    const canAct = actionsFor(key).some((item) => item.action === 5);
+    return `<button class="card hand-card ${playable ? 'playable' : ''} ${canAct ? 'can-act' : ''} ${pose.set ? 'facedown set-pose' : ''}" style="--i:${index}" type="button" data-loc="${key}" data-gesture aria-label="${escape(cardOf(card.code).name)}${pose.set ? ', para baixar' : ''}">${pose.set ? cardBack() : cardFace(cardOf(card.code))}</button>`;
   }).join('');
   const foeHand = view[FOE].hand.filter(Boolean).length;
   $('#foe-hand').innerHTML = `<span class="fan">${cardBack().repeat(Math.min(foeHand, 7))}</span><b>${foeHand}</b>`;
@@ -367,7 +380,7 @@ const defaultPose = (card) => ({ set: Boolean(card.type & TYPE.TRAP) });
 const plan = { target: null, tributes: null, zone: null };
 let skipChainTurn = null; // turno em que o jogador pediu para não ser perguntado de novo sobre respostas
 
-const IDLE_LABELS = { 0: 'Invocar por Normal', 1: 'Invocar por Especial', 2: 'Mudar posição', 3: 'Baixar', 4: 'Baixar', 5: 'Ativar' };
+const IDLE_LABELS = { 0: 'Invocar por Normal', 1: 'Invocar por Especial', 2: 'Mudar posição', 3: 'Baixar em defesa (virado)', 4: 'Baixar', 5: 'Ativar' };
 const sameLoc = (loc, key) => locKey(loc.controller, loc.location, loc.sequence) === key;
 
 /** Ações possíveis para uma carta na pergunta atual: [{ label, response }]. */
@@ -405,6 +418,7 @@ function respond(response) {
   if (!current) return;
   const { resolve } = current;
   current = null;
+  poses.clear(); // a mão reordena: a pose escolhida não vale para a carta que ocupar o lugar
   gestures.reset();
   resolve(response);
 }

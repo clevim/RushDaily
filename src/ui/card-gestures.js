@@ -26,7 +26,8 @@ const kindOf = (item) => ({ 0: 'summon', 1: 'summon', 2: 'position', 3: 'set', 4
 export function shortLabel(item) {
   if (item.action === 0) return 'Invocar';
   if (item.action === 1) return 'Especial';
-  if (item.action === 3 || item.action === 4) return 'Baixar';
+  if (item.action === 3) return 'Defesa'; // monstro baixado: virado em defesa
+  if (item.action === 4) return 'Baixar';
   if (item.action === 'attack') return 'Atacar';
   if (item.action === 2) return /^Mudar para /.test(item.label) ? item.label.slice(11) : /Virad|Virar/.test(item.label) ? 'Virar' : 'Posição';
   return 'Ativar';

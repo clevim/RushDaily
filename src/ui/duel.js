@@ -124,6 +124,7 @@ function slot(controller, location, sequence, card, place, extraClass = '') {
     if (was !== undefined && was !== def) classes.push('spin'); // giro de 90° ao trocar de posição
     if (controller === ME && actionsFor(key).some((item) => item.action === 2)) classes.push('can-pos'); // ainda pode mudar de posição
   }
+  if (controller === ME && actionsFor(key).some((item) => item.action === 5)) classes.push('can-act'); // efeito ativável agora (vem do prompt do motor)
   if (controller === ME && current?.prompt.type === M.SELECT_BATTLECMD && actionsFor(key).some((item) => item.action === 'attack')) classes.push('ready');
   const label = hidden ? (spell ? 'Carta baixada do rival' : 'Monstro virado do rival')
     : `${data.name}${isFaceDown(card) ? ', virada' : ''}${location === L.MZONE && !isFaceDown(card) ? `, ${isDefense(card) ? 'Defesa' : 'Ataque'}, ATK ${card.attack}, DEF ${card.defense}` : ''}${controller === ME ? '' : ' (do rival)'}`;
@@ -192,8 +193,9 @@ function renderHand() {
     const data = cardOf(card.code);
     const pose = { set: Boolean(poses.get(key)?.set) };
     const playable = actionsFor(key).length > 0;
+    const canAct = actionsFor(key).some((item) => item.action === 5);
     const stats = isMonster(data) ? `, Nível ${data.level & 0xff}, ATK ${data.atk}, DEF ${data.def}` : '';
-    return `<button class="card hand-card ${playable ? 'playable' : ''} ${pose.set ? 'set-pose' : ''}" style="--i:${index}" type="button" data-loc="${key}" data-gesture aria-label="${escape(`${data.name}${stats}${pose.set ? ', para baixar virada' : ''}${playable ? ', jogável' : ''}`)}">${pose.set ? back() : face(data)}</button>`;
+    return `<button class="card hand-card ${playable ? 'playable' : ''} ${canAct ? 'can-act' : ''} ${pose.set ? 'set-pose' : ''}" style="--i:${index}" type="button" data-loc="${key}" data-gesture aria-label="${escape(`${data.name}${stats}${pose.set ? ', para baixar virada' : ''}${playable ? ', jogável' : ''}`)}">${pose.set ? back() : face(data)}</button>`;
   }).join('');
   const foeHand = view[FOE].hand.filter(Boolean).length;
   $('#foe-hand').innerHTML = `<span class="foe-backs">${Array.from({ length: Math.min(foeHand, 8) }, () => `<img src="${RUSH_BACK}" alt="">`).join('')}</span><b>${foeHand}</b>`;
@@ -417,7 +419,7 @@ const defaultPose = (card) => ({ set: Boolean(card.type & TYPE.TRAP) });
 const plan = { target: null, tributes: null, zone: null };
 let skipChainTurn = null; // turno em que o jogador pediu para não ser perguntado de novo sobre respostas
 
-const IDLE_LABELS = { 0: 'Invocar por Normal', 1: 'Invocar por Especial', 2: 'Mudar posição', 3: 'Baixar virado', 4: 'Baixar', 5: 'Ativar' };
+const IDLE_LABELS = { 0: 'Invocar por Normal', 1: 'Invocar por Especial', 2: 'Mudar posição', 3: 'Baixar em defesa (virado)', 4: 'Baixar', 5: 'Ativar' };
 const sameLoc = (loc, key) => locKey(loc.controller, loc.location, loc.sequence) === key;
 const isHeart = (loc) => loc.code === HEART_CODE;
 
@@ -456,6 +458,7 @@ function respond(response) {
   if (!current) return;
   const { resolve } = current;
   current = null;
+  poses.clear(); // a mão reordena: a pose escolhida não vale para a carta que ocupar o lugar
   gestures.reset();
   renderDock();
   resolve(response);
@@ -653,7 +656,7 @@ async function openPile(controller, kind) {
 /* ---------- Laço do duelo ---------- */
 
 function save(extra = {}) {
-  writeJson(saveKey, { v: 2, heart: withHeart, responses, ...extra });
+  writeJson(saveKey, { v: 2, heart: withHeart, responses });
 }
 
 async function pump(redo = []) {
@@ -684,6 +687,7 @@ async function pump(redo = []) {
 
 /* ---------- Fim do duelo ---------- */
 
+let rewardDay = date; // qual booster esta vitória liberou (null: os 2 do dia já saíram)
 function finish(winner, already) {
   const won = winner === ME;
   const result = won ? 'win' : winner === FOE ? 'loss' : 'draw';
@@ -694,8 +698,11 @@ function finish(winner, already) {
     history[playerKey] = { ...(history[playerKey] || {}), [date]: history[playerKey]?.[date] === 'win' ? 'win' : result };
     writeJson('rushdaily-history', history);
     // Booster sorteado pela chave do jogador: cada um tira cartas diferentes do mesmo desafio.
-    if (won && !readJson(`rushdaily-classic-booster:${playerKey}:${date}`, null)) {
-      writeJson(`rushdaily-reward:${playerKey}:${date}`, { seed: `booster:${date}:${playerKey}`, difficulty, pending: true });
+    // A 1ª vitória do dia dá booster + peça; uma vitória em outra dificuldade dá um 2º booster ("dia~2"), sem peça.
+    if (won) {
+      const taken = (day) => readJson(`rushdaily-classic-booster:${playerKey}:${day}`, null) || readJson(`rushdaily-reward:${playerKey}:${day}`, null);
+      rewardDay = !taken(date) ? date : !taken(`${date}~2`) ? `${date}~2` : null;
+      if (rewardDay) writeJson(`rushdaily-reward:${playerKey}:${rewardDay}`, { seed: `booster:${rewardDay}:${playerKey}`, difficulty, pending: true });
     }
     queueSync(0); // resultado sobe já, sem esperar a calma do agendamento
   }
@@ -709,10 +716,10 @@ function finish(winner, already) {
   $('#result-kicker').textContent = `${match.player.label} contra ${match.enemy.label} · ${settings.label} · turno ${Math.min(duel.state.turn, FORMAT.turnLimit)}`;
   $('#result-title').textContent = won ? 'Vitória' : winner === FOE ? 'Derrota' : 'Empate';
   $('#result-copy').textContent = won
-    ? `${limit ? `No limite de ${FORMAT.turnLimit} turnos, você tinha mais PV.` : deckOut ? 'O deck do rival acabou.' : reason === 1 ? 'Os pontos de vida do rival chegaram a zero.' : 'Um efeito decidiu o duelo a seu favor.'} Seu booster clássico está liberado e a peça do dia ${Number(date.slice(8))} entrou no Enigma.`
+    ? `${limit ? `No limite de ${FORMAT.turnLimit} turnos, você tinha mais PV.` : deckOut ? 'O deck do rival acabou.' : reason === 1 ? 'Os pontos de vida do rival chegaram a zero.' : 'Um efeito decidiu o duelo a seu favor.'} ${rewardDay === date ? `Seu booster clássico está liberado e a peça do dia ${Number(date.slice(8))} entrou no Enigma.` : rewardDay ? `Booster ${settings.label} liberado; a peça do Enigma é uma por dia.` : 'Os 2 boosters de hoje já saíram.'}`
     : `${limit ? `No limite de ${FORMAT.turnLimit} turnos, ${winner === FOE ? 'o rival tinha mais PV' : 'os PV estavam iguais'}.` : deckOut ? 'Seu deck acabou antes do rival.' : 'Seus pontos de vida chegaram a zero.'} A revanche usa a mesma seed: as cartas chegam na mesma ordem.`;
-  $('#result-main').textContent = won ? 'Abrir booster clássico' : 'Voltar ao desafio';
-  $('#result-main').href = won ? `screens.html?screen=reward&player=${playerKey}` : `index.html?player=${playerKey}`;
+  $('#result-main').textContent = won && rewardDay ? 'Abrir booster clássico' : 'Voltar ao desafio';
+  $('#result-main').href = won && rewardDay ? `screens.html?screen=reward&player=${playerKey}` : `index.html?player=${playerKey}`;
   if (won) scene.burst(GOLD);
   setTimeout(() => $('#result').open || $('#result').showModal(), motion ? 700 : 0);
 }

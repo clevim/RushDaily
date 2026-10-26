@@ -226,6 +226,10 @@ html:has(.arena) { overflow: clip; }
 }
 .hand-card:first-child { margin-left: 0; }
 .hand-card.playable { filter: none; box-shadow: 0 0 0 1.5px rgb(var(--gold-rgb) / 0.75), 0 14px 28px -12px rgb(var(--ink) / 0.9); }
+.zone.can-act .face, .hand-card.can-act { outline: 2px solid #b58cff; outline-offset: 2px; animation: can-act 1.8s ease-in-out infinite; }
+@keyframes can-act { 50% { outline-color: #e3d2ff; outline-offset: 4px; } }
+.calm .can-act, .calm .can-act .face { animation: none !important; }
+@media (prefers-reduced-motion: reduce) { .zone.can-act .face, .hand-card.can-act { animation: none; } }
 .hand-card:hover, .hand-card:focus-visible { z-index: 5; transform: translateY(-14px) scale(1.12) rotate(0); filter: none; }
 .hand-card.selected { z-index: 6; transform: translateY(-30px) scale(1.16) rotate(0); filter: none; box-shadow: 0 0 0 3px var(--gold-hi), 0 0 40px 8px rgb(var(--gold-rgb) / 0.7); }
 .hand-card.lifting { opacity: 0.25; }
