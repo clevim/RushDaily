@@ -285,6 +285,13 @@ function renderHand() {
   $('#foe-hand').setAttribute('aria-label', `Mão do rival: ${foeHand} cartas`);
 }
 
+/** Acende a fase atual na barra (fases do ocgcore: 1 compra, 2 apoio, 4 principal 1, 8–0x80 batalha, 0x100 principal 2, 0x200 final). */
+function setPhase(phase, active) {
+  const name = !phase ? '' : phase <= 2 ? 'draw' : phase === 4 ? 'main' : phase < 0x100 ? 'battle' : phase === 0x100 ? 'main2' : 'end';
+  $('#phases').dataset.owner = active === ME ? 'player' : 'enemy';
+  for (const node of document.querySelectorAll('#phases li')) node.toggleAttribute('aria-current', node.dataset.phase === name);
+}
+
 function render() {
   view = duel.snapshot();
   renderField();
@@ -295,6 +302,7 @@ function render() {
   $('#turn-chip').innerHTML = isPuzzle ? `<b>${replay ? 'Replay · ' : ''}Vença neste turno</b> ${whose}`
     : replay ? `<b>Replay · Turno ${Math.max(1, turn)}</b> ${whose}` : `<b>Turno ${Math.max(1, turn)}${FORMAT.turnLimit ? `/${FORMAT.turnLimit}` : ''}</b> ${whose}`;
   $('#turn-chip').dataset.owner = active === ME ? 'player' : 'enemy';
+  setPhase(duel.state.phase, active);
   gestures?.mark();
   paintCards(document.body);
 }
@@ -347,6 +355,7 @@ async function play(events, quick) {
       case M.NEW_TURN:
         if (!quick) { render(); await banner(event.player === ME ? 'Sua vez' : 'Vez do rival', event.player === ME ? 'player' : 'enemy'); }
         break;
+      case M.NEW_PHASE: setPhase(event.phase, duel.state.active); break;
       case M.SUMMONING: log(`${who(event.controller)} invocou ${cardOf(event.code).name}.`); break;
       case M.SPSUMMONING: log(`${who(event.controller)} invocou por Especial ${cardOf(event.code).name}.`); break;
       case M.FLIPSUMMONING: log(`${who(event.controller)} desvirou ${cardOf(event.code).name}.`); break;

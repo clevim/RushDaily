@@ -144,7 +144,7 @@
 .pull-summary em { font-style: normal; color: var(--gold); font-size: 0.8rem; }
 .pull-summary .dot { width: 8px; height: 8px; transform: rotate(45deg); background: var(--ivory-dim); }
 .pull-summary .dot.rare { background: var(--sky); }
-.pack-hit { position: absolute; left: 50%; top: 50%; width: min(260px, 50vw); height: min(400px, 52vh); translate: -50% -50%; border: 0; background: none; cursor: pointer; border-radius: 12px; }
+.pack-hit { position: absolute; left: 50%; top: 50%; width: min(260px, 50vw); height: min(400px, 52vh); translate: -50% -50%; border: 0; background: none; cursor: pointer; border-radius: 12px; touch-action: none; } /* arrastar rasga a tira, não rola a página */
 .pack-hit:focus-visible { outline: 3px solid var(--gold-hi); outline-offset: 6px; }
 .pack-stage.locked { filter: grayscale(0.85) brightness(0.55); }
 .back-safira img, .back-rubi img { border-radius: inherit; }

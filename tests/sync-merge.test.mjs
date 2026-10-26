@@ -5,6 +5,15 @@ import { SCHEMA_VERSION, SchemaError, mergeProgress, normalize, readProgress, wr
 const pack = (openedAt, tier, ...ids) => ({ openedAt, seed: 's', tier, cards: ids.map((id) => ({ id, foil: null, back: 'rubi', rare: false })) });
 const base = { v: 1, history: { '2026-10-01': 'win' }, collection: { 10: 1, 20: 1 }, boosters: { '2026-10-01': pack('2026-10-01T10:00:00Z', 'common', 10, 20) }, pity: 1 };
 
+test('pity soma o luck dos pacotes sem sorte (Ouro na Caos conta 4) e o pacote antigo sem luck vale a regra de antes', () => {
+  const phone = { ...base, boosters: { ...base.boosters, '2026-10-02': { ...pack('2026-10-02T09:00:00Z', 'gold', 10), luck: 4 } } };
+  const pc = { ...base, boosters: { ...base.boosters, '2026-10-03': { ...pack('2026-10-03T09:00:00Z', 'gold', 20), luck: 3 } } };
+  assert.equal(mergeProgress(phone, pc).pity, 8); // 3 + 4 + o comum antigo (1)
+  const lucky = { ...base, boosters: { ...base.boosters, '2026-10-02': { ...pack('2026-10-02T09:00:00Z', 'galaxy', 10), luck: 0 } } };
+  assert.equal(mergeProgress(lucky, lucky).pity, 0);
+  assert.equal(normalize({ ...lucky, boosters: { '2026-10-02': { ...pack('x', 'gold', 10), luck: 99 } } }).boosters['2026-10-02'].luck, undefined, 'luck fora de 0..4 é descartado');
+});
+
 test('dois aparelhos abrindo boosters diferentes: coleção soma, pity é derivado', () => {
   const phone = { ...base, history: { ...base.history, '2026-10-02': 'win' }, collection: { 10: 2, 20: 1 }, boosters: { ...base.boosters, '2026-10-02': pack('2026-10-02T09:00:00Z', 'common', 10) }, pity: 2 };
   const pc = { ...base, history: { ...base.history, '2026-10-03': 'win' }, collection: { 10: 2, 20: 1, 30: 1 }, boosters: { ...base.boosters, '2026-10-03': pack('2026-10-03T09:00:00Z', 'gold', 10, 30) }, pity: 0 };

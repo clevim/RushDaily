@@ -1,0 +1,69 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import test from 'node:test';
+import { openBooster } from '../src/engine/booster.mjs';
+import { isExtra } from '../src/engine/ocg.mjs';
+
+const cards = JSON.parse(readFileSync(new URL('../src/data/classic/s1.json', import.meta.url)));
+const byId = new Map(cards.map((card) => [card.id, card]));
+const N = 200;
+const RATING = { apprentice: 1, duelist: 2, elite: 3, chaos: 4 };
+const TIERS = ['common', 'silver', 'gold', 'galaxy'];
+const FLOOR = { apprentice: 'common', duelist: 'silver', elite: 'gold', chaos: 'gold' };
+const open = (i, opts = {}) => openBooster(`seed-${i}`, { cards, ...opts });
+const each = (fn, opts) => { for (let i = 0; i < N; i++) fn(open(i, opts), i); };
+
+test('determinismo: mesmos parâmetros, mesmo pacote', () => {
+  const owned = { [cards[0].id]: 2, [cards[5].id]: 3 };
+  for (let i = 0; i < 50; i++) {
+    const opts = { owned, pity: i % 30, difficulty: 'elite' };
+    assert.deepEqual(open(i, opts), open(i, opts));
+  }
+});
+
+test('sempre 5 cartas distintas e existentes no pool', () => {
+  for (const difficulty of Object.keys(RATING)) each((pack) => {
+    assert.equal(pack.cards.length, 5);
+    assert.equal(new Set(pack.cards.map((c) => c.id)).size, 5);
+    for (const c of pack.cards) assert.ok(byId.has(c.id));
+  }, { difficulty });
+});
+
+test('slots comuns nunca são monstros do Deck Adicional', () => {
+  each((pack) => { for (const c of pack.cards) if (!c.rare) assert.ok(!isExtra(byId.get(c.id))); });
+});
+
+test('tema: no máximo 3 cartas do arquétipo por pacote', () => {
+  let packs = 0;
+  for (let i = 0; i < 1000 && packs < N; i++) {
+    const pack = open(i);
+    if (!pack.theme) continue;
+    packs++;
+    assert.ok(pack.cards.filter((c) => byId.get(c.id).archetype === pack.theme).length <= 3);
+  }
+  assert.ok(packs > 50);
+});
+
+test('piso por dificuldade', () => {
+  for (const difficulty of Object.keys(RATING)) each((pack) => {
+    assert.ok(TIERS.indexOf(pack.tier) >= TIERS.indexOf(FLOOR[difficulty]), `${difficulty} ${pack.tier}`);
+  }, { difficulty });
+});
+
+test('luck: 0 acima do piso, rating no piso; pity >= 8*rating sobe um nível', () => {
+  for (const [difficulty, rating] of Object.entries(RATING)) {
+    const floor = TIERS.indexOf(FLOOR[difficulty]);
+    each((pack) => assert.equal(pack.luck, TIERS.indexOf(pack.tier) > floor ? 0 : rating), { difficulty, pity: 3 });
+    each((pack) => {
+      assert.ok(TIERS.indexOf(pack.tier) > floor);
+      assert.equal(pack.luck, 0);
+    }, { difficulty, pity: 8 * rating });
+  }
+  const min = { apprentice: 'silver', duelist: 'gold', elite: 'galaxy', chaos: 'galaxy' };
+  for (const d of Object.keys(RATING)) each((pack) => assert.ok(TIERS.indexOf(pack.tier) >= TIERS.indexOf(min[d])), { difficulty: d, pity: 8 * RATING[d] });
+});
+
+test('sorte aumenta a chance de galáxia no Caos', () => {
+  const count = (pity) => { let n = 0; each((pack) => { if (pack.tier === 'galaxy') n++; }, { difficulty: 'chaos', pity }); return n; };
+  assert.ok(count(28) > count(0));
+});

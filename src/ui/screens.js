@@ -1,5 +1,6 @@
 import { listDifficulties } from '../engine/daily-generator.mjs';
-import { buildDeck, seeded } from '../engine/classic-deck.mjs';
+import { buildDeck } from '../engine/classic-deck.mjs';
+import { DIFFICULTY_FLOOR, openBooster } from '../engine/booster.mjs';
 import { TYPE, isExtra } from '../engine/ocg.mjs';
 import { daysInMonth, heartCharges, monthName, monthOf, monthPieces, recoveredDays, bindKeyChip, escape, glove, getPlayerKey, longDate, nav, readJson, removeKey, settingsFor, tilt, today, toast, writeJson } from './common.js';
 // scene.js (e o Three.js, ~270 KB gzip) só carrega nas telas que têm 3D: Recompensa e Enigma.
@@ -62,79 +63,7 @@ function inspect(card) {
   dialog.showModal();
 }
 
-/* ---------- Booster determinístico ---------- */
-
-const FOILS = {
-  common: [[null, 55], ['star', 18], ['etched', 15], ['prism', 12]],
-  silverCommon: [[null, 25], ['star', 30], ['etched', 25], ['prism', 20]],
-  allFoil: [['star', 35], ['etched', 30], ['prism', 35]],
-  rare: [['prism', 40], ['gold', 35], ['galaxy', 25]],
-  legend: [['gold', 60], ['galaxy', 40]],
-  cosmic: [['galaxy', 70], ['gold', 30]],
-};
-// Chance de cada raridade de pacote (em 100): a sorte decide pela seed do jogador.
-const TIER_ODDS = [['galaxy', 2], ['gold', 8], ['silver', 20], ['common', 70]];
-// Sorte acumulada: cada pacote comum seguido soma estes pesos (até 8 seguidos); no 9º vem pelo menos Prata.
-const PITY_BONUS = { silver: 5, gold: 1.5, galaxy: 0.3 };
-// Piso do pacote por dificuldade (rating 1 a 4: Aprendiz, Duelista, Elite, Caos) e chance extra de Galáxia por ponto de rating acima de 2.
-const TIER_ORDER = ['common', 'silver', 'gold', 'galaxy'];
-const DIFFICULTY_FLOOR = ['common', 'silver', 'gold', 'gold'];
-const GALAXY_PER_RATING = 0.03;
 export const pityKey = (key) => `rushdaily-classic-pity:${key}`;
-
-function weighted(random, table) {
-  let roll = random() * table.reduce((sum, [, weight]) => sum + weight, 0);
-  for (const [value, weight] of table) { roll -= weight; if (roll <= 0) return value; }
-  return table.at(-1)[0];
-}
-
-/** Arquétipos com cartas suficientes para virar tema de pacote. */
-const themesOf = (cards) => {
-  const counts = new Map();
-  for (const card of cards) if (card.archetype) counts.set(card.archetype, (counts.get(card.archetype) || 0) + 1);
-  return [...counts].filter(([, n]) => n >= 8).map(([name]) => name).sort();
-};
-
-/**
- * Pacote do dia: raridade (comum, prata, ouro, galáxia), se aparece disfarçado de comum,
- * a disposição das cartas, um tema de arquétipo opcional e as 5 cartas (sem repetir) com foil e verso.
- * Slots por raridade impressa: comum nos comuns, rare/super nos raros, ultra/secret nos LEGEND.
- * Cartas que o jogador ainda não tem pesam 3x; as que ele já tem 3 cópias pesam 1/4.
- * Mesma seed, mesma coleção e mesma sorte acumulada: mesmo pacote.
- */
-export function openBooster(seed, { owned = {}, pity = 0, cards = pool, difficulty = null } = {}) {
-  const random = seeded(seed);
-  const themes = themesOf(cards);
-  const theme = themes.length && random() < 0.35 ? themes[Math.floor(random() * themes.length)] : null;
-  const streak = Math.min(pity, 8);
-  let tier = weighted(random, TIER_ODDS.map(([id, weight]) => [id, weight + (PITY_BONUS[id] || 0) * streak]));
-  if (tier === 'common' && pity >= 8) tier = 'silver';
-  // Dificuldade: define o piso do pacote (a sorte e a pity só podem melhorar) e, a partir da Elite, dá uma chance extra de Galáxia.
-  const rating = listDifficulties().find((item) => item.id === difficulty)?.rating || 0;
-  const floor = TIER_ORDER.indexOf(DIFFICULTY_FLOOR[rating - 1] || 'common');
-  const galaxyChance = rating >= 3 ? (rating - 2) * GALAXY_PER_RATING : 0;
-  if (random() < galaxyChance) tier = 'galaxy';
-  if (TIER_ORDER.indexOf(tier) < floor) tier = TIER_ORDER[floor];
-  const taken = new Set();
-  const weight = (card) => (owned[card.id] ? (owned[card.id] >= 3 ? 0.25 : 1) : 3) * (theme && card.archetype === theme ? 20 : 1);
-  const pick = (list) => {
-    const card = weighted(random, list.filter((item) => !taken.has(item.id)).map((item) => [item, weight(item)]));
-    taken.add(card.id);
-    return card;
-  };
-  const legends = cards.filter((card) => card.rarity === 'ultra' || card.rarity === 'secret');
-  const rares = cards.filter((card) => card.rarity === 'rare' || card.rarity === 'super');
-  const commons = cards.filter((card) => !card.rarity || card.rarity === 'common');
-  const slot = (list, foils, rare) => ({ id: pick(list).id, foil: weighted(random, foils), back: rare ? 'safira' : 'rubi', rare });
-  const recipe = {
-    common: () => [...[0, 1, 2, 3].map(() => slot(commons, FOILS.common, false)), slot(rares, FOILS.rare, true)],
-    silver: () => [...[0, 1, 2].map(() => slot(commons, FOILS.silverCommon, false)), slot(rares, FOILS.rare, true), slot(rares, FOILS.rare, true)],
-    gold: () => [...[0, 1, 2].map(() => slot(commons, FOILS.allFoil, false)), slot(rares, FOILS.rare, true), slot(legends, FOILS.legend, true)],
-    galaxy: () => [slot(rares, FOILS.allFoil, false), slot(rares, FOILS.cosmic, true), slot(rares, FOILS.cosmic, true), slot(legends, FOILS.cosmic, true), slot(legends, FOILS.cosmic, true)],
-  }[tier];
-  const picked = recipe();
-  return { tier, theme, cards: picked, disguise: (tier === 'gold' || tier === 'galaxy') && random() < 0.5, layout: random() < 0.5 ? 'arc' : 'row' };
-}
 
 /* ---------- Telas ---------- */
 
@@ -300,7 +229,7 @@ async function renderReward() {
   const opened = readJson(boosterKey, null);
   const locked = !pending?.pending && !opened;
   const result = opened ? { tier: 'common', layout: 'arc', ...opened, cards: opened.cards.filter((entry) => byId(entry.id)) }
-    : locked ? null : openBooster(pending.seed, { owned: readCollection(playerKey), pity: readJson(pityKey(playerKey), 0), difficulty: pending.difficulty });
+    : locked ? null : openBooster(pending.seed, { cards: pool, owned: readCollection(playerKey), pity: readJson(pityKey(playerKey), 0), difficulty: pending.difficulty });
   const reduced = settingsFor(playerKey).reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches;
   const wonToday = day === date && readJson('rushdaily-history', {})[playerKey]?.[date] === 'win'; // a peça só vem no 1º booster
   const tierName = result ? TIER_NAME[result.tier] || 'Booster' : 'Booster';
@@ -327,6 +256,11 @@ async function renderReward() {
   // O toque no pacote vale desde já: a cena 3D (e as frentes das cartas) termina de carregar enquanto ele espera.
   let packReady;
   const scene = new Promise((resolve) => { packReady = resolve; });
+  // Arrastar sobre o pacote rasga a tira junto com o dedo; um toque simples continua abrindo.
+  const packEl = root.querySelector('#pack');
+  let dragFrom = null;
+  packEl?.addEventListener('pointerdown', (event) => { dragFrom = event.clientX; });
+  packEl?.addEventListener('pointermove', (event) => { if (dragFrom !== null) scene.then((s) => s.drag?.(Math.abs(event.clientX - dragFrom) / 140)); });
   root.querySelector('#pack')?.addEventListener('click', async (event) => {
     event.currentTarget.remove();
     // Salva antes da animação: fechar a aba no meio não perde o pacote.
@@ -340,7 +274,7 @@ async function renderReward() {
     writeJson(boosterKey, { openedAt: new Date().toISOString(), seed: pending.seed, ...result });
     writeCollection(playerKey, collection);
     writeJson(foilsKey(playerKey), foils);
-    writeJson(pityKey(playerKey), result.tier === 'common' ? readJson(pityKey(playerKey), 0) + 1 : 0);
+    writeJson(pityKey(playerKey), result.luck ? readJson(pityKey(playerKey), 0) + result.luck : 0);
     removeKey(rewardKey);
     root.querySelector('#pack-row').classList.add('solo'); // as 5 cartas precisam da largura toda: a vitrine desce
     copy('Abrindo…');

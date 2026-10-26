@@ -4,8 +4,8 @@
   /* Largura da carta: o que couber na largura (7 colunas) e na altura (5 linhas + mão). */
   --hand: clamp(60px, min(8.4vw, 12dvh), 104px);
   --gap: clamp(4px, 0.8vw, 10px);
-  /* Altura livre = tela - topo (~70px) - bandeja (mão + 30px) - folgas da grade. */
-  --card: clamp(40px, min((100vw - 300px) / 8.2, (100dvh - 104px - var(--hand) * 1.4 - 7 * var(--gap)) / 7.3), 104px);
+  /* Altura livre = tela - topo (~92px, com as fases) - bandeja (mão + 30px) - folgas da grade. */
+  --card: clamp(40px, min((100vw - 300px) / 8.2, (100dvh - 126px - var(--hand) * 1.4 - 7 * var(--gap)) / 7.3), 104px);
 }
 .classic .arena-top { padding-block: 6px; }
 .top-center { display: grid; justify-items: center; gap: 4px; min-width: 0; }
@@ -129,8 +129,8 @@
   .classic {
     --gap: 4px;
     --hand: min(24vw, 14dvh);
-    /* topo (~64) + 2 placas (~100) + folgas + bandeja (botões 38 + mão): o que sobrar vira altura do tabuleiro */
-    --card: min((100vw - 16px - 6 * var(--gap)) / 7.15, (100dvh - 272px - var(--hand) * 1.4) / 7.3);
+    /* topo (~80, com as fases) + 2 placas (~100) + folgas + bandeja (botões 38 + mão): o que sobrar vira altura do tabuleiro */
+    --card: min((100vw - 16px - 6 * var(--gap)) / 7.15, (100dvh - 288px - var(--hand) * 1.4) / 7.3);
   }
   .classic .arena-top { grid-template-columns: auto minmax(0, 1fr) auto; padding: 4px 8px; gap: 8px; }
   .classic .leave img { width: 30px; }
@@ -141,6 +141,8 @@
   .classic .hint { display: none; }
   .classic .tray { padding-top: 4px; }
   .classic .log { max-width: 100%; min-width: 0; }
+  .classic .phases li { padding: 2px 7px; font-size: 0; } /* rótulo curto: o nome inteiro não cabe entre o logo e a ajuda */
+  .classic .phases li::after { content: attr(data-short); font-size: 0.58rem; }
   .classic .log span:first-child { font-size: 0.72rem; }
   .table { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; grid-template-areas: 'foe' 'field' 'me'; align-content: space-evenly; gap: 6px; padding: 0 8px; min-height: 0; }
   .field { justify-self: center; padding: 4px; }

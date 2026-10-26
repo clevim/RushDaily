@@ -717,6 +717,75 @@ const FOIL_COLOR = { star: 0xbfe6ff, etched: 0xffffff, prism: 0xff8ae6, gold: 0x
  * opened: mostra as cartas já reveladas (revisitar). onInspect(i) ao tocar numa carta revelada.
  * piece: { index, total } — a peça do dia do Enigma desce sobre as cartas quando todas foram viradas; onPiece ao tocar nela.
  */
+// Partículas da abertura do pacote: UM Points pré-alocado, animado no vertex shader (uT = segundos desde o início). Sem alocação por frame.
+const FX_MAX = { common: 60, silver: 150, gold: 300, galaxy: 800 }; // desktop; metade em tela pequena / DPR alto / CPU fraca
+const FX_VERT = `
+uniform float uT, uMode, uSize; uniform vec3 uOrigin, uColA, uColB;
+attribute vec4 aSeed; varying vec3 vCol; varying float vA;
+void main(){
+  float r1=aSeed.x, r2=aSeed.y, r3=aSeed.z, r4=aSeed.w, t=uT, a=0., size=1.;
+  vec3 p=uOrigin; vec3 dir=normalize(vec3(r1-.5,r2-.3,r3-.5)+1e-3);
+  float mixc=r4;
+  if(uMode<.5){ // comum: lascas de papel e faíscas
+    float s=t-.2; if(s>0.){ p+=dir*(.8+r4*1.6)*s; p.y-=3.*s*s; a=1.-smoothstep(0.,1.,s); } size=.8;
+  } else if(uMode<1.5){ // prata: estrelinhas cintilando
+    float s=t-.65; if(s>0.){ p.xy+=(vec2(r1,r2)-.5)*vec2(3.2,3.8); p.z+=r3*.6; p+=dir*.25*s; a=smoothstep(0.,.15,s)*(1.-smoothstep(.9,1.6,s))*(.5+.5*sin(t*14.+r4*40.)); } size=1.3;
+  } else if(uMode<2.5){ // ouro: confete dourado
+    float s=t-.9; if(s>0.){ p.x+=(r1-.5)*3.6+sin(s*4.+r4*6.)*.25; p.y+=2.8+r2*1.2-s*(2.2+r3*2.); p.z+=r3*.8; a=smoothstep(0.,.1,s)*(1.-smoothstep(1.2,2.,s)); } size=1.1;
+  } else { // galáxia: vórtice sugando a luz e, aos 0.9s, supernova com onda de choque
+    float ang=r1*6.2832;
+    if(t<.9){ float R=(.4+r2*3.2)*(1.-.92*smoothstep(0.,.9,t)); float th=ang+t*(3.+r3*3.)+R*1.6; p+=vec3(cos(th),sin(th),(r3-.5)*.6)*R; a=smoothstep(0.,.25,t); mixc=1.-R*.3; size=1.+t; }
+    else { float s=t-.9; float sp=r4>.85?6.5:(1.5+r2*5.5); p+=vec3(cos(ang),sin(ang),(r3-.5)*.8)*sp*s*(1.-.25*s); a=1.-smoothstep(.5,1.5,s); mixc=r4>.85?0.:r3; size=r4>.85?1.8:1.2; }
+  }
+  vCol=mix(uColA,uColB,mixc); vA=a;
+  vec4 mv=modelViewMatrix*vec4(p,1.);
+  gl_Position=projectionMatrix*mv; gl_PointSize=a>0.?size*uSize/-mv.z:0.;
+}`;
+const FX_FRAG = `uniform sampler2D uMap; varying vec3 vCol; varying float vA;
+void main(){ gl_FragColor=vec4(vCol,vA)*texture2D(uMap,gl_PointCoord).a; }`;
+const FX_MODE = { tear: 0, spin: 1, beams: 2, supernova: 3 };
+function makeFx(tierDef) {
+  const small = innerWidth < 600 || devicePixelRatio > 2 || (navigator.hardwareConcurrency || 8) <= 4;
+  const id = Object.keys(PACK_TIERS).find((key) => PACK_TIERS[key] === tierDef) || 'common';
+  const n = Math.round(FX_MAX[id] * (small ? 0.5 : 1));
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+  geometry.setAttribute('aSeed', new THREE.BufferAttribute(Float32Array.from({ length: n * 4 }, Math.random), 4));
+  const material = new THREE.ShaderMaterial({
+    vertexShader: FX_VERT, fragmentShader: FX_FRAG, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    uniforms: {
+      uT: { value: 0 }, uMode: { value: FX_MODE[tierDef.opening] }, uSize: { value: 100 },
+      uOrigin: { value: new THREE.Vector3(0, tierDef.opening === 'supernova' ? 0 : TEAR, 0.3) },
+      uColA: { value: new THREE.Color(tierDef.glow) }, uColB: { value: new THREE.Color(tierDef.opening === 'supernova' ? 0xff6ad5 : 0xffffff) }, uMap: { value: sparkTexture() },
+    },
+  });
+  const points = new THREE.Points(geometry, material);
+  points.frustumCulled = false;
+  points.visible = false;
+  return { points, count: n };
+}
+
+// Faixa diagonal branca (reflexo holográfico) varrida uma vez sobre a face da rara.
+let sheenBase = null;
+function sheenTexture() {
+  if (!sheenBase) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const g = c.getContext('2d');
+    const grad = g.createLinearGradient(0, 0, 128, 48);
+    grad.addColorStop(0.3, 'rgba(255,255,255,0)');
+    grad.addColorStop(0.5, 'rgba(255,255,255,0.85)');
+    grad.addColorStop(0.7, 'rgba(255,255,255,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 128, 128);
+    sheenBase = new THREE.CanvasTexture(c);
+    sheenBase.repeat.x = 0.5;
+  }
+  const t = sheenBase.clone();
+  t.needsUpdate = true;
+  return t;
+}
+
 export function boosterScene(canvas, { mark, subtitle, tier: tierId = 'common', cards: cardData = [], disguise = false, opened = false, layout = 'arc', reduced = false, onInspect = null, onAllRevealed = null, piece = null, onPiece = null }) {
   const renderer = makeRenderer(canvas);
   const fallback = { open: () => Promise.resolve(), revealAll() {}, cardAt: () => null };
@@ -754,6 +823,23 @@ export function boosterScene(canvas, { mark, subtitle, tier: tierId = 'common', 
 
   // ----- Partículas: estouros reaproveitáveis -----
   const bursts = [];
+  const shocks = []; // anel de choque e raios da LEGEND: { obj, age, life, grow }
+  const isLegend = (card) => card.userData.data.foil === 'gold' || card.userData.data.foil === 'galaxy';
+  function shockwave(origin, color) {
+    const mat = () => new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.85, 1, 48), mat());
+    ring.position.copy(origin);
+    const rays = new THREE.Group();
+    rays.position.copy(origin);
+    for (let i = 0; i < 10; i += 1) {
+      const ray = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 3.2), mat());
+      ray.geometry.translate(0, 1.9, 0);
+      ray.rotation.z = (i / 10) * Math.PI * 2;
+      rays.add(ray);
+    }
+    scene.add(ring, rays);
+    shocks.push({ obj: ring, age: 0, life: 0.8, grow: 7 }, { obj: rays, age: 0, life: 1.1, grow: 1.5, spin: 0.8 });
+  }
   function spark(origin, color, count = 70, speed = 3, gravity = 5) {
     if (reduced) return;
     const positions = new Float32Array(count * 3);
@@ -800,6 +886,46 @@ export function boosterScene(canvas, { mark, subtitle, tier: tierId = 'common', 
     return aura;
   });
 
+  // Luz de foco: véu escuro atrás da carta rara que está virando (as outras escurecem).
+  const dim = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, depthWrite: false }));
+  dim.position.z = 0.35;
+  dim.visible = false;
+  scene.add(dim);
+  // Reflexo holográfico: plano na face frontal (-z local da carta) com a faixa deslizando.
+  const sheens = cards.map((card) => {
+    if (!card.userData.data.rare) return null;
+    const sheen = new THREE.Mesh(new THREE.PlaneGeometry(CARD_W, CARD_H), new THREE.MeshBasicMaterial({ map: sheenTexture(), transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    sheen.position.z = -0.02;
+    sheen.visible = false;
+    card.add(sheen);
+    return sheen;
+  });
+  let zoom = 0;
+  // Abertura: partículas em shader (um Points reaproveitado), rasgo por arrasto e antecipação por tier.
+  const fx = reduced ? null : makeFx(tier);
+  if (fx) scene.add(fx.points);
+  let fxBase = null; // instante em que as partículas começam (t local do pacote)
+  let dragK = 0; // 0..1: arrasto sobre a tira (vem da tela)
+  let dragSm = 0;
+  let dragPeel = 0;
+  const level = disguise ? 0 : { common: 0, silver: 0.5, gold: 1, galaxy: 1.5 }[tierId] ?? 0; // intensidade da antecipação
+  const pause = { tear: 0.15, spin: 0.2 }[tier.opening] || 0; // suspense curto antes de estourar
+  // Rachadura de luz do pacote disfarçado, antes de evoluir.
+  const crack = new THREE.Mesh(new THREE.PlaneGeometry(0.05, 2.4), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+  crack.position.z = 0.35;
+  crack.visible = false;
+  group.add(crack);
+  const FLY = { beams: 3 };
+  function poseStrip(k, fly) {
+    // Rasgo em duas fases: a tira descasca da costura (ease in-out) e depois se solta em arco, girando.
+    const peel = k < 0.5 ? 4 * k * k * k : 1 - (-2 * k + 2) ** 3 / 2;
+    const loose = Math.max(0, (k - 0.5) / 0.5);
+    const looseE = loose * loose;
+    strip.rotation.set(-peel * 0.5 - looseE * 0.6, peel * 0.7 + looseE * 0.5, peel * 0.9 + looseE * 1.4);
+    strip.position.set(-1.2 + looseE * 1.4, TEAR + Math.sin(loose * Math.PI * 0.5) * fly * 0.7 + looseE * fly * 0.3, peel * 0.45 + looseE * 0.9);
+    return looseE;
+  }
+
   const particles = dust(reduced ? 0 : 160, { x: 10, y: 8, z: 6 });
   scene.add(particles);
 
@@ -818,7 +944,7 @@ export function boosterScene(canvas, { mark, subtitle, tier: tierId = 'common', 
   let revealedCount = opened ? count : 0;
   let shake = 0;
   // Duração da fase do pacote por estilo de abertura (+0.7s se o pacote evoluir antes).
-  const packPhase = { tear: 1.5, spin: 1.9, beams: 2.1, supernova: 1.8 }[tier.opening] + (disguise ? 0.8 : 0);
+  const packPhase = { tear: 1.5, spin: 1.9, beams: 2.1, supernova: 1.8 }[tier.opening] + (disguise ? 0.8 : 0) + pause;
 
   // Peça do dia do Enigma: a peça real do modelo, em ouro, descendo sobre as cartas.
   const piecePivot = new THREE.Group();
@@ -853,6 +979,7 @@ export function boosterScene(canvas, { mark, subtitle, tier: tierId = 'common', 
   function reveal(card) {
     if (!card || card.userData.revealAt !== null || cardsAt === null) return;
     card.userData.revealAt = clock.elapsedTime;
+    if (card.userData.data.rare && !reduced) { try { navigator.vibrate?.(isLegend(card) ? [30, 50, 70] : 25); } catch { /* sem vibração */ } }
     revealedCount += 1;
     if (revealedCount === count) setTimeout(() => { onAllRevealed?.(); showPiece(); }, 700);
   }
@@ -876,17 +1003,30 @@ export function boosterScene(canvas, { mark, subtitle, tier: tierId = 'common', 
     // Tela em pé: depois de aberto, afasta a câmera até as 5 cartas caberem na largura (~8.8 de mundo).
     const fitZ = Math.max(piece ? 8.6 : 7.5, (camera.aspect < 0.8 ? 8.1 : 8.8) / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect)); // piso 7,5: em tela larga as cartas ficam grandes sem passar da altura do palco
     cameraZ += ((opened || openedAt !== null ? fitZ : 10) - cameraZ) * (reduced ? 1 : 0.06);
-    camera.position.set((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake, cameraZ);
+    camera.position.set((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake, cameraZ - zoom);
     camera.lookAt(0, piece && (opened || openedAt !== null) ? 0.5 : 0, 0); // com a peça do Enigma, enquadra um pouco acima para ela caber
 
+    if (fx) {
+      const fxT = openedAt === null ? -1 : time - openedAt - (disguise ? 0.8 : 0);
+      fx.points.visible = fxT >= 0 && fxT < 2.6;
+      if (fx.points.visible) { fx.points.material.uniforms.uT.value = fxT; fx.points.material.uniforms.uSize.value = 0.12 * renderer.domElement.height * 1.87; }
+    }
     if (openedAt === null) {
       group.rotation.y += ((target.x * 0.6 + (reduced ? 0 : Math.sin(time * 0.6) * 0.25)) - group.rotation.y) * 0.08;
       group.rotation.x += ((-target.y * 0.3) - group.rotation.x) * 0.08;
       group.position.y = reduced ? 0 : Math.sin(time * 1.2) * 0.12;
+      // Antecipação: quanto melhor o tier, mais o pacote vibra e brilha; o arrasto também (a tira acompanha o dedo).
+      dragSm += (dragK - dragSm) * 0.3;
+      group.position.x = reduced ? 0 : Math.sin(time * 47) * 0.007 * (level + dragSm * 3);
+      burst.intensity = level * 22 * (0.7 + 0.3 * Math.sin(time * 3)) + dragSm * 80;
+      poseStrip(dragSm * 0.45, 1.6);
     } else if (group.visible) {
       let t = time - openedAt;
       // Evolução: o pacote comum treme, clareia e vira a raridade de verdade.
       if (disguise) {
+        crack.visible = t > 0.15 && t < 0.5;
+        crack.material.opacity = Math.min(1, (t - 0.15) * 4);
+        crack.scale.set(1 + t * 6, 1, 1);
         if (t < 0.8) {
           group.position.x = Math.sin(t * 70) * 0.03 * t;
           burst.intensity = t * 260;
@@ -902,6 +1042,11 @@ export function boosterScene(canvas, { mark, subtitle, tier: tierId = 'common', 
         }
         t -= 0.8;
       }
+      // Suspense curto (comum/prata): treme e acumula luz antes de rasgar.
+      if (pause) {
+        if (t < pause) { const w = t / pause; group.position.x = Math.sin(t * 90) * 0.035 * (1 + level) * w; burst.intensity = w * 120; }
+        t = Math.max(0, t - pause);
+      }
       group.rotation.set(group.rotation.x * 0.9, group.rotation.y * 0.9, 0);
       if (tier.opening === 'spin') {
         // Prata: um giro completo antes de rasgar.
@@ -915,7 +1060,7 @@ export function boosterScene(canvas, { mark, subtitle, tier: tierId = 'common', 
         group.position.x = Math.sin(t * 80) * 0.05 * charge;
         beams.children.forEach((beam, index) => { beam.material.opacity = charge * (0.35 + 0.25 * Math.sin(t * 20 + index)); beam.scale.y = 0.3 + charge; });
         burst.intensity = charge * 240;
-        if (t > 0.9 && !beams.userData.blown) { beams.userData.blown = true; spark(new THREE.Vector3(0, TEAR, 0.3), tier.glow, 140, 5, 4); shake = 0.3; }
+        if (t > 0.9 && !beams.userData.blown) { beams.userData.blown = true; shake = 0.3; }
         t = Math.max(0, t - 0.6);
       }
       if (tier.opening === 'supernova') {
@@ -925,22 +1070,13 @@ export function boosterScene(canvas, { mark, subtitle, tier: tierId = 'common', 
         burst.intensity = k * 320;
         if (t > 0.9 && !group.userData.nova) {
           group.userData.nova = true;
-          spark(new THREE.Vector3(0, 0, 0.3), tier.glow, 220, 6, 0.5);
-          spark(new THREE.Vector3(0, 0, 0.3), 0xffffff, 120, 4, 0.5);
           shake = 0.4;
         }
         if (t > 1.2) group.visible = false;
       } else {
         // Rasgo (comum, prata e ouro): a tira descasca e solta, com lascas.
-        const k = Math.min(1, t / (tier.opening === 'beams' ? 0.5 : 1.1));
-        // Rasgo em duas fases: a tira descasca da costura (ease in-out) e depois se solta em arco, girando.
-        const peel = k < 0.5 ? 4 * k * k * k : 1 - (-2 * k + 2) ** 3 / 2;
-        const loose = Math.max(0, (k - 0.5) / 0.5);
-        const looseE = loose * loose;
-        const fly = tier.opening === 'beams' ? 3 : 1.6;
-        strip.rotation.set(-peel * 0.5 - looseE * 0.6, peel * 0.7 + looseE * 0.5, peel * 0.9 + looseE * 1.4);
-        strip.position.set(-1.2 + looseE * 1.4, TEAR + Math.sin(loose * Math.PI * 0.5) * fly * 0.7 + looseE * fly * 0.3, peel * 0.45 + looseE * 0.9);
-        if (t > 0.05 && !strip.userData.cracked) { strip.userData.cracked = true; spark(new THREE.Vector3(0, TEAR, 0.2), 0xffd36b, 80, 2.5, 6); }
+        const k = Math.min(1, dragPeel + (1 - dragPeel) * t / (tier.opening === 'beams' ? 0.5 : 1.1));
+        const looseE = poseStrip(k, FLY[tier.opening] || 1.6);
         if (tier.opening !== 'beams') burst.intensity = Math.sin(Math.min(1, k) * Math.PI) * 180;
         // A tira se solta e o pacote vazio escorrega para baixo encolhendo (sem fade: opacity + alphaTest faz o pacote piscar).
         const leave = Math.max(0, (t - 1.0) / 0.8);
@@ -960,6 +1096,8 @@ export function boosterScene(canvas, { mark, subtitle, tier: tierId = 'common', 
     hovered = cardsAt === null ? null : raycaster.intersectObjects(cards, false)[0]?.object || null;
     const overPiece = piecePivot.visible && raycaster.intersectObject(piecePivot, true).length > 0;
     canvas.style.cursor = hovered || overPiece ? 'pointer' : '';
+    let focus = 0; // 0..1: força do foco da rara virando agora
+    let focusLegend = false;
     cards.forEach((card, index) => {
       if (cardsAt === null) return;
       const slot = slots[index];
@@ -976,23 +1114,58 @@ export function boosterScene(canvas, { mark, subtitle, tier: tierId = 'common', 
       let flip = 0;
       let lift = card.userData.hover * 0.25;
       if (card.userData.revealAt !== null) {
-        const f = Math.min(1, (time - card.userData.revealAt) / (card.userData.data.rare ? 0.9 : 0.6));
-        flip = card.userData.revealAt < 0 ? 1 : 0.5 - Math.cos(f * Math.PI) / 2;
-        lift += Math.sin(f * Math.PI) * (card.userData.data.rare ? 1.2 : 0.6);
+        const rare = card.userData.data.rare;
+        const f = Math.min(1, (time - card.userData.revealAt) / (rare ? 1.05 : 0.6));
+        // Câmera lenta no meio da virada das raras (~0.2s a 40% da velocidade).
+        const g = rare && !reduced ? f + 0.6 * Math.sin(2 * Math.PI * f) / (2 * Math.PI) : f;
+        flip = card.userData.revealAt < 0 ? 1 : 0.5 - Math.cos(g * Math.PI) / 2;
+        lift += Math.sin(f * Math.PI) * (rare ? 1.2 : 0.6);
+        if (rare && !reduced && card.userData.revealAt >= 0 && f < 1) { focus = Math.max(focus, Math.sin(f * Math.PI)); focusLegend = isLegend(card); }
+        const sheen = sheens[index];
+        if (sheen) {
+          const s = (time - card.userData.revealAt - 1.05) / 0.9; // varre uma vez depois de virar
+          sheen.visible = !reduced && card.userData.revealAt >= 0 && s >= 0 && s <= 1;
+          if (sheen.visible) { sheen.material.map.offset.x = -0.2 + s * 0.9; sheen.material.opacity = 0.75 * Math.sin(s * Math.PI); }
+        }
         if (f > 0.5 && !card.userData.sparked && card.userData.revealAt >= 0) {
           card.userData.sparked = true;
           const color = FOIL_COLOR[card.userData.data.foil] || 0xffffff;
           spark(card.position.clone().add(new THREE.Vector3(0, 0, 0.3)), color, card.userData.data.rare ? 160 : 60, card.userData.data.rare ? 4 : 2.5, 3);
-          if (card.userData.data.rare) { shake = 0.22; burst.color.set(color); burst.intensity = 220; }
+          if (card.userData.data.rare) {
+            if (!reduced) shake = isLegend(card) ? 0.35 : 0.22;
+            burst.color.set(color); burst.intensity = isLegend(card) ? 360 : 220;
+            if (isLegend(card) && !reduced) shockwave(card.position.clone().add(new THREE.Vector3(0, 0, 0.2)), color);
+          }
         }
       }
       card.position.set(position.x, position.y + bob, position.z + lift);
       const spin = tier.opening === 'supernova' ? (1 - e) * Math.PI * 3 : (1 - e) * 0.8;
-      card.rotation.set(-card.userData.hover * 0.08, Math.PI * flip + spin + target.x * 0.15 * e, slot.rz * e * (1 - card.userData.hover * 0.6));
-      card.scale.setScalar((0.8 + 0.2 * e) * (1 + card.userData.hover * 0.06 + (card.userData.revealAt !== null && card.userData.revealAt >= 0 ? Math.sin(Math.min(1, (time - card.userData.revealAt) / 0.6) * Math.PI) * 0.12 : 0)));
+      // LEGEND ainda de costas: trepidação leve (mais forte sob o dedo/mouse).
+      const jitter = !reduced && card.userData.revealAt === null && auras[index] && isLegend(card) ? Math.sin(time * 55 + index * 2) * 0.014 * (0.5 + card.userData.hover * 1.5) * e : 0;
+      card.rotation.set(-card.userData.hover * 0.08, Math.PI * flip + spin + target.x * 0.15 * e, slot.rz * e * (1 - card.userData.hover * 0.6) + jitter);
+      card.scale.setScalar((0.8 + 0.2 * e) * (1 + card.userData.hover * 0.06 + (card.userData.revealAt !== null && card.userData.revealAt >= 0 ? Math.sin(Math.min(1, (time - card.userData.revealAt) / 0.6) * Math.PI) * (card.userData.data.rare && !reduced ? (isLegend(card) ? 0.3 : 0.2) : 0.12) : 0)));
       const aura = auras[index];
-      if (aura) aura.material.opacity = card.userData.revealAt === null ? (0.35 + Math.sin(time * 4) * 0.2) * e : Math.max(0, aura.material.opacity - delta * 1.5);
+      if (aura) {
+        // Antecipação graduada: LEGEND pulsa mais forte e rápido que a rara comum.
+        const big = isLegend(card);
+        const pulse = reduced ? 0 : Math.sin(time * (big ? 7 : 4));
+        aura.material.opacity = card.userData.revealAt === null ? ((big ? 0.6 : 0.35) + pulse * (big ? 0.3 : 0.2)) * e : Math.max(0, aura.material.opacity - delta * 1.5);
+        aura.scale.setScalar(1 + (big ? 0.12 : 0.05) * pulse);
+      }
     });
+    // Foco: véu escuro e câmera chega mais perto enquanto a rara vira.
+    dim.visible = focus > 0.01;
+    dim.material.opacity = focus * 0.6;
+    zoom += (focus * (focusLegend ? 1.1 : 0.6) - zoom) * 0.12;
+    for (let i = shocks.length - 1; i >= 0; i -= 1) {
+      const sh = shocks[i];
+      sh.age += delta;
+      const k = sh.age / sh.life;
+      if (k >= 1) { scene.remove(sh.obj); sh.obj.traverse((o) => { o.geometry?.dispose(); o.material?.dispose(); }); shocks.splice(i, 1); continue; }
+      sh.obj.scale.setScalar(1 + k * sh.grow);
+      if (sh.spin) sh.obj.rotation.z += sh.spin * delta;
+      sh.obj.traverse((o) => { if (o.material) o.material.opacity = 0.9 * (1 - k) ** 2; });
+    }
     if (cardsAt !== null && done && time - cardsAt > 0.75 + count * 0.14) { done(); done = null; }
 
     // A peça desce girando do alto até ficar sobre as cartas, com estouro dourado ao chegar.
@@ -1029,10 +1202,13 @@ export function boosterScene(canvas, { mark, subtitle, tier: tierId = 'common', 
   });
 
   return {
+    /** Arrasto sobre a tira (0..1): a tira acompanha o dedo; soltar abre. */
+    drag(value) { if (openedAt === null) dragK = Math.min(1, Math.max(0, value)); },
     /** Abre o pacote; resolve quando as cartas chegaram à mesa (prontas para virar). */
     open() {
       if (reduced) { group.visible = false; cardsAt = clock.elapsedTime - 5; return Promise.resolve(); }
       openedAt = clock.elapsedTime;
+      dragPeel = dragSm * 0.45;
       return new Promise((resolve) => { done = resolve; });
     },
     revealAll() { cards.filter((card) => card.userData.revealAt === null).forEach((card, order) => setTimeout(() => reveal(card), order * 260)); },

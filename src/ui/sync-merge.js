@@ -52,6 +52,7 @@ function booster(value) {
     theme: str(value.theme, 80),
     layout: value.layout === 'row' ? 'row' : 'arc',
     disguise: value.disguise === true,
+    ...(int(value.luck, 4) !== null ? { luck: value.luck } : {}),
     cards,
   };
 }
@@ -107,14 +108,16 @@ const countCards = (boosters, days) => {
   return counts;
 };
 
-/** Sorte acumulada = pacotes comuns seguidos no fim da lista (a mesma conta que a tela faz ao abrir cada pacote). */
+/** Sorte acumulada = soma dos pontos (luck) dos pacotes sem sorte no fim da lista (a mesma conta que a tela faz ao abrir).
+ * Pacote antigo, sem luck: o comum vale 1 e qualquer outro zera (a regra de antes). */
 function pityOf(boosters) {
-  let streak = 0;
+  let points = 0;
   for (const day of Object.keys(boosters).sort().reverse()) {
-    if (boosters[day].tier !== 'common') break;
-    streak += 1;
+    const luck = boosters[day].luck ?? (boosters[day].tier === 'common' ? 1 : 0);
+    if (!luck) break;
+    points += luck;
   }
-  return streak;
+  return points;
 }
 
 function mergeDecks(local, remote, now) {

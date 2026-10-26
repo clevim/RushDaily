@@ -488,3 +488,20 @@ body.entering.reveal .board, body.entering.reveal .rush-table, body.entering.rev
 .tip-actions { display: flex; gap: 6px; }
 .tip .btn { min-height: 40px; padding: 0 14px; font-size: 0.85rem; }
 .tip-target { outline: 2px dashed var(--gold-hi); outline-offset: 4px; }
+
+/* Fases do turno numa chapa inclinada (as duas arenas) */
+.phases { display: flex; margin: 0; padding: 0; list-style: none; transform: skewX(-14deg); box-shadow: 0 6px 18px -8px var(--ink-solid); }
+.phases li {
+  padding: 4px clamp(8px, 1.1vw, 16px);
+  background: rgb(var(--ink) / 0.55);
+  border: 1px solid rgb(var(--gold-rgb) / 0.22);
+  border-left-width: 0;
+  color: var(--ivory-dim);
+  font: 700 clamp(0.62rem, 0.9vw, 0.8rem)/1.1 var(--body);
+  font-stretch: 80%;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.phases li:first-child { border-left-width: 1px; }
+.phases li[aria-current] { background: var(--foil); color: var(--lacquer); border-color: var(--gold-hi); }
+.phases[data-owner='enemy'] li[aria-current] { background: linear-gradient(160deg, #ff8a5c, var(--blood) 55%, #7d0f19); color: var(--ivory); border-color: #ff8a92; }
