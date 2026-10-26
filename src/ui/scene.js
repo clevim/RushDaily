@@ -1196,7 +1196,8 @@ export function puzzleScene(canvas, { owned = [], total = 38, fresh = null, redu
 
   const puzzle = new THREE.Group();
   scene.add(puzzle);
-  const ghost = new THREE.LineBasicMaterial({ color: GOLD, transparent: true, opacity: 0.16 });
+  const ghost = new THREE.LineBasicMaterial({ color: GOLD, transparent: true, opacity: 0.3 });
+  const moldFill = new THREE.MeshBasicMaterial({ color: 0x0b0906, transparent: true, opacity: 0.55 });
   const movers = []; // peças animadas: { mesh, from, to, start, spin }
   let material = null;
   let ringMesh = null;
@@ -1231,9 +1232,13 @@ export function puzzleScene(canvas, { owned = [], total = 38, fresh = null, redu
     const placed = pieces.filter((_, index) => haveIt(index) && index !== fresh).flatMap((piece) => piece.arrays);
     if (complete) placed.push(ring);
     if (placed.length) puzzle.add(new THREE.Mesh(geometryOf(...placed), material));
-    pieces.forEach((piece, index) => {
-      if (!haveIt(index)) puzzle.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometryOf(...piece.arrays), 25), ghost));
-    });
+    // Molde vazio: preenchimento escuro + contorno dourado fino (a peça nova encaixa aqui).
+    const molds = pieces.filter((_, index) => !haveIt(index) || index === fresh);
+    if (molds.length) {
+      const hollow = geometryOf(...molds.flatMap((piece) => piece.arrays));
+      puzzle.add(new THREE.Mesh(hollow, moldFill));
+      puzzle.add(new THREE.LineSegments(new THREE.EdgesGeometry(hollow, 25), ghost));
+    }
     if (fresh !== null && haveIt(fresh)) {
       const mesh = new THREE.Mesh(geometryOf(...pieces[fresh].arrays), material);
       puzzle.add(mesh);
@@ -1285,6 +1290,7 @@ export function puzzleScene(canvas, { owned = [], total = 38, fresh = null, redu
     const lit = (complete && !explode) || ringMesh?.visible;
     glow.intensity += ((lit ? 60 + Math.sin(time * 2) * 20 : 0) - glow.intensity) * (explode ? 0.02 : 0.04);
     halo.rotation.z = time * 0.2;
+    if (!reduced) ghost.opacity = 0.26 + Math.sin(time * 1.4) * 0.12; // pulso lento do molde vazio
     particles.userData.tick?.(delta);
     renderer.render(scene, camera);
     if (explode && !finished && explodedAt !== null && time - explodedAt > 1.9) {

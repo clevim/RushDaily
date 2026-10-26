@@ -304,18 +304,20 @@ async function renderReward() {
     locked ? 'Vença o duelo de hoje para liberar 5 cartas.'
       : opened ? 'Toque numa carta para ler.'
         : 'Toque no pacote para abrir.')}
+    <div class="pack-row ${opened ? 'solo' : ''}" id="pack-row">
     <div class="pack-stage ${locked ? 'locked' : ''}"><canvas class="pack-canvas" id="pack-canvas" aria-label="Booster em 3D"></canvas>
       ${locked || opened ? '' : '<button class="pack-hit" type="button" id="pack" aria-label="Abrir booster"></button>'}</div>
+    <section class="tier-ref" aria-labelledby="tier-ref-title"><h2 id="tier-ref-title">Versões do booster</h2>
+      <canvas class="tier-canvas" id="tier-canvas" aria-label="Boosters Comum, Prata e Ouro em 3D"></canvas>
+      <ul class="tier-legend">${SHOWCASE.map((id) => `<li><b>${TIER_NAME[id]}</b><span>${tierDifficulties(id)}</span></li>`).join('')}</ul>
+      <p class="tier-note">Qualquer pacote pode sair melhor por sorte; a Elite e o Caos ainda têm chance de Galáxia.</p></section>
+    </div>
     <div class="pack-controls" id="pack-controls" ${opened ? '' : 'hidden'}>
       <p class="pack-hint" id="pack-hint">${opened ? '' : 'Toque nas cartas para virar.'}</p>
       <div class="center"><button class="btn" type="button" id="reveal-all" ${opened ? 'hidden' : ''}>Revelar todas</button> <a class="btn ghost" href="screens.html?screen=collection&player=${playerKey}">Ver coleção</a></div>
       <div id="pack-summary">${opened ? summary(result) : ''}</div>
     </div>
-    ${locked ? `<div class="center"><a class="btn big" href="index.html?player=${playerKey}">Ir para o desafio</a></div>` : ''}
-    <section class="tier-ref" aria-labelledby="tier-ref-title"><h2 id="tier-ref-title">Qual booster cada dificuldade dá</h2>
-      <canvas class="tier-canvas" id="tier-canvas" aria-label="Boosters Comum, Prata e Ouro em 3D"></canvas>
-      <ul class="tier-legend">${SHOWCASE.map((id) => `<li><b>${TIER_NAME[id]}</b><span>${tierDifficulties(id)}</span></li>`).join('')}</ul>
-      <p class="tier-note">Qualquer pacote pode sair melhor por sorte; a Elite e o Caos ainda têm chance de Galáxia.</p></section>`;
+    ${locked ? `<div class="center"><a class="btn big" href="index.html?player=${playerKey}">Ir para o desafio</a></div>` : ''}`;
 
   const copy = (text) => { root.querySelector('.screen-head p').textContent = text; };
   // O toque no pacote vale desde já: a cena 3D (e as frentes das cartas) termina de carregar enquanto ele espera.
@@ -336,6 +338,7 @@ async function renderReward() {
     writeJson(foilsKey(playerKey), foils);
     writeJson(pityKey(playerKey), result.tier === 'common' ? readJson(pityKey(playerKey), 0) + 1 : 0);
     removeKey(rewardKey);
+    root.querySelector('#pack-row').classList.add('solo'); // as 5 cartas precisam da largura toda: a vitrine desce
     copy('Abrindo…');
     await (await scene).open();
     root.querySelector('#pack-controls').hidden = false;
@@ -382,7 +385,10 @@ function renderPuzzle() {
   const recovered = recoveredDays(playerKey).filter((day) => monthOf(day) === month).map((day) => Number(day.slice(8)) - 1);
   const charges = heartCharges(playerKey).length;
   const todayIndex = Number(date.slice(8)) - 1;
-  const fresh = Number(new URLSearchParams(location.search).get('fresh'));
+  const seenKey = `rushdaily-enigma-seen:${playerKey}:${month}`; // peças cuja animação de encaixe já tocou
+  const unseen = owned.filter((index) => !readJson(seenKey, []).includes(index));
+  const fresh = unseen.length ? unseen[unseen.length - 1] : null; // a mais nova ainda não animada
+  if (unseen.length) writeJson(seenKey, owned);
   const missed = Array.from({ length: todayIndex }, (_, index) => index).filter((index) => !owned.includes(index));
   const dayIso = (index) => `${month}-${String(index + 1).padStart(2, '0')}`;
   const recoverHref = (index) => `arena.html?dia=${dayIso(index)}&player=${playerKey}`;
@@ -417,7 +423,7 @@ function renderPuzzle() {
     assemble: new URLSearchParams(location.search).get('demo') === '1',
     owned,
     total,
-    fresh: Number.isInteger(fresh) && owned.includes(fresh) ? fresh : null,
+    fresh,
     reduced: settingsFor(playerKey).reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches,
   }));
 }
