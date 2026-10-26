@@ -4,7 +4,7 @@ import test from 'node:test';
 import createCore, { OcgDuelMode, OcgMessageType as M } from '../src/vendor/ocgcore/index.js';
 import { FORMATS, RUSH_ZONES, createDuel, isExtra } from '../src/engine/ocg.mjs';
 import { decide } from '../src/engine/ocg-ai.mjs';
-import { buildRushDeck, validateRushDeck } from '../src/engine/rush-deck.mjs';
+import { buildRushDeck, meetsRequirements, validateRushDeck } from '../src/engine/rush-deck.mjs';
 
 // Exige os dados do Rush (npm run setup -- --so rush-ocg); não depende dos dados do clássico.
 const root = new URL('../', import.meta.url);
@@ -67,6 +67,14 @@ test('deck gerado é legal, coerente e determinístico', () => {
     const monsters = deck.main.map((id) => cards.get(id)).filter((card) => card.type & 0x1);
     assert.ok(monsters.filter((card) => card.race === deck.theme.race).length >= monsters.length / 3, `seed ${i}: tema fraco`);
     assert.ok(deck.main.filter((id) => !(cards.get(id).type & 0x1)).length >= 12, `seed ${i}: poucas Magias/Armadilhas`);
+    // Magia/Armadilha só com requisitos (Tipo/Atributo/nome/Nível) atendidos pelo deck; Fusão só com as matérias no deck.
+    const mainCards = deck.main.map((id) => cards.get(id));
+    for (const card of mainCards) assert.ok(meetsRequirements(card, mainCards), `seed ${i}: ${card.name} sem requisito no deck`);
+    const names = new Set(mainCards.flatMap((card) => [card.name, card.nameEn]));
+    for (const id of deck.extra) {
+      const mats = [...cards.get(id).desc.split('\n')[0].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+      assert.ok(mats.length && mats.every((name) => names.has(name)), `seed ${i}: ${cards.get(id).name} sem matérias no deck`);
+    }
   }
   assert.deepEqual(buildRushDeck({ seed: 'igual', pool }), buildRushDeck({ seed: 'igual', pool }));
   assert.notDeepEqual(buildRushDeck({ seed: 'a', pool }).main, buildRushDeck({ seed: 'b', pool }).main);

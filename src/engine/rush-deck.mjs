@@ -5,6 +5,7 @@
 // de cada categoria (1 monstro Lenda, 1 Magia Lenda, 1 Armadilha Lenda), contando deck e adicional.
 import { FORMATS, TYPE, isExtra } from './ocg.mjs';
 import { seeded } from './classic-deck.mjs';
+import { ATTRIBUTES as ATTRIBUTES_PT, RACES as RACES_PT } from '../data/classic/strings-pt.mjs';
 
 export { seeded };
 
@@ -25,11 +26,34 @@ const category = (card) => (isMonster(card) ? 'monster' : card.type & TYPE.SPELL
 // Rituais precisam da Magia certa e peças de Máximo só entram como pacote (as três juntas).
 const playable = (card) => card && !isExtra(card) && !(card.type & TYPE.RITUAL) && !(card.type & TYPE.TOKEN) && !card.maximum;
 const nameKey = (card) => card.nameEn || card.name;
-// Texto em inglês para achar o tema citado (as traduções em PT não citam Tipo/Atributo pelo nome em inglês).
-const textOf = (card) => (card.pt ? '' : card.desc || '');
-const mentions = (card, word) => new RegExp(`\\b${word.replace(/[-\s]/g, '[-\\s]')}\\b`).test(textOf(card));
-const citedRaces = (card) => Object.values(RACE_NAMES).filter((name) => mentions(card, name));
-const citedAttributes = (card) => Object.values(ATTRIBUTE_NAMES).filter((name) => new RegExp(`\\b${name}\\b`).test(textOf(card)));
+// O texto das cartas está em PT ("monstro do Tipo Besta-Guerreira de Atributo VENTO"): Tipo/Atributo pelos nomes em PT.
+const racePt = (race) => RACES_PT[Math.log2(race)];
+const textOf = (card) => card.desc || '';
+const unquoted = (card) => textOf(card).replace(/"[^"]*"/g, ''); // nomes de carta citados não contam como Tipo/Atributo
+// Mais longo primeiro: "Besta-Guerreira" antes de "Besta", "Dragão Supremo" antes de "Dragão".
+const RACE_RE = new RegExp(`(?<![\\wÀ-ú-])(${[...RACES_PT].sort((a, b) => b.length - a.length).join('|')})(?![\\wÀ-ú-])`, 'g');
+const ATTR_RE = new RegExp(`(?<![\\wÀ-ú-])(${Object.values(ATTRIBUTES_PT).join('|')})(?![\\wÀ-ú-])`, 'g');
+const citedRaces = (card) => [...new Set([...unquoted(card).matchAll(RACE_RE)].map((m) => m[1]))];
+const citedAttributes = (card) => [...new Set([...unquoted(card).matchAll(ATTR_RE)].map((m) => m[1]))];
+const citedNames = (card) => [...textOf(card).matchAll(/"([^"]+)"/g)].map((m) => m[1]).filter((name) => name !== card.name && name !== card.nameEn);
+// Níveis só do [REQUISITO] (no efeito costumam ser do monstro do oponente): "Nível 7 ou mais", "Nível 4 ou menos", "Nível 6 ou 7".
+const citedLevels = (card) => [...(textOf(card).split('[EFEITO]')[0].matchAll(/Nível (\d+)(?: ou (mais|menos|\d+))?/g))]
+  .map(([, n, rel]) => (lv) => (rel === 'mais' ? lv >= +n : rel === 'menos' ? lv <= +n : lv === +n || lv === +rel));
+
+/** Magia/Armadilha que cita Tipo, Atributo, nome/arquétipo ou Nível só serve se algum monstro (ou carta, no caso do nome)
+ * do deck atende cada citação. Monstros sempre servem. mainCards: cartas já no deck. */
+export function meetsRequirements(card, mainCards) {
+  if (isMonster(card)) return true;
+  const monsters = mainCards.filter(isMonster);
+  const races = citedRaces(card);
+  const attrs = citedAttributes(card);
+  const names = citedNames(card);
+  const levels = citedLevels(card);
+  return (!races.length || monsters.some((m) => races.includes(racePt(m.race))))
+    && (!attrs.length || monsters.some((m) => attrs.includes(ATTRIBUTES_PT[m.attribute])))
+    && (!names.length || names.some((name) => mainCards.some((c) => c !== card && (c.name.includes(name) || c.nameEn.includes(name)))))
+    && (!levels.length || monsters.some((m) => levels.some((ok) => ok(level(m)))));
+}
 
 /** Cotas do deck de 40 (escalam para outros tamanhos): curva baixa, poucos de 1 e 2 Sacrifícios e 14 Magias/Armadilhas
  * (com 17 a mão enchia de Magias/Armadilhas sem uso). Magias de Fusão ficam fora da cota: só entram pela lógica de Fusão. */
@@ -109,7 +133,8 @@ export function buildRushDeck({ seed, pool, format = FORMATS.rush, race = null }
   const sets = [...setCount].filter(([, n]) => n >= 4);
   const setcode = sets.length && random() < 0.5 ? weightedPick(random, sets.map(([code, n]) => [code, n])) : null;
   const raceName = theme.name;
-  const attrName = ATTRIBUTE_NAMES[attribute];
+  const racePtName = racePt(theme.race);
+  const attrName = ATTRIBUTES_PT[attribute];
 
   const main = [];
   const counts = new Map();
@@ -132,7 +157,9 @@ export function buildRushDeck({ seed, pool, format = FORMATS.rush, race = null }
     if (card.legend) legendUsed.add(category(card));
   };
   const free = (card) => RUSH_LIMITS.copies - (counts.get(nameKey(card)) || 0);
-  const allowed = (card) => playable(card) && free(card) > 0 && !(card.legend && legendUsed.has(category(card)));
+  // Magia/Armadilha só com os requisitos atendidos pelo deck montado até aqui (os monstros entram antes, pelas cotas).
+  const allowed = (card) => playable(card) && free(card) > 0 && !(card.legend && legendUsed.has(category(card)))
+    && meetsRequirements(card, main.map((id) => byId.get(id)));
 
   // Peso de cada carta para o tema.
   const weight = (card) => {
@@ -144,12 +171,13 @@ export function buildRushDeck({ seed, pool, format = FORMATS.rush, race = null }
     } else {
       const races = citedRaces(card);
       const attrs = citedAttributes(card);
-      if (races.includes(raceName)) w += 6;
+      if (races.includes(racePtName)) w += 6;
       if (attrs.includes(attrName)) w += 3;
       // Cita outro Tipo/Atributo e não o nosso: provavelmente não funciona neste deck.
-      if ((races.length && !races.includes(raceName)) || (attrs.length && !attrs.includes(attrName) && !races.includes(raceName))) w *= 0.05;
-      if (/Fusion Summon/.test(textOf(card))) w *= 0.3; // Magias de Fusão entram pelo adicional
+      if ((races.length && !races.includes(racePtName)) || (attrs.length && !attrs.includes(attrName) && !races.includes(racePtName))) w *= 0.05;
+      if (/Invoque por Fusão|Fusion Summon/.test(textOf(card))) w *= 0.3; // Magias de Fusão entram pelo adicional
     }
+    if (citedNames(card).some((name) => starNames.has(name))) w *= 5; // busca/apoia uma estrela
     if (setcode && card.setcode === setcode) w *= 4;
     if (card.legend) w *= 0.6;
     return w;
@@ -163,13 +191,25 @@ export function buildRushDeck({ seed, pool, format = FORMATS.rush, race = null }
     for (const piece of [byId.get(center.id - 1), center, byId.get(center.id + 1)]) add(piece, 2);
   }
   // Pacote de Fusão do tema: uma Fusão do Tipo cujas matérias citadas existem no pool entra com 2 cópias de cada matéria.
-  const byName = new Map(pool.filter(playable).map((card) => [card.nameEn, card]));
+  const byName = new Map(pool.filter(playable).flatMap((card) => [[card.nameEn, card], [card.name, card]]));
   const fusionCandidates = pool.filter((card) => card.type & TYPE.FUSION && card.race === theme.race && !card.legend)
     .map((card) => ({ card, mats: materialsOf(card).map((name) => byName.get(name)) }))
     .filter(({ mats }) => mats.length >= 2 && mats.every((mat) => mat && !mat.legend && level(mat) <= 6));
-  if (fusionCandidates.length && random() < 0.6) {
-    const { mats } = fusionCandidates[Math.floor(random() * fusionCandidates.length)];
-    for (const mat of mats) if (room(mat)) add(mat, Math.min(2, free(mat)));
+  // Estrelas: as Fusões escolhidas e um Tributo forte do Tipo (1 cópia); o resto do deck favorece cartas que as citam.
+  const starNames = new Set();
+  const tributes = ofRace.filter((card) => level(card) >= 7 && !card.legend && card.type & TYPE.EFFECT);
+  if (tributes.length) {
+    const star = tributes[Math.floor(random() * tributes.length)];
+    starNames.add(star.name).add(star.nameEn);
+    add(star, 1);
+  }
+  if (fusionCandidates.length) {
+    const first = fusionCandidates[Math.floor(random() * fusionCandidates.length)];
+    // A segunda Fusão (se houver) divide ao menos uma matéria com a primeira.
+    const sharing = fusionCandidates.filter((c) => c !== first && c.mats.some((mat) => first.mats.includes(mat)));
+    const chosen = sharing.length ? [first, sharing[Math.floor(random() * sharing.length)]] : [first];
+    for (const { card } of chosen) starNames.add(card.name).add(card.nameEn);
+    for (const { mats } of chosen) for (const mat of mats) if (!counts.get(nameKey(mat))) add(mat, Math.min(2, free(mat)));
   }
 
   // Peso calculado uma vez por carta (o tema não muda durante a montagem).
@@ -189,7 +229,9 @@ export function buildRushDeck({ seed, pool, format = FORMATS.rush, race = null }
       if (!options.length) break;
       const card = pickFrom(options);
       // Cópias: Lenda 1; nível baixo costuma ir em 2 ou 3; nível 7+ em 1 ou 2.
-      const want = card.legend ? 1 : isMonster(card) && level(card) >= 7 ? 1 + Math.floor(random() * 2) : 2 + Math.floor(random() * 2);
+      // Suporte e técnicas: 1 cópia (2 se do tema); motor (monstros de nível baixo): 2 ou 3.
+      const want = card.legend ? 1 : isMonster(card) && level(card) >= 7 ? 1 + Math.floor(random() * 2)
+        : isMonster(card) ? 2 + Math.floor(random() * 2) : 1 + (themed(card) ? 1 : 0);
       add(card, Math.min(want, free(card), quota.n - quota.have));
     }
   }
@@ -200,12 +242,12 @@ export function buildRushDeck({ seed, pool, format = FORMATS.rush, race = null }
     add(pickFrom(options), 1);
   }
 
-  // Adicional: Fusões cujas matérias citadas estão todas no deck (ou ao menos uma, com peso menor).
+  // Adicional: só Fusões cujas matérias citadas estão todas no deck.
   const names = new Set(main.map((id) => byId.get(id)).flatMap((card) => [card.nameEn, card.name]));
   const scored = pool.filter((card) => card.type & TYPE.FUSION).map((card) => {
     const mats = materialsOf(card);
     const have = mats.filter((name) => names.has(name)).length;
-    return [card, mats.length && have === mats.length ? 4 : have ? 1 : 0];
+    return [card, mats.length && have === mats.length ? 4 : 0];
   }).filter(([, score]) => score > 0);
   const extra = [];
   while (extra.length < format.extra && scored.length) {
@@ -221,9 +263,15 @@ export function buildRushDeck({ seed, pool, format = FORMATS.rush, race = null }
   if (extra.length) {
     // Só as que ainda não estão no deck (a cópia sorteada antes já conta).
     const wanted = fusions.filter((card) => !counts.get(nameKey(card)) && !(card.legend && legendUsed.has('spell'))).flatMap((card) => (card.legend ? [card] : [card, card]));
+    let swapped = 0;
     for (let i = main.length - 1; i >= 0 && wanted.length; i -= 1) {
       const card = byId.get(main[i]);
-      if (!(card.type & TYPE.SPELL) || card.legend || fusions.includes(card) || weights.get(card.id) > 1) continue;
+      // A primeira troca (vaga fixa da Magia de Fusão) vale para qualquer Magia; as demais só para as fracas.
+      if (!(card.type & TYPE.SPELL) || card.legend || fusions.includes(card) || (swapped && weights.get(card.id) > 1)) continue;
+      // Não troca uma Magia da qual outra carta do deck depende (requisito).
+      const after = main.map((id, j) => byId.get(j === i ? wanted[0].id : id));
+      if (!after.every((c) => meetsRequirements(c, after))) continue;
+      swapped += 1;
       const swap = wanted.shift();
       counts.set(nameKey(card), counts.get(nameKey(card)) - 1);
       counts.set(nameKey(swap), (counts.get(nameKey(swap)) || 0) + 1);

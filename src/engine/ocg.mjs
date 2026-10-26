@@ -106,6 +106,7 @@ export function createDuel(lib, { seed, format = FORMATS.rapido, decks = [], puz
   lib.startDuel(handle);
 
   let lastPrompt = null;
+  let promptHint = 0n; // dica da pergunta respondida: volta se o motor recusar (RETRY) e repetir a mesma pergunta
   const state = { turn: 0, active: 0, phase: 0, hint: 0n, lp: [...startLp], winner: null, reason: null };
   const track = (message) => {
     switch (message.type) {
@@ -158,11 +159,15 @@ export function createDuel(lib, { seed, format = FORMATS.rapido, decks = [], puz
           // RETRY: o motor recusou a última resposta e repete a mesma pergunta.
           const retry = messages.at(-1)?.type === OcgMessageType.RETRY;
           if (!retry) lastPrompt = messages.at(-1);
+          else state.hint = promptHint;
           return { events, prompt: lastPrompt, retry, winner: null };
         }
       }
     },
-    respond(response) { lib.duelSetResponse(handle, response); },
+    // A dica (SELECTMSG) vale só para a pergunta seguinte, como no cliente do EDOPro: muitos scripts Rush fazem
+    // Select sem Duel.Hint, e a dica velha virava o título errado (ex.: "devolver ao Deck" ao escolher o que destruir)
+    // e enganava a IA sobre custo ou ganho.
+    respond(response) { promptHint = state.hint; state.hint = 0n; lib.duelSetResponse(handle, response); },
     destroy() { lib.destroyDuel(handle); },
   };
 }

@@ -200,7 +200,7 @@ function slot(controller, location, sequence, card, place, extraClass = '') {
   const label = hidden ? (spell ? 'Carta baixada do rival' : 'Monstro virado do rival') : `${data.name}${isFaceDown(card) ? ', virada' : ''}`;
   const materials = card.overlayCards?.length ? `<span class="xyz-mats">${card.overlayCards.length}</span>` : '';
   return `<div class="${classes.join(' ')}" data-loc="${key}" ${place}>
-    <button class="card face" type="button" data-loc="${key}" data-gesture aria-label="${escape(label)}">${hidden ? cardBack() : cardFace(data, { live: card })}</button>${materials}</div>`;
+    <button class="card face" type="button" data-loc="${key}" data-gesture aria-label="${escape(label)}">${isFaceDown(card) ? cardBack() : cardFace(data, { live: card })}</button>${materials}</div>`;
 }
 
 function pile(controller, kind, count, top, place) {
@@ -259,7 +259,7 @@ function renderHand() {
     const key = locKey(ME, L.HAND, card.sequence);
     const pose = poses.get(key) || defaultPose(cardOf(card.code));
     const playable = actionsFor(key).length > 0;
-    return `<button class="card hand-card ${playable ? 'playable' : ''} ${pose.set ? 'facedown set-pose' : ''}" style="--i:${index}" type="button" data-loc="${key}" data-gesture aria-label="${escape(cardOf(card.code).name)}${pose.set ? ', para baixar' : ''}">${cardFace(cardOf(card.code))}</button>`;
+    return `<button class="card hand-card ${playable ? 'playable' : ''} ${pose.set ? 'facedown set-pose' : ''}" style="--i:${index}" type="button" data-loc="${key}" data-gesture aria-label="${escape(cardOf(card.code).name)}${pose.set ? ', para baixar' : ''}">${pose.set ? cardBack() : cardFace(cardOf(card.code))}</button>`;
   }).join('');
   const foeHand = view[FOE].hand.filter(Boolean).length;
   $('#foe-hand').innerHTML = `<span class="fan">${cardBack().repeat(Math.min(foeHand, 7))}</span><b>${foeHand}</b>`;
@@ -461,7 +461,9 @@ function bindGestures() {
     const key = node.dataset.loc;
     // Fora da vez de responder (animações, vez do rival) só dá para ler a carta.
     press = { key, node, x: event.clientX, y: event.clientY, moved: false, held: false, ghost: null, idle: !current };
-    if (!press.idle) press.timer = setTimeout(() => { press.held = true; onHold(key); }, HOLD_MS);
+    const pressed = press;
+    // Segurar troca a pose e redesenha a mão: se o dedo seguir arrastando, o fantasma sai da carta nova, não da que sumiu.
+    if (!press.idle) press.timer = setTimeout(() => { pressed.held = true; onHold(key); pressed.node = document.querySelector(`.hand-card[data-loc="${key}"]`) || pressed.node; }, HOLD_MS);
   });
   document.addEventListener('pointermove', (event) => {
     if (!press || press.idle) return;
@@ -515,6 +517,18 @@ function bindGestures() {
   };
   document.addEventListener('pointerup', finish);
   document.addEventListener('pointercancel', () => { if (press) { clearTimeout(press.timer); press.ghost?.remove(); press = null; dragging = null; markTargets(); } });
+  // Segurar no celular não deve abrir o menu do navegador sobre as cartas.
+  document.addEventListener('contextmenu', (event) => { if (event.target.closest('[data-gesture]')) event.preventDefault(); });
+  // Teclado (clique sem ponteiro): Enter numa carta abre a leitura com as ações; D é o mesmo que tocar duas vezes.
+  document.addEventListener('click', (event) => {
+    if (event.detail !== 0) return;
+    const node = event.target.closest('[data-gesture]');
+    if (node) showZoom(node.dataset.loc);
+  });
+  document.addEventListener('keydown', (event) => {
+    const node = event.target.closest?.('[data-gesture]');
+    if (node && event.key.toLowerCase() === 'd') onDoubleTap(node.dataset.loc);
+  });
 }
 
 function togglePose(key) {
@@ -525,17 +539,17 @@ function togglePose(key) {
 }
 function onDoubleTap(key) {
   const [controller, location] = key.split(':').map(Number);
-  if (controller !== ME) return;
+  if (controller !== ME || !current) return;
   if (location === L.HAND) { togglePose(key); return; }
   const change = actionsFor(key).find((item) => item.action === 2);
   if (change) respond(change.response);
 }
 function onHold(key) {
   const [controller, location] = key.split(':').map(Number);
-  if (controller !== ME) return;
+  if (controller !== ME) { showZoom(key); return; }
   if (location === L.HAND) { togglePose(key); return; }
   const flip = actionsFor(key).find((item) => item.action === 2 && item.label === 'Invocar por Virada');
-  if (flip) respond(flip.response);
+  if (flip) respond(flip.response); else showZoom(key);
 }
 
 /* ---------- Zoom com ações ---------- */

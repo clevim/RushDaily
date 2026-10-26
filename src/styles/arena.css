@@ -81,8 +81,7 @@
 .zone.defense .live-stats b:first-child { color: var(--ivory-dim); }
 .zone.defense .live-stats b:last-child { color: var(--gold-hi); }
 .classic .card:has(> .ycard) { background: none; overflow: visible; }
-.zone.facedown .ycard:not(.back) { filter: brightness(0.55) saturate(0.5); }
-/* Carta virada (campo) ou marcada para baixar (mão): só um realce azul em volta, sem texto por cima. */
+/* Carta virada (campo) ou marcada para baixar (mão): mostra o verso, com um realce azul em volta. */
 .classic .zone.facedown .ycard, .classic .hand-card.set-pose .ycard { box-shadow: 0 0 0 2px var(--sky), 0 0 16px 2px rgb(79 179 232 / 0.55); }
 .zone .ycard, .pile .ycard { box-shadow: 0 6px 14px -6px var(--ink-solid); }
 .xyz-mats { position: absolute; top: -6px; left: -6px; z-index: 2; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #111; border: 1.5px solid var(--gold); color: var(--gold-hi); font: 700 0.7rem/1 var(--body); }
