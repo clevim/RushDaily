@@ -119,7 +119,7 @@ export async function ensureStarter(playerKey) {
   const owned = readCollection(playerKey);
   if (Object.keys(owned).length) return owned;
   const [{ pool }, { synergy, templates }] = await Promise.all([loadSeasonPool(), loadDeckHints()]);
-  const starters = ['a', 'b'].map((tag) => buildDeck({ seed: `starter:${playerKey}:${tag}`, pool, synergy, templates, format: PVP_FORMAT }));
+  const starters = ['a'].map((tag) => buildDeck({ seed: `starter:${playerKey}:${tag}`, pool, synergy, templates, format: PVP_FORMAT }));
   const collection = {};
   for (const deck of starters) for (const id of [...deck.main, ...deck.extra]) collection[id] = Math.min(3, (collection[id] || 0) + 1);
   writeCollection(playerKey, collection);

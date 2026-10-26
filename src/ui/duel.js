@@ -10,6 +10,7 @@ import { ATTRIBUTES, RACES, describe } from '../data/classic/strings-pt.mjs';
 import { cardStats, isMonster } from './rush-info.js';
 import { RUSH_BACK, paintRushCards, warmRushCards } from './rush-render.js';
 import { answerCommon, createAsk } from './ocg-ask.js';
+import { bindCardGestures } from './card-gestures.js';
 import { escape, getPlayerKey, heartUnlocked, readJson, reducedMotion, removeKey, settingsFor, today, toast, useHeart, writeJson } from './common.js';
 import { duelScene, enigmaBurst, enigmaMini } from './scene.js';
 import { resultGrid } from './share.js';
@@ -28,8 +29,6 @@ const $ = (selector) => document.querySelector(selector);
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, motion ? ms : 0));
 const GOLD = 0xf5b21a;
 const RED = 0xe0303f;
-const HOLD_MS = 420;
-const DOUBLE_TAP_MS = 320;
 const ME = 0; // no desafio do dia você sempre começa (time 0)
 const FOE = 1;
 const saveKey = `rushdaily-game:${playerKey}:${date}:${difficulty}`;
@@ -81,7 +80,7 @@ function readScript(name) {
   return scripts.get(name);
 }
 const lib = await corePromise;
-const duel = createDuel(lib, { seed: match.seed, format: FORMAT, decks, lp: startLp, skills: withHeart ? [{ team: ME, code: HEART_CODE }] : [], cards, readScript, onError: (text) => console.warn('[motor]', text) });
+const duel = createDuel(lib, { seed: match.seed, format: FORMAT, decks, lp: startLp, hands: match.enemy.hand ? [FORMAT.hand, match.enemy.hand] : null, skills: withHeart ? [{ team: ME, code: HEART_CODE }] : [], cards, readScript, onError: (text) => console.warn('[motor]', text) });
 let responses = [];
 let view = duel.snapshot();
 const aiMemory = {};
@@ -108,6 +107,7 @@ const back = () => `<span class="rcard back" aria-hidden="true"><img src="${RUSH
 
 const at = (row, col) => `style="grid-area:${row}/${col}"`;
 
+const lastDef = new Map();
 function slot(controller, location, sequence, card, place, extraClass = '') {
   const key = locKey(controller, location, sequence);
   const spell = location === L.SZONE;
@@ -118,11 +118,17 @@ function slot(controller, location, sequence, card, place, extraClass = '') {
   const classes = [base, 'filled'];
   if (location === L.MZONE && isDefense(card)) classes.push('defense');
   if (isFaceDown(card)) classes.push('facedown');
+  if (location === L.MZONE) {
+    const def = Boolean(isDefense(card)), was = lastDef.get(key);
+    lastDef.set(key, def);
+    if (was !== undefined && was !== def) classes.push('spin'); // giro de 90° ao trocar de posição
+    if (controller === ME && actionsFor(key).some((item) => item.action === 2)) classes.push('can-pos'); // ainda pode mudar de posição
+  }
   if (controller === ME && current?.prompt.type === M.SELECT_BATTLECMD && actionsFor(key).some((item) => item.action === 'attack')) classes.push('ready');
   const label = hidden ? (spell ? 'Carta baixada do rival' : 'Monstro virado do rival')
     : `${data.name}${isFaceDown(card) ? ', virada' : ''}${location === L.MZONE && !isFaceDown(card) ? `, ${isDefense(card) ? 'Defesa' : 'Ataque'}, ATK ${card.attack}, DEF ${card.defense}` : ''}${controller === ME ? '' : ' (do rival)'}`;
   return `<div class="${classes.join(' ')}" data-loc="${key}" ${place}>
-    <button class="card face" type="button" data-loc="${key}" data-gesture aria-label="${escape(label)}">${hidden ? back() : face(data, location === L.MZONE ? card : null)}</button></div>`;
+    <button class="card face" type="button" data-loc="${key}" data-gesture aria-label="${escape(label)}">${hidden || (spell && isFaceDown(card)) ? back() : face(data, location === L.MZONE ? card : null)}</button></div>`;
 }
 
 function pile(controller, kind, count, top, place) {
@@ -184,7 +190,7 @@ function renderHand() {
   $('#hand').innerHTML = hand.map((card, index) => {
     const key = locKey(ME, L.HAND, card.sequence);
     const data = cardOf(card.code);
-    const pose = poses.get(key) || defaultPose(data);
+    const pose = { set: Boolean(poses.get(key)?.set) };
     const playable = actionsFor(key).length > 0;
     const stats = isMonster(data) ? `, Nível ${data.level & 0xff}, ATK ${data.atk}, DEF ${data.def}` : '';
     return `<button class="card hand-card ${playable ? 'playable' : ''} ${pose.set ? 'set-pose' : ''}" style="--i:${index}" type="button" data-loc="${key}" data-gesture aria-label="${escape(`${data.name}${stats}${pose.set ? ', para baixar virada' : ''}${playable ? ', jogável' : ''}`)}">${pose.set ? back() : face(data)}</button>`;
@@ -209,7 +215,7 @@ function render() {
   renderTurn();
   tweenLp(ME);
   tweenLp(FOE);
-  markTargets();
+  gestures?.mark();
   paintRushCards(document.body);
 }
 
@@ -405,6 +411,7 @@ async function lunge(event) {
 /* ---------- O que dá para fazer agora (pergunta aberta) ---------- */
 
 let current = null; // { prompt, resolve }
+let gestures = null; // card-gestures.js (ligado no fim do arquivo)
 const poses = new Map(); // carta da mão -> { set }
 const defaultPose = (card) => ({ set: Boolean(card.type & TYPE.TRAP) });
 const plan = { target: null, tributes: null, zone: null };
@@ -449,16 +456,12 @@ function respond(response) {
   if (!current) return;
   const { resolve } = current;
   current = null;
-  dragging = null;
-  markTargets();
-  hideZoom();
+  gestures.reset();
   renderDock();
   resolve(response);
 }
 
 /* ---------- Alvos de arrastar ---------- */
-
-let dragging = null; // { key }
 
 function dropTargets(key) {
   const prompt = current?.prompt;
@@ -496,101 +499,33 @@ function dropTargets(key) {
   return zones;
 }
 
-function markTargets(key = dragging?.key) {
-  document.querySelectorAll('.drop-ok, .drop-hover').forEach((node) => node.classList.remove('drop-ok', 'drop-hover'));
-  if (!key) return;
-  for (const target of dropTargets(key)) document.querySelector(target.node)?.classList.add('drop-ok');
-}
-
 /* ---------- Gestos: tocar, tocar duas vezes, segurar, arrastar; teclado ---------- */
 
 function bindGestures() {
-  let press = null;
-  let lastTap = { key: null, at: 0 };
-  document.addEventListener('pointerdown', (event) => {
-    if (!$('#help').hidden && !event.target.closest('#help, #help-toggle')) $('#help-toggle').click();
-    if (event.button > 0) return;
-    const node = event.target.closest('[data-gesture]');
-    if (!node) return;
-    const key = node.dataset.loc;
-    // Fora da vez de responder (animações, vez do rival) só dá para ler a carta.
-    press = { key, node, x: event.clientX, y: event.clientY, moved: false, held: false, ghost: null, idle: !current };
-    const pressed = press;
-    // Segurar troca a pose e redesenha a mão: se o dedo seguir arrastando, o fantasma sai da carta nova, não da que sumiu.
-    if (!press.idle) press.timer = setTimeout(() => { pressed.held = true; onHold(key); pressed.node = document.querySelector(`.hand-card[data-loc="${key}"]`) || pressed.node; }, HOLD_MS);
+  const rushTarget = (key) => (cardOf(cardAt(key)?.code).level & 0xff) >= 5 && key.split(':')[1] === String(L.HAND);
+  const gestures = bindCardGestures({
+    live: () => Boolean(current),
+    actions: actionsFor,
+    targets: dropTargets,
+    pick(item) { plan.target = null; plan.zone = null; respond(item.response); },
+    drop(target) {
+      plan.target = target.target === undefined ? plan.target : target.target;
+      plan.zone = target.zone || null;
+      if (target.tribute !== undefined) plan.tributes = [target.tribute];
+      respond(target.response);
+    },
+    describe: describeCard,
+    paint: paintRushCards,
+    doubleTap: onDoubleTap,
+    hold: onHold,
+    dragHint: (key) => (rushTarget(key) ? 'Solte numa zona livre ou em cima do monstro que vai virar tributo.' : null),
+    beforeDown(event) { if (!$('#help').hidden && !event.target.closest('#help, #help-toggle')) $('#help-toggle').click(); },
   });
-  document.addEventListener('pointermove', (event) => {
-    if (!press || press.idle) return;
-    const distance = Math.hypot(event.clientX - press.x, event.clientY - press.y);
-    if (!press.moved && distance > 10) {
-      if (!dropTargets(press.key).length) return;
-      clearTimeout(press.timer);
-      press.moved = true;
-      dragging = { key: press.key };
-      press.ghost = press.node.cloneNode(true);
-      press.ghost.className = 'drag-ghost card';
-      Object.assign(press.ghost.style, { width: `${press.node.getBoundingClientRect().width}px`, translate: '-50% -50%' });
-      document.body.append(press.ghost);
-      press.node.classList.add('lifting');
-      markTargets(press.key);
-      $('#hint').textContent = (cardOf(cardAt(press.key)?.code).level & 0xff) >= 5 && press.key.split(':')[1] === String(L.HAND)
-        ? 'Solte numa zona livre ou em cima do monstro que vai virar tributo.' : 'Solte numa zona acesa.';
-    }
-    if (press.moved) {
-      Object.assign(press.ghost.style, { left: `${event.clientX}px`, top: `${event.clientY}px` });
-      document.querySelectorAll('.drop-hover').forEach((n) => n.classList.remove('drop-hover'));
-      document.elementFromPoint(event.clientX, event.clientY)?.closest('.drop-ok')?.classList.add('drop-hover');
-    }
-  });
-  const finish = (event) => {
-    if (!press) return;
-    clearTimeout(press.timer);
-    const { key, moved, held, ghost, node } = press;
-    press = null;
-    if (moved) {
-      ghost?.remove();
-      node.classList.remove('lifting');
-      const over = document.elementFromPoint(event.clientX, event.clientY)?.closest('.drop-ok');
-      const target = over && dropTargets(key).find((item) => document.querySelector(item.node) === over);
-      dragging = null;
-      markTargets();
-      renderDock();
-      if (target) {
-        plan.target = target.target === undefined ? plan.target : target.target;
-        plan.zone = target.zone || null;
-        if (target.tribute !== undefined) plan.tributes = [target.tribute];
-        respond(target.response);
-      }
-      return;
-    }
-    if (held) return;
-    // Toque duplo só faz algo nas suas cartas (mão: baixar/jogar; campo: mudar posição). Nas outras, zoom na hora.
-    const [controller, location] = key.split(':').map(Number);
-    if (!current || controller !== ME || (location !== L.HAND && !actionsFor(key).some((item) => item.action === 2))) { showZoom(key); return; }
-    const now = performance.now();
-    if (lastTap.key === key && now - lastTap.at < DOUBLE_TAP_MS) { lastTap = { key: null, at: 0 }; onDoubleTap(key); return; }
-    lastTap = { key, at: now };
-    setTimeout(() => { if (lastTap.key === key && lastTap.at === now) showZoom(key); }, DOUBLE_TAP_MS);
-  };
-  document.addEventListener('pointerup', finish);
-  document.addEventListener('pointercancel', () => { if (press) { clearTimeout(press.timer); press.ghost?.remove(); press.node.classList.remove('lifting'); press = null; dragging = null; markTargets(); } });
-  // Segurar no celular não deve abrir o menu do navegador sobre as cartas.
-  document.addEventListener('contextmenu', (event) => { if (event.target.closest('[data-gesture]')) event.preventDefault(); });
-  // Teclado (clique sem ponteiro): Enter numa carta abre a leitura com as ações; nas pilhas, a lista.
   document.addEventListener('click', (event) => {
     const pileNode = event.target.closest('[data-pile]');
-    if (pileNode) { const [controller, kind] = pileNode.dataset.pile.split(':'); openPile(Number(controller), kind); return; }
-    if (event.detail !== 0) return;
-    const node = event.target.closest('[data-gesture]');
-    if (node) showZoom(node.dataset.loc, { focus: true });
+    if (pileNode) { const [controller, kind] = pileNode.dataset.pile.split(':'); openPile(Number(controller), kind); }
   });
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && $('#zoom').classList.contains('show')) { hideZoom(); return; }
-    const node = event.target.closest?.('[data-gesture]');
-    if (!node) return;
-    const key = event.key.toLowerCase();
-    if (key === 'd') onDoubleTap(node.dataset.loc); // D: o mesmo que tocar duas vezes
-  });
+  return gestures;
 }
 
 function togglePose(key) {
@@ -625,43 +560,16 @@ function cardAt(key) {
   return list?.find((item) => item?.sequence === sequence) || list?.[sequence];
 }
 
-let zoomReturn = null;
-function showZoom(key, { focus = false } = {}) {
+/** Conteúdo da leitura (card-gestures.js mostra e liga as ações). */
+function describeCard(key) {
   const live = cardAt(key);
-  if (!live) return;
+  if (!live) return null;
   const [controller, location] = key.split(':').map(Number);
   const hidden = controller !== ME && (isFaceDown(live) || location === L.HAND);
-  const actions = hidden ? [] : actionsFor(key);
-  const zoom = $('#zoom');
   const data = cardOf(live.code);
-  const buttons = actions.map((item, index) => `<button class="btn ${index ? 'ghost' : ''}" type="button" data-act="${index}">${escape(item.label)}</button>`).join('');
-  zoom.innerHTML = `<div class="card">${hidden ? back() : face(data)}</div>
-    <div class="zoom-copy">${hidden ? '<h2>Carta virada</h2><p>Você ainda não sabe qual é.</p>' : `<h2>${escape(data.name)}</h2><p class="zoom-stats">${escape(cardStats(data, location === L.MZONE ? live : null))}</p><p class="zoom-text">${escape(data.desc)}</p>`}
-      <div class="zoom-actions">${buttons}<button class="btn ghost" type="button" data-close>Fechar</button></div></div>`;
-  zoom.classList.add('show');
-  zoom.setAttribute('aria-hidden', 'false');
-  zoom.setAttribute('role', 'dialog');
-  zoom.setAttribute('aria-label', hidden ? 'Carta virada' : data.name);
-  paintRushCards(zoom);
-  zoomReturn = focus ? document.activeElement : null;
-  if (focus) setTimeout(() => zoom.querySelector('.btn')?.focus(), 30);
-  const openedAt = performance.now();
-  zoom.onclick = (event) => {
-    if (performance.now() - openedAt < 350 && event.detail !== 0) return; // o clique sintético do próprio toque que abriu
-    const button = event.target.closest('[data-act]');
-    if (button) { plan.target = null; plan.zone = null; respond(actions[Number(button.dataset.act)].response); return; }
-    hideZoom();
-  };
+  return { hidden, html: hidden ? back() : face(data), name: data.name, stats: cardStats(data, location === L.MZONE ? live : null), text: data.desc };
 }
-function hideZoom() {
-  const zoom = $('#zoom');
-  if (!zoom.classList.contains('show')) return;
-  zoom.classList.remove('show');
-  zoom.setAttribute('aria-hidden', 'true');
-  zoom.innerHTML = '';
-  if (zoomReturn?.isConnected) zoomReturn.focus();
-  zoomReturn = null;
-}
+const showZoom = (key, options) => gestures.info(key, options);
 
 /* ---------- Diálogos (ocg-ask.js) ---------- */
 
@@ -690,8 +598,8 @@ function renderDock() {
   renderSkill();
   const hintNode = $('#hint');
   if (duel.state.winner !== null) hintNode.textContent = '';
-  else if (idle) hintNode.textContent = 'Arraste da mão para o campo (Invocações ilimitadas). Toque para ler e ver ações; toque duas vezes para alternar entre jogar e baixar.';
-  else if (battle) hintNode.textContent = prompt.attacks.length ? 'Arraste seu monstro até o alvo, ou até a placa do rival para o ataque direto.' : 'Nenhum ataque disponível. Encerre o turno.';
+  else if (idle) hintNode.textContent = 'Toque numa carta para ver as ações, ou arraste da mão para o campo (Invocações ilimitadas). Toque duas vezes: jogar ou baixar.';
+  else if (battle) hintNode.textContent = prompt.attacks.length ? 'Toque no seu monstro e em Atacar, ou arraste-o até o alvo (ou a placa do rival).' : 'Nenhum ataque disponível. Encerre o turno.';
   else if (duel.state.active === FOE) hintNode.textContent = 'O rival está jogando.';
 }
 
@@ -941,6 +849,7 @@ $('#share').addEventListener('click', async () => {
   const text = resultGrid({
     date, difficulty: settings.label, rating: settings.rating, outcome: winner === ME ? 'win' : winner === FOE ? 'loss' : 'draw',
     turns: Math.min(duel.state.turn, FORMAT.turnLimit), start: startLp, lpByTurn,
+    vs: `${match.player.label} 🆚 ${match.enemy.label}`, url: new URL('.', location.href).href,
   });
   try {
     if (navigator.share && matchMedia('(pointer: coarse)').matches) { await navigator.share({ text }); return; }
@@ -979,7 +888,7 @@ $('#field').insertAdjacentHTML('afterbegin', '<div id="zones" class="zones-grid"
 $('#player-key').textContent = playerKey;
 $('#foe-name').innerHTML = `Rival <span class="who-key">${escape(match.enemy.label)}</span>`;
 $('#matchup-chip').innerHTML = `${escape(match.player.label)} <i>contra</i> ${escape(match.enemy.label)} · ${escape(settings.label)}`;
-bindGestures();
+gestures = bindGestures();
 render();
 renderSkill();
 startLiveEnigma();

@@ -99,11 +99,6 @@
 .classic .enemy-hand b::before { content: 'Mão '; font-weight: 600; color: var(--ivory-dim); }
 
 /* Zoom: carta grande + texto legível + ações */
-.classic .zoom { grid-template-columns: minmax(0, min(380px, 40vw)) minmax(0, 400px); }
-.classic .zoom .card { box-shadow: 0 40px 80px -20px var(--ink-solid); }
-.zoom-text { max-height: 40dvh; overflow: auto; color: var(--ivory) !important; font-size: 1rem; line-height: 1.45; }
-.zoom-actions { display: grid; gap: 10px; margin-top: 16px; }
-.zoom-actions .btn { min-height: 46px; }
 
 /* Diálogo de escolhas */
 .ask { width: min(94vw, 640px); max-height: 88dvh; overflow: auto; }
@@ -171,9 +166,6 @@
   .zone.fzone.empty::after, .zone.emz-zone.empty::after { font-size: 0.46rem; }
   .classic .dock { gap: 0; padding-bottom: 4px; }
   .classic .dock .btn { min-height: 38px; font-size: 0.8rem; min-width: 0; }
-  .classic .zoom { grid-template-columns: 1fr; align-content: start; padding-top: 16px; overflow: auto; }
-  .classic .zoom .card { width: min(64vw, 260px); }
-  .zoom-text { max-height: none; font-size: 0.92rem; }
   .ask-items { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
   .ask-item.with-card .ycard { width: 74px; }
 }
@@ -191,3 +183,4 @@
 .puzzle-mode #to-end { display: none; }
 /* Títulos longos do puzzle ("Peça recuperada!", "O turno acabou") cabem no celular */
 .puzzle-mode .result-title { font-size: clamp(2.4rem, 10vw, 5.2rem); overflow-wrap: anywhere; padding-inline: 0.1em; }
+

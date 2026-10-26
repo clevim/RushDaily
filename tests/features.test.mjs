@@ -5,7 +5,7 @@ import test from 'node:test';
 const store = new Map();
 globalThis.localStorage = { getItem: (key) => (store.has(key) ? store.get(key) : null), setItem: (key, value) => store.set(key, String(value)), removeItem: (key) => store.delete(key) };
 const { canRecover, heartCharges, monthPieces, puzzleFor, recoverKey } = await import('../src/ui/common.js');
-const { GRID, decodeReplay, encodeReplay, resultGrid } = await import('../src/ui/share.js');
+const { decodeReplay, encodeReplay, resultGrid } = await import('../src/ui/share.js');
 
 test('puzzle do dia: mesma data, mesmo puzzle; datas diferentes espalham', () => {
   const ids = Array.from({ length: 40 }, (_, i) => `p${i}`);
@@ -46,12 +46,11 @@ test('link de replay vai e volta; lixo e respostas estranhas viram null', async 
   assert.equal(await decodeReplay(await encodeReplay({ ...replay, kind: 'puzzle', puzzle: '../x' })), null);
 });
 
-test('grade do Rush: um quadrado por turno, estrela na vitória, sem cartas', () => {
-  const text = resultGrid({ date: '2026-10-23', difficulty: 'Duelista', rating: 2, outcome: 'win', turns: 6, start: [5000, 4000],
-    lpByTurn: [null, [5000, 4000], [4200, 4000], [4200, 2000], undefined, [3000, 1000], [3000, 0]] });
-  const lines = text.split('\n');
-  assert.equal(lines[0], 'RushDaily 23/10 · Duelista ★★☆☆');
-  assert.equal(lines[1], 'Vitória em 6 turnos');
-  assert.equal(lines.slice(2).join(''), [GRID.none, GRID.taken, GRID.dealt, GRID.none, GRID.both, GRID.dealt, GRID.win].join(''));
-  assert.equal(lines[2], [GRID.none, GRID.taken, GRID.dealt, GRID.none, GRID.both].join(''));
+test('resumo do Rush: barras de PV e maior golpe, sem cartas', () => {
+  const text = resultGrid({ date: '2026-10-23', difficulty: 'Duelista', rating: 2, outcome: 'win', turns: 6, start: [5000, 4000], vs: 'Dragão 🆚 Guerreiro',
+    lpByTurn: [null, [5000, 4000], [4200, 4000], [4200, 2000], undefined, [3000, 1000], [3000, 0]], url: 'http://x/' });
+  assert.equal(text, [
+    'RushDaily 23/10 · Duelista ★★☆☆', 'Dragão 🆚 Guerreiro', '🏆 Vitória em 6 turnos',
+    'Você ❤️❤️❤️🖤🖤 3.000 PV', 'Rival 🖤🖤🖤🖤🖤 0 PV', '💥 Maior golpe: 2.000 de dano', '', 'Consegue melhor? http://x/',
+  ].join('\n'));
 });

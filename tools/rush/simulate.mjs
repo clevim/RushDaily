@@ -80,9 +80,9 @@ const median = (list) => [...list].sort((a, b) => a - b)[list.length >> 1];
 const p90 = (list) => [...list].sort((a, b) => a - b)[Math.floor(list.length * 0.9)];
 
 /** Um duelo com a IA do Rush nos dois lados (levels[time]); 'gulosa' usa a IA do clássico. */
-function runDuel({ seed, decks, format, lp = null, levels, skills = [] }) {
+function runDuel({ seed, decks, format, lp = null, hands = null, levels, skills = [] }) {
   const table = skills.length ? new Map([...cards, [HEART_CODE, HEART_CARD]]) : cards;
-  const duel = createDuel(lib, { seed, decks, format, lp, skills, cards: table, readScript: withHeart(readScript), onError });
+  const duel = createDuel(lib, { seed, decks, format, lp, hands, skills, cards: table, readScript: withHeart(readScript), onError });
   const memory = [{}, {}];
   let steps = 0, retries = 0, out = null;
   for (;;) {
@@ -113,7 +113,7 @@ if (mode === 'diario') {
       const match = generateDailyMatch({ date, difficulty: difficulty.id, pool });
       const decks = [match.player.deck, match.enemy.deck];
       if (size !== DAILY_FORMAT.main) decks.forEach((deck, team) => { deck.main = buildRushDeck({ seed: `${date}:${team}`, pool, format, race: [match.player.theme, match.enemy.theme][team].race }).main; });
-      const result = runDuel({ seed: match.seed, decks, format, lp: [match.player.lp, match.enemy.lp], levels: ['elite', match.enemy.ai] });
+      const result = runDuel({ seed: match.seed, decks, format, lp: [match.player.lp, match.enemy.lp], hands: match.enemy.hand ? [format.hand, match.enemy.hand] : null, levels: ['elite', match.enemy.ai] });
       if (result.winner === null) { stuck += 1; continue; }
       turns.push(result.turns); all.push(result.turns);
       if (result.winner === 0) wins += 1;

@@ -12,6 +12,7 @@ import { paintCards, warmCards } from './classic-render.js';
 import { escape, getPlayerKey, longDate, monthName, monthOf, puzzleFor, readJson, recoverDay, reducedMotion, today, toast, writeJson } from './common.js';
 import { decodeReplay, encodeReplay } from './share.js';
 import { answerCommon, createAsk } from './ocg-ask.js';
+import { bindCardGestures } from './card-gestures.js';
 import { queueSync, syncNow } from './sync.js';
 import { duelScene } from './scene.js';
 
@@ -25,8 +26,6 @@ let speed = 1; // replay: 1x, 2x, 4x
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, motion ? ms / speed : 0));
 const GOLD = 0xf5b21a;
 const RED = 0xe0303f;
-const HOLD_MS = 420;
-const DOUBLE_TAP_MS = 320;
 const hashOf = (text) => { let value = 2166136261; for (const char of text) { value ^= char.charCodeAt(0); value = Math.imul(value, 16777619); } return (value >>> 0).toString(36); };
 
 async function loadJson(url) { return (await fetch(url)).json(); }
@@ -187,6 +186,7 @@ const isDefense = (card) => card.position & (P.FACEUP_DEFENSE | P.FACEDOWN_DEFEN
 
 const at = (row, col) => `style="grid-area:${row}/${col}"`;
 
+const lastDef = new Map();
 function slot(controller, location, sequence, card, place, extraClass = '') {
   const key = locKey(controller, location, sequence);
   const spell = location === L.SZONE;
@@ -197,6 +197,12 @@ function slot(controller, location, sequence, card, place, extraClass = '') {
   const classes = [base, 'filled'];
   if (location === L.MZONE && isDefense(card)) classes.push('defense');
   if (isFaceDown(card)) classes.push('facedown');
+  if (location === L.MZONE) {
+    const def = Boolean(isDefense(card)), was = lastDef.get(key);
+    lastDef.set(key, def);
+    if (was !== undefined && was !== def) classes.push('spin'); // giro de 90° ao trocar de posição
+    if (controller === ME && actionsFor(key).some((item) => item.action === 2)) classes.push('can-pos'); // ainda pode mudar de posição
+  }
   const label = hidden ? (spell ? 'Carta baixada do rival' : 'Monstro virado do rival') : `${data.name}${isFaceDown(card) ? ', virada' : ''}`;
   const materials = card.overlayCards?.length ? `<span class="xyz-mats">${card.overlayCards.length}</span>` : '';
   return `<div class="${classes.join(' ')}" data-loc="${key}" ${place}>
@@ -257,7 +263,7 @@ function renderHand() {
   $('#hand').style.setProperty('--n', hand.length);
   $('#hand').innerHTML = hand.map((card, index) => {
     const key = locKey(ME, L.HAND, card.sequence);
-    const pose = poses.get(key) || defaultPose(cardOf(card.code));
+    const pose = { set: Boolean(poses.get(key)?.set) };
     const playable = actionsFor(key).length > 0;
     return `<button class="card hand-card ${playable ? 'playable' : ''} ${pose.set ? 'facedown set-pose' : ''}" style="--i:${index}" type="button" data-loc="${key}" data-gesture aria-label="${escape(cardOf(card.code).name)}${pose.set ? ', para baixar' : ''}">${pose.set ? cardBack() : cardFace(cardOf(card.code))}</button>`;
   }).join('');
@@ -276,7 +282,7 @@ function render() {
   $('#turn-chip').innerHTML = isPuzzle ? `<b>${replay ? 'Replay · ' : ''}Vença neste turno</b> ${whose}`
     : replay ? `<b>Replay · Turno ${Math.max(1, turn)}</b> ${whose}` : `<b>Turno ${Math.max(1, turn)}${FORMAT.turnLimit ? `/${FORMAT.turnLimit}` : ''}</b> ${whose}`;
   $('#turn-chip').dataset.owner = active === ME ? 'player' : 'enemy';
-  markTargets();
+  gestures?.mark();
   paintCards(document.body);
 }
 
@@ -354,6 +360,7 @@ async function play(events, quick) {
 /* ---------- O que dá para fazer agora (pergunta aberta) ---------- */
 
 let current = null; // { prompt, resolve }
+let gestures = null; // card-gestures.js (ligado no fim do arquivo)
 const poses = new Map(); // carta da mão -> { set }
 const defaultPose = (card) => ({ set: Boolean(card.type & TYPE.TRAP) });
 // O que o gesto já decidiu: alvo do ataque arrastado, tributo solto em cima e zona onde a carta caiu.
@@ -398,14 +405,11 @@ function respond(response) {
   if (!current) return;
   const { resolve } = current;
   current = null;
-  markTargets();
-  hideZoom();
+  gestures.reset();
   resolve(response);
 }
 
 /* ---------- Alvos de arrastar ---------- */
-
-let dragging = null; // { key }
 
 function dropTargets(key) {
   const prompt = current?.prompt;
@@ -444,90 +448,25 @@ function dropTargets(key) {
   return zones;
 }
 
-function markTargets(key = dragging?.key) {
-  document.querySelectorAll('.drop-ok, .drop-hover').forEach((node) => node.classList.remove('drop-ok', 'drop-hover'));
-  if (!key) return;
-  for (const target of dropTargets(key)) document.querySelector(target.node)?.classList.add('drop-ok');
-}
-
 /* ---------- Gestos ---------- */
 
 function bindGestures() {
-  let press = null;
-  let lastTap = { key: null, at: 0 };
-  document.addEventListener('pointerdown', (event) => {
-    const node = event.target.closest('[data-gesture]');
-    if (!node) return;
-    const key = node.dataset.loc;
-    // Fora da vez de responder (animações, vez do rival) só dá para ler a carta.
-    press = { key, node, x: event.clientX, y: event.clientY, moved: false, held: false, ghost: null, idle: !current };
-    const pressed = press;
-    // Segurar troca a pose e redesenha a mão: se o dedo seguir arrastando, o fantasma sai da carta nova, não da que sumiu.
-    if (!press.idle) press.timer = setTimeout(() => { pressed.held = true; onHold(key); pressed.node = document.querySelector(`.hand-card[data-loc="${key}"]`) || pressed.node; }, HOLD_MS);
-  });
-  document.addEventListener('pointermove', (event) => {
-    if (!press || press.idle) return;
-    const distance = Math.hypot(event.clientX - press.x, event.clientY - press.y);
-    if (!press.moved && distance > 10) {
-      if (!dropTargets(press.key).length) return;
-      clearTimeout(press.timer);
-      press.moved = true;
-      dragging = { key: press.key };
-      press.ghost = press.node.cloneNode(true);
-      press.ghost.className = 'drag-ghost card';
-      // Do tamanho da carta tocada e centrado no dedo (sem isso herda a largura da página e cobre o tapete).
-      Object.assign(press.ghost.style, { width: `${press.node.getBoundingClientRect().width}px`, translate: '-50% -50%' });
-      document.body.append(press.ghost);
-      markTargets(press.key);
-    }
-    if (press.moved) {
-      Object.assign(press.ghost.style, { left: `${event.clientX}px`, top: `${event.clientY}px` });
-      document.querySelectorAll('.drop-hover').forEach((n) => n.classList.remove('drop-hover'));
-      const over = document.elementFromPoint(event.clientX, event.clientY)?.closest('.drop-ok');
-      over?.classList.add('drop-hover');
-    }
-  });
-  const finish = (event) => {
-    if (!press) return;
-    clearTimeout(press.timer);
-    const { key, moved, held, ghost } = press;
-    press = null;
-    if (moved) {
-      ghost?.remove();
-      const over = document.elementFromPoint(event.clientX, event.clientY)?.closest('.drop-ok');
-      const target = over && dropTargets(key).find((item) => document.querySelector(item.node) === over);
-      dragging = null;
-      markTargets();
-      if (target) {
-        plan.target = target.target === undefined ? plan.target : target.target;
-        plan.zone = target.zone || null;
-        if (target.tribute !== undefined) plan.tributes = [target.tribute];
-        respond(target.response);
-      }
-      return;
-    }
-    if (held) return;
-    // Toque duplo só faz algo nas suas cartas (mão: baixar/levantar; campo: mudar posição). Nas outras, zoom na hora.
-    const [controller, location] = key.split(':').map(Number);
-    if (!current || controller !== ME || (location !== L.HAND && !actionsFor(key).some((item) => item.action === 2))) { showZoom(key); return; }
-    const now = performance.now();
-    if (lastTap.key === key && now - lastTap.at < DOUBLE_TAP_MS) { lastTap = { key: null, at: 0 }; onDoubleTap(key); return; }
-    lastTap = { key, at: now };
-    setTimeout(() => { if (lastTap.key === key && lastTap.at === now) showZoom(key); }, DOUBLE_TAP_MS);
-  };
-  document.addEventListener('pointerup', finish);
-  document.addEventListener('pointercancel', () => { if (press) { clearTimeout(press.timer); press.ghost?.remove(); press = null; dragging = null; markTargets(); } });
-  // Segurar no celular não deve abrir o menu do navegador sobre as cartas.
-  document.addEventListener('contextmenu', (event) => { if (event.target.closest('[data-gesture]')) event.preventDefault(); });
-  // Teclado (clique sem ponteiro): Enter numa carta abre a leitura com as ações; D é o mesmo que tocar duas vezes.
-  document.addEventListener('click', (event) => {
-    if (event.detail !== 0) return;
-    const node = event.target.closest('[data-gesture]');
-    if (node) showZoom(node.dataset.loc);
-  });
-  document.addEventListener('keydown', (event) => {
-    const node = event.target.closest?.('[data-gesture]');
-    if (node && event.key.toLowerCase() === 'd') onDoubleTap(node.dataset.loc);
+  return bindCardGestures({
+    live: () => Boolean(current),
+    actions: actionsFor,
+    targets: dropTargets,
+    pick(item) { plan.target = null; plan.zone = null; respond(item.response); },
+    drop(target) {
+      plan.target = target.target === undefined ? plan.target : target.target;
+      plan.zone = target.zone || null;
+      if (target.tribute !== undefined) plan.tributes = [target.tribute];
+      respond(target.response);
+    },
+    describe: describeCard,
+    paint: paintCards,
+    doubleTap: onDoubleTap,
+    hold: onHold,
+    dragHint: (key) => (cardOf(cardAt(key)?.code).level >= 5 && key.split(':')[1] === String(L.HAND) ? 'Solte numa zona livre ou em cima do monstro que vai virar tributo.' : null),
   });
 }
 
@@ -561,29 +500,16 @@ function cardAt(key) {
   return list?.find((item) => item?.sequence === sequence) || list?.[sequence];
 }
 
-function showZoom(key) {
+/** Conteúdo da leitura (card-gestures.js mostra e liga as ações). */
+function describeCard(key) {
   const live = cardAt(key);
-  if (!live) return;
+  if (!live) return null;
   const [controller] = key.split(':').map(Number);
   const hidden = controller !== ME && isFaceDown(live);
-  const actions = hidden ? [] : actionsFor(key);
-  const zoom = $('#zoom');
   const data = cardOf(live.code);
-  const buttons = actions.map((item, index) => `<button class="btn ${index ? 'ghost' : ''}" type="button" data-act="${index}">${escape(item.label)}</button>`).join('');
-  zoom.innerHTML = `<div class="card">${hidden ? cardBack() : cardFace(data)}</div>
-    <div class="zoom-copy">${hidden ? '<h2>Carta virada</h2><p>Você ainda não sabe qual é.</p>' : `<h2>${escape(data.name)}</h2><p class="zoom-stats">${escape(cardStats(data, live))}</p><p class="zoom-text">${escape(data.desc)}</p>`}
-      ${buttons ? `<div class="zoom-actions">${buttons}</div>` : ''}</div>`;
-  zoom.classList.add('show');
-  paintCards(zoom);
-  const openedAt = performance.now();
-  zoom.onclick = (event) => {
-    if (performance.now() - openedAt < 400) return; // o clique sintético do próprio toque que abriu o zoom
-    const button = event.target.closest('[data-act]');
-    if (button) { plan.target = null; plan.zone = null; respond(actions[Number(button.dataset.act)].response); return; }
-    hideZoom();
-  };
+  return { hidden, html: hidden ? cardBack() : cardFace(data), name: data.name, stats: cardStats(data, live), text: data.desc };
 }
-function hideZoom() { $('#zoom').classList.remove('show'); }
+const showZoom = (key, options) => gestures.info(key, options);
 
 /* ---------- Diálogo genérico ---------- */
 
@@ -617,8 +543,8 @@ async function answer(prompt) {
         $('#to-m2').hidden = !(!idle && prompt.to_m2);
         $('#to-end').hidden = !prompt.to_ep;
         $('#hint').textContent = (isPuzzle ? `${puzzle.goal} ` : '') + (idle
-          ? 'Arraste da mão para o campo. Toque para ler e ver ações; toque duas vezes para alternar entre jogar e baixar.'
-          : prompt.attacks.length ? 'Arraste seu monstro até o alvo, ou até o rival para atacar direto.' : 'Nenhum ataque disponível.');
+          ? 'Toque numa carta para ver as ações, ou arraste da mão para o campo. Toque duas vezes: jogar ou baixar.'
+          : prompt.attacks.length ? 'Toque no seu monstro e em Atacar, ou arraste-o até o alvo (ou o rival).' : 'Nenhum ataque disponível.');
         render();
       });
     case M.SELECT_CHAIN: {
@@ -810,7 +736,7 @@ $('#rp-speed').addEventListener('click', (event) => {
 });
 $('#rp-turn').addEventListener('click', () => { skipTo = duel.state.turn + 1; });
 
-bindGestures();
+gestures = bindGestures();
 start();
 responses = [];
 render();
@@ -827,4 +753,4 @@ if (replay) {
   pump({ replay: saved?.responses || [] }); // partida terminada é repetida até o resultado
   if (!saved?.responses?.length) await banner(isPuzzle ? 'Vença neste turno!' : ME === 0 ? 'Duelo! Você começa' : 'Duelo! O rival começa', 'player');
 }
-window.__arena = { cards, duel: () => duel, view: () => view, current: () => current, responses: () => responses.length, respond, actionsFor, replayLink }; // testes automáticos
+window.__arena = { cards, duel: () => duel, view: () => view, current: () => current, responses: () => responses.length, respond, actionsFor, dropTargets, replayLink }; // testes automáticos

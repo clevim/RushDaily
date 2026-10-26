@@ -16,9 +16,9 @@ export const PLAYER_LP = 6000;
 
 const DIFFICULTIES = {
   apprentice: { id: 'apprentice', label: 'Aprendiz', rating: 1, enemyLp: 4000, ai: 'aprendiz', deckRank: 0, modifier: 'O rival começa com 4.000 PV, joga sem plano e recebe o deck mais fraco do dia.' },
-  duelist: { id: 'duelist', label: 'Duelista', rating: 2, enemyLp: 5000, ai: 'duelista', deckRank: 1, modifier: 'O rival começa com 6.000 PV e usa as Invocações ilimitadas do Rush.' },
-  elite: { id: 'elite', label: 'Elite', rating: 3, enemyLp: 6000, ai: 'elite', deckRank: 2, modifier: 'PV iguais (8.000), deck mais forte e respostas em toda chance.' },
-  chaos: { id: 'chaos', label: 'Caos', rating: 4, enemyLp: 7000, ai: 'caos', deckRank: 3, modifier: '8.000 PV, o deck mais forte do dia e um rival que troca monstros sem medo.' },
+  duelist: { id: 'duelist', label: 'Duelista', rating: 2, enemyLp: 5000, ai: 'duelista', deckRank: 1, modifier: 'O rival começa com 5.000 PV, usa as Invocações ilimitadas do Rush e erra uma jogada em cada sete.' },
+  elite: { id: 'elite', label: 'Elite', rating: 3, enemyLp: 6000, ai: 'elite', deckRank: 2, modifier: 'O rival começa com 6.000 PV, deck mais forte, olha uma jogada à frente e quase não erra.' },
+  chaos: { id: 'chaos', label: 'Caos', rating: 4, enemyLp: 7000, enemyHand: DAILY_FORMAT.hand + 1, ai: 'caos', deckRank: 3, modifier: 'O rival começa com 7.000 PV, 1 carta a mais na mão inicial e o deck mais forte do dia; não erra, olha uma jogada à frente, guarda Armadilhas e troca monstros sem medo.' },
 };
 const DEFAULT_DIFFICULTY = 'duelist';
 export const DIFFICULTY_IDS = Object.keys(DIFFICULTIES);
@@ -88,7 +88,7 @@ export function generateDailyMatch({ date, difficulty = DEFAULT_DIFFICULTY, pool
     format: DAILY_FORMAT,
     difficulty: settings,
     player: { deck: { main: player.main, extra: player.extra }, theme: player.theme, label: themeLabel(player.theme), lp: PLAYER_LP },
-    enemy: { deck: { main: enemy.deck.main, extra: enemy.deck.extra }, theme: enemy.deck.theme, label: themeLabel(enemy.deck.theme), lp: settings.enemyLp, ai: settings.ai, power: enemy.power },
+    enemy: { deck: { main: enemy.deck.main, extra: enemy.deck.extra }, theme: enemy.deck.theme, label: themeLabel(enemy.deck.theme), lp: settings.enemyLp, hand: settings.enemyHand, ai: settings.ai, power: enemy.power },
   };
 }
 

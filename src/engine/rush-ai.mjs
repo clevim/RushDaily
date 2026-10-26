@@ -34,6 +34,10 @@ export function decideRush(prompt, context) {
   const theirs = view[foe];
   const caos = level === 'caos';
   const unknown = caos ? 1200 : 1500; // palpite de DEF de um monstro virado
+  const smart = level !== 'duelista'; // elite e caos olham uma jogada à frente
+  // Erro intencional: duelista 15%, elite 5%, caos nunca. Sempre cai numa opção válida, só pior.
+  const slipRate = { duelista: 0.15, elite: 0.05 }[level] || 0;
+  const slip = () => slipRate > 0 && chance(memory, slipRate);
   if (memory.turn !== state.turn) Object.assign(memory, { turn: state.turn, tried: new Set(), target: null, swings: new Map() });
   const data = (code) => cards.get(code) || { atk: 0, def: 0, level: 0, type: 0 };
   const myMonsters = RUSH_ZONES.monsters.map((seq) => mine.monsters[seq]).filter(Boolean);
@@ -47,19 +51,27 @@ export function decideRush(prompt, context) {
   const probe = level === 'duelista' ? 1500 : 1000;
   const beats = (atk, card) => atk > guard(card) || (!isFaceUp(card) && !inAttack(card) && atk >= probe)
     || (caos && inAttack(card) && isFaceUp(card) && atk === card.attack && atk >= 1500);
+  // Avaliação de um golpe: dano causado + monstro dele destruído − monstro meu perdido.
+  const hit = (atk, card) => {
+    if (!isFaceUp(card)) return atk > unknown ? unknown : -atk;
+    if (inAttack(card)) return atk > card.attack ? atk : atk === card.attack ? 0 : -atk;
+    return atk > card.defense ? card.defense : atk === card.defense ? 0 : card.defense - atk;
+  };
+  const bestHit = (atk) => (foeMonsters.length ? Math.max(0, ...foeMonsters.map((card) => hit(atk, card))) : atk);
   const key = (action, loc) => `${action}:${loc.code}:${loc.location}:${loc.sequence}`;
 
   switch (prompt.type) {
     case M.SELECT_IDLECMD: {
       const fresh = (list, action) => list.map((loc, index) => ({ loc, index, action })).filter(({ loc }) => !memory.tried.has(key(action, loc)));
       const take = (choice) => { memory.tried.add(key(choice.action, choice.loc)); return { type: R.SELECT_IDLECMD, action: choice.action, index: choice.index }; };
-      // 1. Invocação-Especial (Máximo, efeitos que invocam): a de maior ATK.
+      const options = []; // na ordem fixa; elite/caos escolhem a de melhor avaliação
       const special = fresh(prompt.special_summons, 1).sort((a, b) => data(b.loc.code).atk - data(a.loc.code).atk)[0];
-      if (special) return take(special);
-      // 2. Magias da mão ou do campo (inclui Fusão e Magia de Campo). Armadilhas ficam para baixar.
+      if (special) options.push({ ...special, score: bestHit(data(special.loc.code).atk) + 500 });
+      // Magias da mão ou do campo (inclui Fusão e Magia de Campo). Armadilhas ficam para baixar.
       const spell = fresh(prompt.activates, 5).find(({ loc }) => loc.location !== L.MZONE && !(data(loc.code).type & TYPE.TRAP));
-      if (spell) return take(spell);
-      // 3. Invocações (ilimitadas no Rush): primeiro os de nível baixo (base para os tributos), depois os de tributo.
+      if (spell && slip()) memory.tried.add(key(spell.action, spell.loc)); // erro: deixa a Magia passar
+      else if (spell) options.push({ ...spell, score: 600 + (caos && /Fusão|Fusion/.test(data(spell.loc.code).desc || '') ? 5000 : 0) });
+      // Invocações (ilimitadas no Rush): primeiro os de nível baixo (base para os tributos), depois os de tributo.
       const summons = fresh(prompt.summons, 0).map((item) => ({ ...item, card: data(item.loc.code) }));
       const sets = fresh(prompt.monster_sets, 3);
       const weakest = myMonsters.map((card) => Math.max(card.attack, isFaceUp(card) ? 0 : card.defense)).sort((a, b) => a - b);
@@ -73,21 +85,27 @@ export function decideRush(prompt, context) {
       const lows = summons.filter(({ card }) => !tributesFor(levelOf(card))).sort((a, b) => b.card.atk - a.card.atk);
       // Com monstro de tributo na mão e campo vazio, os baixos sobem mesmo fracos: viram tributo.
       const wantsFodder = summons.some(({ card }) => tributesFor(levelOf(card)) > myMonsters.length);
+      const lostBy = ({ card }) => Math.max(0, ...weakest.slice(0, tributesFor(levelOf(card))));
+      let summon = null;
       if (freeZones > 0) {
         const strong = lows.find(({ card }) => card.atk >= threat || !foeMonsters.length);
-        if (strong) return take(strong);
-        if (tribute) return take(tribute);
         // Fraco demais para ficar em Ataque: baixa virado em Defesa (bloqueia e serve de tributo).
         const blocker = sets.filter(({ loc }) => !tributesFor(levelOf(data(loc.code)))).sort((a, b) => data(b.loc.code).def - data(a.loc.code).def)[0];
-        if (blocker && (wantsFodder || myMonsters.length < 2 || data(blocker.loc.code).def >= threat)) return take(blocker);
-        if (lows[0] && wantsFodder) return take(lows[0]);
-      } else if (tribute) return take(tribute);
-      // 4. Efeitos de monstro (no campo ou na mão) e Magias que ainda sobrarem.
+        if (strong) summon = { ...strong, score: bestHit(strong.card.atk) + 300 };
+        else if (tribute) summon = { ...tribute, score: bestHit(tribute.card.atk) - lostBy(tribute) + 300 };
+        else if (blocker && (wantsFodder || myMonsters.length < 2 || data(blocker.loc.code).def >= threat)) summon = { ...blocker, score: 200 + (data(blocker.loc.code).def >= threat ? 200 : 0) };
+        else if (lows[0] && wantsFodder) summon = { ...lows[0], score: 250 };
+      } else if (tribute) summon = { ...tribute, score: bestHit(tribute.card.atk) - lostBy(tribute) + 300 };
+      if (summon && summon.action === 0 && sets[0] && slip()) summon = { ...sets[0], score: 0 }; // erro: baixa em vez de invocar
+      if (summon) options.push(summon);
+      // Efeitos de monstro (no campo ou na mão) e Magias que ainda sobrarem.
       const effect = fresh(prompt.activates, 5).find(({ loc }) => !(data(loc.code).type & TYPE.TRAP) || loc.location === L.MZONE);
-      if (effect) return take(effect);
-      // 5. Armadilhas baixadas enquanto houver zona.
+      if (effect) options.push({ ...effect, score: 500 });
+      // Armadilhas baixadas enquanto houver zona.
       const trap = fresh(prompt.spell_sets, 4).find(({ loc }) => data(loc.code).type & TYPE.TRAP);
-      if (trap) return take(trap);
+      if (trap) options.push({ ...trap, score: 100 });
+      const chosen = smart ? options.reduce((best, item) => (!best || item.score > best.score ? item : best), null) : options[0];
+      if (chosen) return take(chosen);
       // 6. Posições: levanta quem vence algo (ou com o campo dele vazio); deita quem só apanharia.
       for (const choice of fresh(prompt.pos_changes, 2)) {
         const card = mine.monsters[choice.loc.sequence];
@@ -106,6 +124,7 @@ export function decideRush(prompt, context) {
       // Efeitos de Batalha primeiro (uma vez por turno), depois o melhor ataque.
       if (prompt.chains.length && !memory.tried.has('battle-chain')) { memory.tried.add('battle-chain'); return { type: R.SELECT_BATTLECMD, action: 0, index: 0 }; }
       let best = null;
+      const cands = [];
       const live = (loc) => mine.monsters[loc.sequence];
       prompt.attacks.forEach((loc, index) => {
         if ((memory.swings.get(loc.sequence) || 0) >= 2) return;
@@ -113,12 +132,19 @@ export function decideRush(prompt, context) {
         if (!foeMonsters.length && loc.can_direct) { if (!best || atk + 10000 > best.score) best = { index, target: null, score: atk + 10000 }; return; }
         for (const target of foeMonsters) {
           if (!beats(atk, target)) continue;
+          if (caos && !isFaceUp(target) && atk < 1500) continue; // joga em volta do virado do jogador
           // Prefere matar o monstro mais forte dele com o atacante mais fraco que dá conta.
-          const gain = 2000 + (target.attack || 0) + (inAttack(target) ? atk - guard(target) : 0) - atk / 4;
+          let gain = 2000 + (target.attack || 0) + (inAttack(target) ? atk - guard(target) : 0) - atk / 4;
+          if (smart) { const ev = hit(atk, target); if (ev < 0) continue; gain = 2000 + ev - atk / 4; }
+          cands.push({ index, target, score: gain });
           if (!best || gain > best.score) best = { index, target, score: gain };
         }
         if (loc.can_direct && foeMonsters.length && (!best || atk > best.score)) best = { index, target: null, score: atk }; // efeito de ataque direto
       });
+      if (best && slip()) { // erro: ataca o alvo pior, ou não ataca
+        cands.sort((a, b) => a.score - b.score);
+        best = cands.length > 1 ? cands[0] : null;
+      }
       if (best) {
         const seq = prompt.attacks[best.index].sequence;
         memory.swings.set(seq, (memory.swings.get(seq) || 0) + 1);
@@ -136,7 +162,12 @@ export function decideRush(prompt, context) {
       // Na vez dele: responde (armadilhas no ataque). Na própria vez: gatilhos dos próprios monstros.
       const reacting = state.active !== me;
       const own = prompt.selects.findIndex((s) => s.location === L.MZONE || s.location === L.HAND);
-      if (reacting && (level !== 'duelista' || chance(memory, 0.75))) return { type: R.SELECT_CHAIN, index: 0 };
+      // Caos guarda a Armadilha do campo: só reage se o rival mostra ameaça relevante (senão espera o próximo gatilho).
+      if (reacting && caos && prompt.selects[0].location === L.SZONE && !(foeMonsters.length && (threat >= 1500 || state.lp[me] <= threat * 2))) {
+        memory.tried.delete(chainKey);
+        return { type: R.SELECT_CHAIN, index: null };
+      }
+      if (reacting && !slip()) return { type: R.SELECT_CHAIN, index: 0 };
       return { type: R.SELECT_CHAIN, index: own >= 0 ? own : null };
     }
     case M.SELECT_CARD: {

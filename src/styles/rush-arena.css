@@ -210,14 +210,9 @@ polygon.fly-piece.top { fill: var(--gold-lo); }
 
 /* Lançamento (carta ativada no centro): o do rival brilha em vermelho */
 .rush-arena .cast[data-owner='enemy'] .card { box-shadow: 0 0 0 2px var(--blood), 0 0 80px 20px rgb(224 48 63 / 0.45); }
-.rush-arena .cast .card { background: none; }
+.rush-arena .cast .card, .rush-arena .zoom .card { background: none; }
 
 /* ---------- Leitura e diálogos ---------- */
-.rush-arena .zoom { grid-template-columns: minmax(0, min(360px, 38vw)) minmax(0, 420px); }
-.rush-arena .zoom .card { background: none; box-shadow: 0 40px 80px -20px var(--ink-solid); }
-.zoom-text { max-height: 40dvh; overflow: auto; color: var(--ivory) !important; font-size: 1rem; line-height: 1.45; white-space: pre-line; }
-.zoom-actions { display: grid; gap: 10px; margin-top: 16px; }
-.zoom-actions .btn { min-height: 46px; }
 .ask { width: min(94vw, 680px); max-height: 88dvh; overflow: auto; }
 .ask-note { margin: -8px 0 14px; padding: 6px 10px; border-left: 3px solid var(--gold); background: rgb(var(--gold-rgb) / 0.08); color: var(--ivory-dim); font-size: 0.85rem; text-align: left; }
 .ask-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-bottom: 18px; }
@@ -302,9 +297,7 @@ polygon.fly-piece.top { fill: var(--gold-lo); }
   .link-card .rcard { width: 24px; }
   .link-name { font-size: 0.7rem; }
   .link-name b { -webkit-line-clamp: 1; }
-  .rush-arena .zoom { grid-template-columns: 1fr; align-content: start; padding-top: 16px; overflow: auto; }
-  .rush-arena .zoom .card { width: min(60vw, 250px); }
-  .zoom-text { max-height: none; font-size: 0.92rem; }
   .ask-items { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
   .ask-item.with-card .rcard { width: 72px; }
 }
+

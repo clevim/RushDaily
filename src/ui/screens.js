@@ -406,12 +406,11 @@ function renderPuzzle() {
           const state = recovered.includes(index) ? 'recovered' : owned.includes(index) ? 'won' : index < todayIndex ? 'missed' : index === todayIndex ? 'today' : 'later';
           const label = { won: 'vencido', recovered: 'recuperado no puzzle', missed: 'sem vitória, toque para recuperar', today: 'hoje', later: 'ainda não chegou' }[state];
           return state === 'missed'
-            ? `<li class="missed"><a href="${recoverHref(index)}" aria-label="Dia ${index + 1}, ${label}">${index + 1}</a></li>`
+            ? `<li class="missed"><a href="${recoverHref(index)}" aria-label="Recuperar dia ${index + 1}" title="Recuperar dia ${index + 1}">${index + 1}</a></li>`
             : `<li class="${state}" aria-label="Dia ${index + 1}, ${label}">${index + 1}</li>`;
         }).join('')}</ol>
         ${missed.length ? `<div class="recover">
-          <p>Perdeu um dia? O puzzle "vença neste turno" daquele dia devolve a peça.</p>
-          <div class="recover-days">${missed.map((index) => `<a class="btn ghost" href="${recoverHref(index)}">Recuperar dia ${index + 1}</a>`).join('')}</div>
+          <p>Perdeu um dia? Toque no dia riscado no calendário para jogar o puzzle "vença neste turno" daquele dia e recuperar a peça.</p>
         </div>` : ''}
         ${recovered.length ? `<p class="recover-note"><i class="recover-dot" aria-hidden="true"></i>${recovered.length} dia${recovered.length > 1 ? 's' : ''} recuperado${recovered.length > 1 ? 's' : ''} no puzzle.</p>` : ''}
         <p class="heart-state">${charges ? `${charges} carga${charges > 1 ? 's' : ''} pronta${charges > 1 ? 's' : ''} para usar.` : 'Nenhuma carga ainda.'}</p>

@@ -56,7 +56,7 @@ function playDaily(date, difficulty, { heart = false } = {}) {
   const match = generateDailyMatch({ date, difficulty, pool });
   const table = heart ? new Map([...cards, [HEART_CODE, HEART_CARD]]) : cards;
   const errors = [];
-  const duel = createDuel(lib, { seed: match.seed, format: match.format, decks: [match.player.deck, match.enemy.deck], lp: [match.player.lp, match.enemy.lp],
+  const duel = createDuel(lib, { seed: match.seed, format: match.format, decks: [match.player.deck, match.enemy.deck], lp: [match.player.lp, match.enemy.lp], hands: match.enemy.hand ? [match.format.hand, match.enemy.hand] : null,
     skills: heart ? [{ team: 0, code: HEART_CODE }] : [], cards: table, readScript: withHeart(readScript), onError: (text) => errors.push(text) });
   assert.deepEqual(duel.state.lp, [match.player.lp, match.enemy.lp]);
   const memory = [{}, {}];
@@ -107,6 +107,7 @@ test('um desafio diário inteiro (IA x IA) termina sem erro em cada dificuldade'
   const turns = [];
   for (const difficulty of DIFFICULTY_IDS) turns.push(playDaily('2026-10-24', difficulty).turns);
   assert.ok(turns.every((n) => n >= 2), JSON.stringify(turns));
+  assert.equal(generateDailyMatch({ date: "2026-10-24", difficulty: "chaos", pool }).enemy.hand, DAILY_FORMAT.hand + 1);
 });
 
 test('Coração das Cartas: Skill nativa, uma vez por duelo, busca 1 carta do Deck', () => {

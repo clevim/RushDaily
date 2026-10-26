@@ -89,26 +89,33 @@ export async function decodeReplay(code) {
 
 /* ---------- Grade do desafio Rush (estilo Wordle, sem revelar cartas) ---------- */
 
-export const GRID = { dealt: '🟩', taken: '🟥', both: '🟨', none: '⬛', win: '⭐' };
+/** Barra de 5 corações: cheia = PV iniciais; sempre mostra ao menos 1 se ainda há PV. */
+const hearts = (lp, max) => {
+  const n = lp <= 0 ? 0 : Math.min(5, Math.max(1, Math.round((lp / max) * 5)));
+  return '❤️'.repeat(n) + '🖤'.repeat(5 - n);
+};
 
 /**
- * Um quadrado por turno a partir dos PV de cada turno ([você, rival] no fim do turno; buraco = nada mudou).
+ * Resumo legível sem legenda: barras de PV finais dos dois lados + maior golpe do duelo.
  * { date, difficulty, rating, outcome: 'win'|'loss'|'draw', turns, start: [você, rival], lpByTurn }
  */
-export function resultGrid({ date, difficulty, rating, outcome, turns, start, lpByTurn = [] }) {
-  const squares = [];
+export function resultGrid({ date, difficulty, rating, outcome, turns, start, lpByTurn = [], vs = '', url = '' }) {
   let last = start;
+  let biggest = 0;
   for (let turn = 1; turn <= turns; turn += 1) {
     const now = lpByTurn[turn] || last;
-    const dealt = now[1] < last[1];
-    const taken = now[0] < last[0];
-    squares.push(dealt && taken ? GRID.both : dealt ? GRID.dealt : taken ? GRID.taken : GRID.none);
+    biggest = Math.max(biggest, last[1] - now[1]);
     last = now;
   }
-  if (outcome === 'win') squares.push(GRID.win);
-  const rows = [];
-  for (let at = 0; at < squares.length; at += 5) rows.push(squares.slice(at, at + 5).join(''));
   const [, month, day] = date.split('-');
-  const label = { win: 'Vitória', loss: 'Derrota', draw: 'Empate' }[outcome];
-  return [`RushDaily ${day}/${month} · ${difficulty} ${'★'.repeat(rating)}${'☆'.repeat(Math.max(0, 4 - rating))}`, `${label} em ${turns} turno${turns === 1 ? '' : 's'}`, ...rows].join('\n');
+  const label = { win: '🏆 Vitória', loss: '💀 Derrota', draw: '🤝 Empate' }[outcome];
+  return [
+    `RushDaily ${day}/${month} · ${difficulty} ${'★'.repeat(rating)}${'☆'.repeat(Math.max(0, 4 - rating))}`,
+    ...(vs ? [vs] : []),
+    `${label} em ${turns} turno${turns === 1 ? '' : 's'}`,
+    `Você ${hearts(last[0], start[0])} ${last[0].toLocaleString('pt-BR')} PV`,
+    `Rival ${hearts(last[1], start[1])} ${last[1].toLocaleString('pt-BR')} PV`,
+    ...(biggest > 0 ? [`💥 Maior golpe: ${biggest.toLocaleString('pt-BR')} de dano`] : []),
+    ...(url ? ['', `Consegue melhor? ${url}`] : []),
+  ].join('\n');
 }
