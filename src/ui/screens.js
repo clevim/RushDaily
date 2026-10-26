@@ -76,6 +76,10 @@ const FOILS = {
 const TIER_ODDS = [['galaxy', 2], ['gold', 8], ['silver', 20], ['common', 70]];
 // Sorte acumulada: cada pacote comum seguido soma estes pesos (até 8 seguidos); no 9º vem pelo menos Prata.
 const PITY_BONUS = { silver: 5, gold: 1.5, galaxy: 0.3 };
+// Piso do pacote por dificuldade (rating 1 a 4: Aprendiz, Duelista, Elite, Caos) e chance extra de Galáxia por ponto de rating acima de 2.
+const TIER_ORDER = ['common', 'silver', 'gold', 'galaxy'];
+const DIFFICULTY_FLOOR = ['common', 'silver', 'gold', 'gold'];
+const GALAXY_PER_RATING = 0.03;
 export const pityKey = (key) => `rushdaily-classic-pity:${key}`;
 
 function weighted(random, table) {
@@ -98,13 +102,19 @@ const themesOf = (cards) => {
  * Cartas que o jogador ainda não tem pesam 3x; as que ele já tem 3 cópias pesam 1/4.
  * Mesma seed, mesma coleção e mesma sorte acumulada: mesmo pacote.
  */
-export function openBooster(seed, { owned = {}, pity = 0, cards = pool } = {}) {
+export function openBooster(seed, { owned = {}, pity = 0, cards = pool, difficulty = null } = {}) {
   const random = seeded(seed);
   const themes = themesOf(cards);
   const theme = themes.length && random() < 0.35 ? themes[Math.floor(random() * themes.length)] : null;
   const streak = Math.min(pity, 8);
   let tier = weighted(random, TIER_ODDS.map(([id, weight]) => [id, weight + (PITY_BONUS[id] || 0) * streak]));
   if (tier === 'common' && pity >= 8) tier = 'silver';
+  // Dificuldade: define o piso do pacote (a sorte e a pity só podem melhorar) e, a partir da Elite, dá uma chance extra de Galáxia.
+  const rating = listDifficulties().find((item) => item.id === difficulty)?.rating || 0;
+  const floor = TIER_ORDER.indexOf(DIFFICULTY_FLOOR[rating - 1] || 'common');
+  const galaxyChance = rating >= 3 ? (rating - 2) * GALAXY_PER_RATING : 0;
+  if (random() < galaxyChance) tier = 'galaxy';
+  if (TIER_ORDER.indexOf(tier) < floor) tier = TIER_ORDER[floor];
   const taken = new Set();
   const weight = (card) => (owned[card.id] ? (owned[card.id] >= 3 ? 0.25 : 1) : 3) * (theme && card.archetype === theme ? 20 : 1);
   const pick = (list) => {
@@ -274,6 +284,10 @@ function summary(result) {
 
 const TIER_NAME = { common: 'Booster', silver: 'Booster Prata', gold: 'Booster Ouro', galaxy: 'Booster Galáxia' }; // = PACK_TIERS[...].label (scene.js)
 
+const SHOWCASE = ['common', 'silver', 'gold'];
+// Dificuldades que dão cada raridade como piso (o Ouro junta Elite e Caos).
+const tierDifficulties = (id) => listDifficulties().filter((item) => DIFFICULTY_FLOOR[item.rating - 1] === id).map((item) => item.label).join(' e ');
+
 async function renderReward() {
   const sceneModule = loadScene(); // baixa o Three.js enquanto o resto da tela é montado
   const rewardKey = `rushdaily-reward:${playerKey}:${date}`;
@@ -282,7 +296,7 @@ async function renderReward() {
   const opened = readJson(boosterKey, null);
   const locked = !pending?.pending && !opened;
   const result = opened ? { tier: 'common', layout: 'arc', ...opened, cards: opened.cards.filter((entry) => byId(entry.id)) }
-    : locked ? null : openBooster(pending.seed, { owned: readCollection(playerKey), pity: readJson(pityKey(playerKey), 0) });
+    : locked ? null : openBooster(pending.seed, { owned: readCollection(playerKey), pity: readJson(pityKey(playerKey), 0), difficulty: pending.difficulty });
   const reduced = settingsFor(playerKey).reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches;
   const wonToday = readJson('rushdaily-history', {})[playerKey]?.[date] === 'win';
   const tierName = result ? TIER_NAME[result.tier] || 'Booster' : 'Booster';
@@ -297,7 +311,11 @@ async function renderReward() {
       <div class="center"><button class="btn" type="button" id="reveal-all" ${opened ? 'hidden' : ''}>Revelar todas</button> <a class="btn ghost" href="screens.html?screen=collection&player=${playerKey}">Ver coleção</a></div>
       <div id="pack-summary">${opened ? summary(result) : ''}</div>
     </div>
-    ${locked ? `<div class="center"><a class="btn big" href="index.html?player=${playerKey}">Ir para o desafio</a></div>` : ''}`;
+    ${locked ? `<div class="center"><a class="btn big" href="index.html?player=${playerKey}">Ir para o desafio</a></div>` : ''}
+    <section class="tier-ref" aria-labelledby="tier-ref-title"><h2 id="tier-ref-title">Qual booster cada dificuldade dá</h2>
+      <canvas class="tier-canvas" id="tier-canvas" aria-label="Boosters Comum, Prata e Ouro em 3D"></canvas>
+      <ul class="tier-legend">${SHOWCASE.map((id) => `<li><b>${TIER_NAME[id]}</b><span>${tierDifficulties(id)}</span></li>`).join('')}</ul>
+      <p class="tier-note">Qualquer pacote pode sair melhor por sorte; a Elite e o Caos ainda têm chance de Galáxia.</p></section>`;
 
   const copy = (text) => { root.querySelector('.screen-head p').textContent = text; };
   // O toque no pacote vale desde já: a cena 3D (e as frentes das cartas) termina de carregar enquanto ele espera.
@@ -349,6 +367,7 @@ async function renderReward() {
       if (result.tier !== 'common') toast(TIER_COPY[result.tier]);
     },
   });
+  sceneModule.then(({ tierShowcase }) => tierShowcase(root.querySelector('#tier-canvas'), { mark: 'src/assets/logo-mark.png', reduced }));
   window.__packCards = (index) => pack.cardAt(index); // usado pelos testes automáticos
   window.__pack = pack;
   root.querySelector('#pack-summary').addEventListener('click', (event) => { const item = event.target.closest('[data-id]'); if (item) inspect(byId(item.dataset.id)); });

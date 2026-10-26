@@ -122,6 +122,14 @@
 /* Booster */
 .pack-stage { position: relative; display: grid; place-items: center; height: min(66vh, 600px); }
 .pack-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.tier-ref { margin: 28px auto 0; max-width: 720px; text-align: center; }
+.tier-ref h2 { font-size: 1rem; margin: 0 0 4px; }
+.tier-canvas { display: block; width: 100%; height: clamp(200px, 38vw, 300px); }
+.tier-legend { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.tier-legend li { display: grid; gap: 2px; font-size: 0.85rem; }
+.tier-legend b { color: var(--gold-hi); }
+.tier-note { margin: 10px 0 0; font-size: 0.8rem; color: var(--ivory-dim); }
+.tier-legend span { color: var(--ivory-dim); }
 .pack-controls { margin-top: 8px; }
 /* PC: o palco 3D cede altura para o resumo e o "Ver coleção" caberem na primeira tela. */
 @media (min-width: 900px) and (max-height: 960px) { .pack-stage { height: clamp(320px, calc(100vh - 440px), 520px); } .screen-head { margin-bottom: 8px; } }

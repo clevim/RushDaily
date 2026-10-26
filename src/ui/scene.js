@@ -496,7 +496,7 @@ async function packBack(renderer, { mark }) {
   return texture;
 }
 
-/** Máscara alfa do pacote: dentes nos lacres e, se pedido, só um lado da linha de rasgo. */
+/** Máscara alfa do pacote: serrilha fina nos lacres e, se pedido, só um lado da linha de rasgo. */
 function packMask(tearV, keep) {
   const canvas = document.createElement('canvas');
   canvas.width = 512;
@@ -508,7 +508,7 @@ function packMask(tearV, keep) {
   const teeth = (y, dir) => {
     context.beginPath();
     context.moveTo(0, y);
-    for (let x = 0; x <= 512; x += 16) context.lineTo(x, y + (x / 16 % 2 ? 10 : 0) * dir);
+    for (let x = 0; x <= 512; x += 8) context.lineTo(x, y + (x / 8 % 2 ? 7 : 0) * dir);
     context.lineTo(512, y - 40 * dir);
     context.lineTo(0, y - 40 * dir);
     context.fill();
@@ -516,16 +516,18 @@ function packMask(tearV, keep) {
   teeth(2, 1); // topo
   teeth(766, -1); // base
   if (keep) {
-    // Linha de rasgo serrilhada irregular (mesma para corpo e tira).
+    // Linha de rasgo serrilhada irregular (mesma para corpo e tira). Os pontos vão até x=512 exato:
+    // parar em 506 e fechar no canto deixava uma tira branca diagonal fininha.
     const y = (1 - tearV) * 768;
+    const corner = keep === 'body' ? 0 : 768;
     context.beginPath();
-    context.moveTo(0, keep === 'body' ? 0 : 768);
-    for (let x = 0; x <= 512; x += 22) context.lineTo(x, y + (x / 22 % 2 ? 9 : -9) + Math.sin(x * 0.37) * 4);
-    context.lineTo(512, keep === 'body' ? 0 : 768);
+    context.moveTo(0, corner);
+    for (let x = 0; x < 512 + 22; x += 22) { const px = Math.min(x, 512); context.lineTo(px, y + (x / 22 % 2 ? 9 : -9) + Math.sin(x * 0.37) * 4); }
+    context.lineTo(512, corner);
+    context.closePath();
     context.fill();
   }
-  const texture = new THREE.CanvasTexture(canvas);
-  return texture;
+  return new THREE.CanvasTexture(canvas);
 }
 
 /** Mapa de normais de "amassado": manchas e vincos suaves, para a luz desenhar rugas no foil. */
@@ -567,22 +569,19 @@ function wrinkleNormals() {
   return new THREE.CanvasTexture(canvas);
 }
 
-/** Malha de um lado do pacote: estufada como travesseiro, achatada e estriada nos lacres. */
+/** Malha de um lado do pacote: estufada como travesseiro e estriada nos lacres (estrias com >4 vértices por ciclo, sem serrilhado). */
 function pouchGeometry(width, height, crimp) {
-  const geometry = new THREE.PlaneGeometry(width, height, 48, 80);
+  const geometry = new THREE.PlaneGeometry(width, height, 96, 64);
   const position = geometry.attributes.position;
+  const inner = height / 2 - crimp;
   for (let index = 0; index < position.count; index += 1) {
     const x = position.getX(index);
     const y = position.getY(index);
     const u = Math.abs(x) / (width / 2);
-    let z;
-    if (Math.abs(y) > height / 2 - crimp) {
-      z = 0.012 + Math.sin(x * 70) * 0.006; // estrias do lacre
-    } else {
-      const v = Math.abs(y) / (height / 2 - crimp);
-      z = 0.012 + 0.16 * (1 - u ** 6) * (1 - v ** 5); // barriga do pacote
-    }
-    position.setZ(index, z);
+    const v = Math.min(1, Math.abs(y) / inner);
+    const belly = (1 - u ** 4) * (1 - v ** 4); // 0 nas bordas e nos lacres
+    const ripple = Math.sin(x * 55) * 0.006 * (1 - belly) * (Math.abs(y) > inner ? 1 : 0); // estrias só no lacre
+    position.setZ(index, 0.01 + 0.17 * belly + ripple);
   }
   geometry.computeVertexNormals();
   return geometry;
@@ -651,6 +650,53 @@ async function packFace(renderer, { mark, title, subtitle, tier = PACK_TIERS.com
   return texture;
 }
 
+/**
+ * Pacote 3D (frente + verso estufados, lacres serrilhados, tira de rasgo separada), na aparência `look`.
+ * Compartilhado pela abertura (boosterScene) e pela vitrine das raridades (tierShowcase).
+ */
+const W = 2.4; // pacote: largura, altura e altura da linha de rasgo acima do centro
+const H = 3.6;
+const TEAR = 1.3;
+let wrinkleTexture = null;
+function buildPack(renderer, { mark, subtitle, look }) {
+  const CRIMP = 0.26;
+  const group = new THREE.Group();
+  wrinkleTexture ||= wrinkleNormals();
+  const foilMaterial = (alphaMap) => new THREE.MeshPhysicalMaterial({
+    color: 0xffffff, metalness: look.metalness, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.12,
+    iridescence: look.iridescence, iridescenceIOR: 1.5, iridescenceThicknessRange: [250, 700],
+    normalMap: wrinkleTexture, normalScale: new THREE.Vector2(0.35, 0.35), alphaMap, alphaTest: 0.5, side: THREE.DoubleSide, transparent: true, // transparent desde o início: ligar no meio da abertura recompilava o shader e travava a animação
+  });
+  const tearV = (TEAR + H / 2) / H;
+  const mirrored = (texture) => { texture.wrapS = THREE.RepeatWrapping; texture.repeat.x = -1; return texture; };
+  const frontBody = foilMaterial(packMask(tearV, 'body'));
+  const frontStrip = foilMaterial(packMask(tearV, 'strip'));
+  const backBody = foilMaterial(mirrored(packMask(tearV, 'body')));
+  const backStrip = foilMaterial(mirrored(packMask(tearV, 'strip')));
+  const packMaterials = [frontBody, frontStrip, backBody, backStrip];
+  const applyFace = (style) => packFace(renderer, { mark, title: style.label.toUpperCase(), subtitle, tier: style }).then((texture) => {
+    for (const material of [frontBody, frontStrip]) { material.map = texture; material.needsUpdate = true; }
+  });
+  applyFace(look);
+  packBack(renderer, { mark }).then((texture) => {
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.repeat.x = -1;
+    for (const material of [backBody, backStrip]) { material.map = texture; material.needsUpdate = true; }
+  });
+  const side = pouchGeometry(W, H, CRIMP);
+  const face = (material, back) => { const mesh = new THREE.Mesh(side, material); if (back) mesh.rotation.y = Math.PI; return mesh; };
+  const body = new THREE.Group();
+  body.add(face(frontBody, false), face(backBody, true));
+  const strip = new THREE.Group();
+  strip.position.set(-W / 2, TEAR, 0);
+  const stripFaces = new THREE.Group();
+  stripFaces.position.set(W / 2, -TEAR, 0);
+  stripFaces.add(face(frontStrip, false), face(backStrip, true));
+  strip.add(stripFaces);
+  group.add(body, strip);
+  return { group, strip, packMaterials, applyFace };
+}
+
 /** Acabamento físico da frente de cada carta revelada, conforme o foil sorteado. */
 function cardFrontMaterial(map, foil) {
   const settings = {
@@ -689,46 +735,8 @@ export function boosterScene(canvas, { mark, subtitle, tier: tierId = 'common', 
   scene.add(burst);
 
   // ----- Pacote: frente e verso estufados, lacres e linha de rasgo -----
-  const group = new THREE.Group();
+  const { group, strip, packMaterials, applyFace } = buildPack(renderer, { mark, subtitle, look: disguise ? PACK_TIERS.common : tier });
   scene.add(group);
-  const W = 2.4;
-  const H = 3.6;
-  const CRIMP = 0.26;
-  const TEAR = 1.3;
-  const wrinkles = wrinkleNormals();
-  const look = disguise ? PACK_TIERS.common : tier;
-  const foilMaterial = (alphaMap) => new THREE.MeshPhysicalMaterial({
-    color: 0xffffff, metalness: look.metalness, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.12,
-    iridescence: look.iridescence, iridescenceIOR: 1.5, iridescenceThicknessRange: [250, 700],
-    normalMap: wrinkles, normalScale: new THREE.Vector2(0.35, 0.35), alphaMap, alphaTest: 0.5, side: THREE.DoubleSide,
-  });
-  const tearV = (TEAR + H / 2) / H;
-  const mirrored = (texture) => { texture.wrapS = THREE.RepeatWrapping; texture.repeat.x = -1; return texture; };
-  const frontBody = foilMaterial(packMask(tearV, 'body'));
-  const frontStrip = foilMaterial(packMask(tearV, 'strip'));
-  const backBody = foilMaterial(mirrored(packMask(tearV, 'body')));
-  const backStrip = foilMaterial(mirrored(packMask(tearV, 'strip')));
-  const packMaterials = [frontBody, frontStrip, backBody, backStrip];
-  const applyFace = (style) => packFace(renderer, { mark, title: style.label.toUpperCase(), subtitle, tier: style }).then((texture) => {
-    for (const material of [frontBody, frontStrip]) { material.map = texture; material.needsUpdate = true; }
-  });
-  applyFace(look);
-  packBack(renderer, { mark }).then((texture) => {
-    texture.wrapS = THREE.RepeatWrapping;
-    texture.repeat.x = -1;
-    for (const material of [backBody, backStrip]) { material.map = texture; material.needsUpdate = true; }
-  });
-  const side = pouchGeometry(W, H, CRIMP);
-  const face = (material, back) => { const mesh = new THREE.Mesh(side, material); if (back) mesh.rotation.y = Math.PI; return mesh; };
-  const body = new THREE.Group();
-  body.add(face(frontBody, false), face(backBody, true));
-  const strip = new THREE.Group();
-  strip.position.set(-W / 2, TEAR, 0);
-  const stripFaces = new THREE.Group();
-  stripFaces.position.set(W / 2, -TEAR, 0);
-  stripFaces.add(face(frontStrip, false), face(backStrip, true));
-  strip.add(stripFaces);
-  group.add(body, strip);
   group.visible = !opened;
 
   // Raios de luz (Ouro): planos aditivos saindo da costura.
@@ -913,7 +921,7 @@ export function boosterScene(canvas, { mark, subtitle, tier: tierId = 'common', 
       if (tier.opening === 'supernova') {
         // Galáxia: o pacote se contrai, brilha e explode em estrelas.
         const k = Math.min(1, t / 0.9);
-        group.scale.setScalar(1 - 0.25 * Math.sin(k * Math.PI / 2) + (t > 0.9 ? (t - 0.9) * 2 : 0));
+        group.scale.setScalar(Math.max(0.001, (1 - 0.25 * Math.sin(k * Math.PI / 2) + (t > 0.9 ? (t - 0.9) * 2 : 0)) * (t > 0.9 ? 1 - Math.min(1, (t - 0.9) * 4) : 1))); // some encolhendo: opacity + alphaTest faria o pacote piscar e sumir de uma vez
         burst.intensity = k * 320;
         if (t > 0.9 && !group.userData.nova) {
           group.userData.nova = true;
@@ -921,26 +929,26 @@ export function boosterScene(canvas, { mark, subtitle, tier: tierId = 'common', 
           spark(new THREE.Vector3(0, 0, 0.3), 0xffffff, 120, 4, 0.5);
           shake = 0.4;
         }
-        for (const material of packMaterials) {
-          if (t > 0.9) { if (!material.transparent) { material.transparent = true; material.needsUpdate = true; } material.opacity = Math.max(0, 1 - (t - 0.9) * 4); }
-        }
         if (t > 1.2) group.visible = false;
       } else {
         // Rasgo (comum, prata e ouro): a tira descasca e solta, com lascas.
         const k = Math.min(1, t / (tier.opening === 'beams' ? 0.5 : 1.1));
-        const peel = k * k * (3 - 2 * k);
-        strip.rotation.set(-peel * 0.6, peel * 0.8, peel * 1.1);
-        const loose = Math.max(0, (k - 0.55) / 0.45);
-        const fly = tier.opening === 'beams' ? 3 : 1.4;
-        strip.position.set(-1.2 + loose * 1.2, TEAR + loose * fly, peel * 0.5 + loose * 0.8);
+        // Rasgo em duas fases: a tira descasca da costura (ease in-out) e depois se solta em arco, girando.
+        const peel = k < 0.5 ? 4 * k * k * k : 1 - (-2 * k + 2) ** 3 / 2;
+        const loose = Math.max(0, (k - 0.5) / 0.5);
+        const looseE = loose * loose;
+        const fly = tier.opening === 'beams' ? 3 : 1.6;
+        strip.rotation.set(-peel * 0.5 - looseE * 0.6, peel * 0.7 + looseE * 0.5, peel * 0.9 + looseE * 1.4);
+        strip.position.set(-1.2 + looseE * 1.4, TEAR + Math.sin(loose * Math.PI * 0.5) * fly * 0.7 + looseE * fly * 0.3, peel * 0.45 + looseE * 0.9);
         if (t > 0.05 && !strip.userData.cracked) { strip.userData.cracked = true; spark(new THREE.Vector3(0, TEAR, 0.2), 0xffd36b, 80, 2.5, 6); }
         if (tier.opening !== 'beams') burst.intensity = Math.sin(Math.min(1, k) * Math.PI) * 180;
-        // Depois que a tira sai, o pacote desce e some.
-        const leave = Math.max(0, (t - 1.0) / 0.7);
-        group.position.y = -ease(Math.min(1, leave)) * 3.4;
-        for (const material of packMaterials) {
-          if (leave > 0) { if (!material.transparent) { material.transparent = true; material.needsUpdate = true; } material.opacity = 1 - Math.min(1, leave); }
-        }
+        // A tira se solta e o pacote vazio escorrega para baixo encolhendo (sem fade: opacity + alphaTest faz o pacote piscar).
+        const leave = Math.max(0, (t - 1.0) / 0.8);
+        const out = leave * leave * (3 - 2 * leave);
+        group.position.y = -out * 3.8;
+        group.rotation.z = out * 0.25;
+        group.scale.setScalar(Math.max(0.001, 1 - out));
+        strip.scale.setScalar(Math.max(0.001, 1 - looseE * 0.35));
         beams.children.forEach((beam) => { beam.material.opacity *= 0.92; });
         if (leave >= 1) group.visible = false;
       }
@@ -981,7 +989,7 @@ export function boosterScene(canvas, { mark, subtitle, tier: tierId = 'common', 
       card.position.set(position.x, position.y + bob, position.z + lift);
       const spin = tier.opening === 'supernova' ? (1 - e) * Math.PI * 3 : (1 - e) * 0.8;
       card.rotation.set(-card.userData.hover * 0.08, Math.PI * flip + spin + target.x * 0.15 * e, slot.rz * e * (1 - card.userData.hover * 0.6));
-      card.scale.setScalar(1 + card.userData.hover * 0.06 + (card.userData.revealAt !== null && card.userData.revealAt >= 0 ? Math.sin(Math.min(1, (time - card.userData.revealAt) / 0.6) * Math.PI) * 0.12 : 0));
+      card.scale.setScalar((0.8 + 0.2 * e) * (1 + card.userData.hover * 0.06 + (card.userData.revealAt !== null && card.userData.revealAt >= 0 ? Math.sin(Math.min(1, (time - card.userData.revealAt) / 0.6) * Math.PI) * 0.12 : 0)));
       const aura = auras[index];
       if (aura) aura.material.opacity = card.userData.revealAt === null ? (0.35 + Math.sin(time * 4) * 0.2) * e : Math.max(0, aura.material.opacity - delta * 1.5);
     });
@@ -1039,6 +1047,50 @@ export function boosterScene(canvas, { mark, subtitle, tier: tierId = 'common', 
       return { x: rect.left + (point.x + 1) / 2 * rect.width, y: rect.top + (1 - point.y) / 2 * rect.height };
     },
   };
+}
+
+/**
+ * Vitrine das raridades de booster (comum, prata, ouro) lado a lado, girando devagar, num único canvas/renderer.
+ * Pausa fora da tela. Devolve { destroy }.
+ */
+export function tierShowcase(canvas, { mark, subtitle = '', tiers = ['common', 'silver', 'gold'], reduced = false }) {
+  const renderer = makeRenderer(canvas, 1.5);
+  if (!renderer) return { destroy() {} };
+  const scene = new THREE.Scene();
+  scene.environment = studioEnvironment(renderer);
+  const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+  const key = new THREE.DirectionalLight(0xffe2a8, 2.2);
+  key.position.set(-3, 4, 6);
+  scene.add(key);
+  const fill = new THREE.DirectionalLight(0xffffff, 1.4); // de frente: prata e ouro (muito metálicos) ficam escuros só com o ambiente
+  fill.position.set(2, 1, 8);
+  scene.add(fill);
+  const spacing = W * 1.25;
+  const packs = tiers.map((id, index) => {
+    const { group } = buildPack(renderer, { mark, subtitle, look: PACK_TIERS[id] });
+    group.position.x = (index - (tiers.length - 1) / 2) * spacing;
+    group.rotation.y = index * 0.5;
+    scene.add(group);
+    return group;
+  });
+  let visible = true;
+  const observer = typeof IntersectionObserver === 'function' ? new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; }) : null;
+  observer?.observe(canvas);
+  const clock = new THREE.Clock();
+  renderer.setAnimationLoop(() => {
+    if (!visible) return;
+    fit(renderer, camera, canvas);
+    const span = tiers.length * spacing;
+    camera.position.set(0, 0, Math.max(9, (span / 2 + 0.3) / (Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect))); // enquadra os três na largura
+    const time = clock.getElapsedTime();
+    packs.forEach((group, index) => {
+      if (!reduced) group.rotation.y = Math.sin(time * 0.5 + index * 0.9) * 0.7; // vai e volta devagar: o rosto fica sempre legível
+      group.position.y = reduced ? 0 : Math.sin(time * 1.1 + index) * 0.06;
+    });
+    renderer.render(scene, camera);
+  });
+  return { destroy() { renderer.setAnimationLoop(null); observer?.disconnect(); renderer.dispose(); } };
 }
 
 /* ---------- Enigma do Milênio ---------- */
