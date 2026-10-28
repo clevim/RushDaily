@@ -23,8 +23,8 @@ const TIERS = ['common', 'silver', 'gold', 'galaxy'];
 
 const isObj = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const isDay = (text) => typeof text === 'string' && /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(text);
-// Booster/recompensa: o dia, ou "dia~2" para o 2º booster (vitória em outra dificuldade, sem peça).
-const isSlot = (text) => typeof text === 'string' && isDay(text.replace(/~2$/, ''));
+// Booster/recompensa: "dia~<dificuldade>" (um por dificuldade vencida); "dia" e "dia~2" são do formato antigo.
+const isSlot = (text) => typeof text === 'string' && isDay(text.replace(/~(2|[a-z]+)$/, ''));
 const isMonth = (text) => typeof text === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(text);
 const isCardId = (id) => /^[1-9]\d{0,9}$/.test(String(id)) && Number(id) <= 2 ** 31 - 1;
 const int = (value, max) => (Number.isSafeInteger(value) && value >= 0 && value <= max ? value : null);

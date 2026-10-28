@@ -687,7 +687,8 @@ async function pump(redo = []) {
 
 /* ---------- Fim do duelo ---------- */
 
-let rewardDay = date; // qual booster esta vitória liberou (null: os 2 do dia já saíram)
+let rewardDay = date; // qual booster esta vitória liberou (null: o desta dificuldade já saiu hoje)
+let firstWin = true; // 1ª vitória do dia: é ela que traz a peça do Enigma
 function finish(winner, already) {
   const won = winner === ME;
   const result = won ? 'win' : winner === FOE ? 'loss' : 'draw';
@@ -695,13 +696,14 @@ function finish(winner, already) {
   save({ done: true, winner, turns: duel.state.turn });
   if (!already) {
     const history = readJson('rushdaily-history', {});
+    firstWin = history[playerKey]?.[date] !== 'win';
     history[playerKey] = { ...(history[playerKey] || {}), [date]: history[playerKey]?.[date] === 'win' ? 'win' : result };
     writeJson('rushdaily-history', history);
     // Booster sorteado pela chave do jogador: cada um tira cartas diferentes do mesmo desafio.
-    // A 1ª vitória do dia dá booster + peça; uma vitória em outra dificuldade dá um 2º booster ("dia~2"), sem peça.
+    // Um booster por dificuldade vencida no dia ("dia~<id>"); a peça vem só com a 1ª vitória do dia.
     if (won) {
-      const taken = (day) => readJson(`rushdaily-classic-booster:${playerKey}:${day}`, null) || readJson(`rushdaily-reward:${playerKey}:${day}`, null);
-      rewardDay = !taken(date) ? date : !taken(`${date}~2`) ? `${date}~2` : null;
+      const day = `${date}~${difficulty}`;
+      rewardDay = readJson(`rushdaily-classic-booster:${playerKey}:${day}`, null) || readJson(`rushdaily-reward:${playerKey}:${day}`, null) ? null : day;
       if (rewardDay) writeJson(`rushdaily-reward:${playerKey}:${rewardDay}`, { seed: `booster:${rewardDay}:${playerKey}`, difficulty, pending: true });
     }
     queueSync(0); // resultado sobe já, sem esperar a calma do agendamento
@@ -716,7 +718,7 @@ function finish(winner, already) {
   $('#result-kicker').textContent = `${match.player.label} contra ${match.enemy.label} · ${settings.label} · turno ${Math.min(duel.state.turn, FORMAT.turnLimit)}`;
   $('#result-title').textContent = won ? 'Vitória' : winner === FOE ? 'Derrota' : 'Empate';
   $('#result-copy').textContent = won
-    ? `${limit ? `No limite de ${FORMAT.turnLimit} turnos, você tinha mais PV.` : deckOut ? 'O deck do rival acabou.' : reason === 1 ? 'Os pontos de vida do rival chegaram a zero.' : 'Um efeito decidiu o duelo a seu favor.'} ${rewardDay === date ? `Seu booster clássico está liberado e a peça do dia ${Number(date.slice(8))} entrou no Enigma.` : rewardDay ? `Booster ${settings.label} liberado; a peça do Enigma é uma por dia.` : 'Os 2 boosters de hoje já saíram.'}`
+    ? `${limit ? `No limite de ${FORMAT.turnLimit} turnos, você tinha mais PV.` : deckOut ? 'O deck do rival acabou.' : reason === 1 ? 'Os pontos de vida do rival chegaram a zero.' : 'Um efeito decidiu o duelo a seu favor.'} ${rewardDay && firstWin ? `Seu booster clássico está liberado e a peça do dia ${Number(date.slice(8))} entrou no Enigma.` : rewardDay ? `Booster ${settings.label} liberado; a peça do Enigma é uma por dia.` : `O booster ${settings.label} de hoje já saiu: vença em outra dificuldade para ganhar o dela.`}`
     : `${limit ? `No limite de ${FORMAT.turnLimit} turnos, ${winner === FOE ? 'o rival tinha mais PV' : 'os PV estavam iguais'}.` : deckOut ? 'Seu deck acabou antes do rival.' : 'Seus pontos de vida chegaram a zero.'} A revanche usa a mesma seed: as cartas chegam na mesma ordem.`;
   $('#result-main').textContent = won && rewardDay ? 'Abrir booster clássico' : 'Voltar ao desafio';
   $('#result-main').href = won && rewardDay ? `screens.html?screen=reward&player=${playerKey}` : `index.html?player=${playerKey}`;

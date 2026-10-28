@@ -1,4 +1,4 @@
-import { listDifficulties, getDifficulty } from '../engine/daily-generator.mjs';
+import { listDifficulties } from '../engine/daily-generator.mjs';
 import { buildDeck } from '../engine/classic-deck.mjs';
 import { DIFFICULTY_FLOOR, openBooster } from '../engine/booster.mjs';
 import { TYPE, isExtra } from '../engine/ocg.mjs';
@@ -220,19 +220,18 @@ const tierDifficulties = (id) => listDifficulties().filter((item) => DIFFICULTY_
 async function renderReward() {
   const sceneModule = loadScene();
   const reduced = settingsFor(playerKey).reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const DIFFICULTIES = ['aprendiz', 'duelista', 'elite', 'caos'];
   const wonToday = readJson('rushdaily-history', {})[playerKey]?.[date] === 'win';
 
-  // Um slot por dificuldade (chave inclui a dificuldade)
-  const slots = DIFFICULTIES.map((diff) => {
-    const rewardKey = `rushdaily-reward:${playerKey}:${date}~${diff}`;
-    const boosterKey = `rushdaily-classic-booster:${playerKey}:${date}~${diff}`;
-    return { diff, rewardKey, boosterKey, pending: readJson(rewardKey, null), opened: readJson(boosterKey, null) };
+  // Um slot por dificuldade ("dia~<id>", gravado em duel.js); "dia" e "dia~2" são do formato antigo (2 boosters fixos).
+  const slots = [date, `${date}~2`, ...listDifficulties().map((item) => `${date}~${item.id}`)].map((day) => {
+    const rewardKey = `rushdaily-reward:${playerKey}:${day}`;
+    const boosterKey = `rushdaily-classic-booster:${playerKey}:${day}`;
+    return { day, rewardKey, boosterKey, pending: readJson(rewardKey, null), opened: readJson(boosterKey, null) };
   });
 
   const pendingSlots = slots.filter((s) => s.pending && s.pending.pending);
   const openedSlots = slots.filter((s) => s.opened);
-  const isFirst = openedSlots.length === 0; // a peça só vai no primeiro booster do dia
+  const isFirst = openedSlots.length === (pendingSlots.length ? 0 : 1); // a peça só vai no primeiro booster do dia
 
   if (!pendingSlots.length && !openedSlots.length) {
     root.innerHTML = `${head('Booster do dia', 'Vença o duelo de hoje para liberar 5 cartas.')}
@@ -244,7 +243,6 @@ async function renderReward() {
   const slot = pendingSlots[0] || openedSlots[openedSlots.length - 1];
   const pending = slot.pending;
   const opened = slot.opened;
-  const locked = false;
 
   const result = opened
     ? { tier: 'common', layout: 'arc', ...opened, cards: opened.cards.filter((e) => byId(e.id)) }
@@ -256,7 +254,7 @@ async function renderReward() {
       });
 
   const tierName = result ? TIER_NAME[result.tier] || 'Booster' : 'Booster';
-  const remaining = pendingSlots.length - (opened ? 0 : 1);
+  const remaining = Math.max(0, pendingSlots.length - 1); // pendentes além deste
 
   root.innerHTML = `${head(opened ? `${tierName} de hoje` : 'Booster liberado',
     opened ? 'Toque numa carta para ler.' : 'Toque no pacote para abrir.')}
@@ -272,7 +270,7 @@ async function renderReward() {
       <p class="pack-hint" id="pack-hint">${opened ? '' : 'Toque nas cartas para virar.'}</p>
       <div class="center">
         <button class="btn" type="button" id="reveal-all" ${opened ? 'hidden' : ''}>Revelar todas</button>
-        ${pendingSlots.length > 1 || remaining > 0
+        ${remaining > 0
           ? `<button class="btn" type="button" id="next-booster" hidden>Próximo booster</button>`
           : `<a class="btn ghost" href="screens.html?screen=collection&player=${playerKey}">Ver coleção</a>`}
       </div>

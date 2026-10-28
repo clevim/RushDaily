@@ -225,12 +225,12 @@ O progresso (coleção, decks, histórico, PvP, boosters, Enigma, Coração das 
 
 ### Cache e Cloudflare
 
-O `nginx.conf` já manda o `Cache-Control` certo por tipo (sem build não há arquivos com hash, então código e dados usam prazo curto com `stale-while-revalidate`, e as imagens de nome estável usam 7 dias):
+O `nginx.conf` já manda o `Cache-Control` certo por tipo (sem build não há arquivos com hash, então código, dados e o motor usam `no-cache`, que revalida por ETag a cada carregamento, e as imagens de nome estável usam 7 dias):
 
 | O quê | `Cache-Control` do nginx | Observação |
 |---|---|---|
-| `.html`, `.js`, `.mjs`, `.css`, `.json` | `public, max-age=300, stale-while-revalidate=86400` | Uma atualização aparece em até 5 min (ou no recarregamento seguinte). Medido: 2ª visita sem requisição à origem em 5 min. |
-| `.lua` (scripts das cartas), `.wasm` (motor) | `public, max-age=604800, stale-while-revalidate=86400` | `.lua` sai como `text/plain` (comprime ~6x); `.wasm` como `application/wasm`. |
+| `.html`, `.js`, `.mjs`, `.css`, `.json`, `.wasm` | `no-cache` | Sempre revalida (304 se não mudou). Uma atualização chega no próximo carregamento. `.wasm` sai como `application/wasm` e tem nome fixo, por isso não fica em cache longo. |
+| `.lua` (scripts das cartas) | `public, max-age=604800, stale-while-revalidate=86400` | Sai como `text/plain` (comprime ~6x). Depois de regerar os scripts: purge. |
 | `.webp`, `.png`, `.svg`, `.woff2`, `.bin` | `public, max-age=604800, stale-while-revalidate=86400` | Nome estável (id da carta). Para forçar uma arte nova: purge ou renomear. |
 | `ocgcore.sync-*.js` (hash no nome) | `public, max-age=31536000, immutable` | |
 

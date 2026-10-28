@@ -58,11 +58,12 @@ function render() {
   $('#matchup').style.setProperty('--len', Math.max(data.player.label.length, data.enemy.label.length));
   $('#matchup').setAttribute('aria-label', `${data.player.label} contra ${data.enemy.label}`);
   $('#brief').textContent = `Rush Duel: seu deck de ${data.player.label} ${ATTRIBUTE_OF[data.player.theme.attribute] || ''} contra ${data.enemy.label} ${ATTRIBUTE_OF[data.enemy.theme.attribute] || ''}. ${data.difficulty.modifier}${heartUnlocked(playerKey) ? ' Você tem um Coração das Cartas guardado: ele entra no duelo.' : ''}`.replace(/\s+/g, ' ').replace(' .', '.');
-  const boosterPending = [date, `${date}~2`].some((day) => readJson(`rushdaily-reward:${playerKey}:${day}`, null));
-  const secondTaken = Boolean(readJson(`rushdaily-classic-booster:${playerKey}:${date}~2`, null));
+  const days = [date, `${date}~2`, ...listDifficulties().map((item) => `${date}~${item.id}`)]; // = renderReward (screens.js)
+  const boosterPending = days.some((day) => readJson(`rushdaily-reward:${playerKey}:${day}`, null));
+  const thisTaken = Boolean(readJson(`rushdaily-classic-booster:${playerKey}:${date}~${difficulty}`, null)); // o desta dificuldade já saiu
   const boosterLink = `<a href="screens.html?screen=reward&player=${playerKey}">Abrir booster</a>`;
   const ongoing = readJson(`rushdaily-game:${playerKey}:${date}:${difficulty}`, null);
-  $('#status').innerHTML = result === 'win' ? (boosterPending ? `Vitória registrada. Seu booster está esperando: ${boosterLink}.` : secondTaken ? 'Vitória registrada e os 2 boosters de hoje abertos. Amanhã tem desafio novo.' : 'Vitória registrada e booster aberto. Vença em outra dificuldade para ganhar o booster dela (sem peça do Enigma).')
+  $('#status').innerHTML = result === 'win' ? (boosterPending ? `Vitória registrada. Seu booster está esperando: ${boosterLink}.` : thisTaken ? 'Vitória registrada e o booster desta dificuldade aberto. Vença em outra dificuldade para ganhar o dela (sem peça do Enigma).' : 'Vitória registrada. Vença nesta dificuldade para ganhar o booster dela (sem peça do Enigma).')
     : result === 'loss' ? 'Você perdeu hoje. A revanche continua aberta.'
       : result === 'draw' ? 'Empate. A revanche continua aberta.'
         : ongoing?.v === 2 && ongoing.responses?.length && !ongoing.done ? 'Sua partida de hoje está salva: entre para continuar.'
