@@ -1,4 +1,4 @@
-import { listDifficulties } from '../engine/daily-generator.mjs';
+import { listDifficulties, getDifficulty } from '../engine/daily-generator.mjs';
 import { buildDeck } from '../engine/classic-deck.mjs';
 import { DIFFICULTY_FLOOR, openBooster } from '../engine/booster.mjs';
 import { TYPE, isExtra } from '../engine/ocg.mjs';
@@ -218,52 +218,77 @@ const SHOWCASE = ['common', 'silver', 'gold'];
 const tierDifficulties = (id) => listDifficulties().filter((item) => DIFFICULTY_FLOOR[item.rating - 1] === id).map((item) => item.label).join(' e ');
 
 async function renderReward() {
-  const sceneModule = loadScene(); // baixa o Three.js enquanto o resto da tela é montado
-  // 1º booster do dia (com peça) ou o 2º ("dia~2", vitória em outra dificuldade, sem peça): o pendente vem primeiro.
-  const second = `${date}~2`;
-  const has = (prefix, day) => readJson(`${prefix}:${playerKey}:${day}`, null);
-  const day = has('rushdaily-reward', date) || !(has('rushdaily-reward', second) || has('rushdaily-classic-booster', second)) ? date : second;
-  const rewardKey = `rushdaily-reward:${playerKey}:${day}`;
-  const boosterKey = `rushdaily-classic-booster:${playerKey}:${day}`;
-  const pending = readJson(rewardKey, null);
-  const opened = readJson(boosterKey, null);
-  const locked = !pending?.pending && !opened;
-  const result = opened ? { tier: 'common', layout: 'arc', ...opened, cards: opened.cards.filter((entry) => byId(entry.id)) }
-    : locked ? null : openBooster(pending.seed, { cards: pool, owned: readCollection(playerKey), pity: readJson(pityKey(playerKey), 0), difficulty: pending.difficulty });
+  const sceneModule = loadScene();
   const reduced = settingsFor(playerKey).reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const wonToday = day === date && readJson('rushdaily-history', {})[playerKey]?.[date] === 'win'; // a peça só vem no 1º booster
+  const DIFFICULTIES = ['aprendiz', 'duelista', 'elite', 'caos'];
+  const wonToday = readJson('rushdaily-history', {})[playerKey]?.[date] === 'win';
+
+  // Um slot por dificuldade (chave inclui a dificuldade)
+  const slots = DIFFICULTIES.map((diff) => {
+    const rewardKey = `rushdaily-reward:${playerKey}:${date}~${diff}`;
+    const boosterKey = `rushdaily-classic-booster:${playerKey}:${date}~${diff}`;
+    return { diff, rewardKey, boosterKey, pending: readJson(rewardKey, null), opened: readJson(boosterKey, null) };
+  });
+
+  const pendingSlots = slots.filter((s) => s.pending && s.pending.pending);
+  const openedSlots = slots.filter((s) => s.opened);
+  const isFirst = openedSlots.length === 0; // a peça só vai no primeiro booster do dia
+
+  if (!pendingSlots.length && !openedSlots.length) {
+    root.innerHTML = `${head('Booster do dia', 'Vença o duelo de hoje para liberar 5 cartas.')}
+      <div class="pack-row"><div class="pack-stage locked"><canvas class="pack-canvas" id="pack-canvas" aria-label="Booster em 3D"></canvas></div></div>
+      <div class="center"><a class="btn big" href="index.html?player=${playerKey}">Ir para o desafio</a></div>`;
+    return;
+  }
+
+  const slot = pendingSlots[0] || openedSlots[openedSlots.length - 1];
+  const pending = slot.pending;
+  const opened = slot.opened;
+  const locked = false;
+
+  const result = opened
+    ? { tier: 'common', layout: 'arc', ...opened, cards: opened.cards.filter((e) => byId(e.id)) }
+    : openBooster(pending.seed, {
+        cards: pool,
+        owned: readCollection(playerKey),
+        pity: readJson(pityKey(playerKey), 0),
+        difficulty: pending.difficulty, // <- já muda a % de chance pela dificuldade
+      });
+
   const tierName = result ? TIER_NAME[result.tier] || 'Booster' : 'Booster';
-  root.innerHTML = `${head(locked ? 'Booster do dia' : opened ? `${tierName} de hoje` : 'Booster liberado',
-    locked ? 'Vença o duelo de hoje para liberar 5 cartas.'
-      : opened ? 'Toque numa carta para ler.'
-        : 'Toque no pacote para abrir.')}
+  const remaining = pendingSlots.length - (opened ? 0 : 1);
+
+  root.innerHTML = `${head(opened ? `${tierName} de hoje` : 'Booster liberado',
+    opened ? 'Toque numa carta para ler.' : 'Toque no pacote para abrir.')}
     <div class="pack-row ${opened ? 'solo' : ''}" id="pack-row">
-    <div class="pack-stage ${locked ? 'locked' : ''}"><canvas class="pack-canvas" id="pack-canvas" aria-label="Booster em 3D"></canvas>
-      ${locked || opened ? '' : '<button class="pack-hit" type="button" id="pack" aria-label="Abrir booster"></button>'}</div>
-    <section class="tier-ref" aria-labelledby="tier-ref-title"><h2 id="tier-ref-title">Versões do booster</h2>
-      <canvas class="tier-canvas" id="tier-canvas" aria-label="Boosters Comum, Prata e Ouro em 3D"></canvas>
-      <ul class="tier-legend">${SHOWCASE.map((id) => `<li><b>${TIER_NAME[id]}</b><span>${tierDifficulties(id)}</span></li>`).join('')}</ul>
-      <p class="tier-note">Qualquer pacote pode sair melhor por sorte; a Elite e o Caos ainda têm chance de Galáxia.</p></section>
+      <div class="pack-stage"><canvas class="pack-canvas" id="pack-canvas" aria-label="Booster em 3D"></canvas>
+        ${opened ? '' : '<button class="pack-hit" type="button" id="pack" aria-label="Abrir booster"></button>'}</div>
+      <section class="tier-ref" aria-labelledby="tier-ref-title"><h2 id="tier-ref-title">Versões do booster</h2>
+        <canvas class="tier-canvas" id="tier-canvas" aria-label="Boosters Comum, Prata e Ouro em 3D"></canvas>
+        <ul class="tier-legend">${SHOWCASE.map((id) => `<li><b>${TIER_NAME[id]}</b><span>${tierDifficulties(id)}</span></li>`).join('')}</ul>
+        <p class="tier-note">Qualquer pacote pode sair melhor por sorte; a Elite e o Caos ainda têm chance de Galáxia.</p></section>
     </div>
     <div class="pack-controls" id="pack-controls" ${opened ? '' : 'hidden'}>
       <p class="pack-hint" id="pack-hint">${opened ? '' : 'Toque nas cartas para virar.'}</p>
-      <div class="center"><button class="btn" type="button" id="reveal-all" ${opened ? 'hidden' : ''}>Revelar todas</button> <a class="btn ghost" href="screens.html?screen=collection&player=${playerKey}">Ver coleção</a></div>
+      <div class="center">
+        <button class="btn" type="button" id="reveal-all" ${opened ? 'hidden' : ''}>Revelar todas</button>
+        ${pendingSlots.length > 1 || remaining > 0
+          ? `<button class="btn" type="button" id="next-booster" hidden>Próximo booster</button>`
+          : `<a class="btn ghost" href="screens.html?screen=collection&player=${playerKey}">Ver coleção</a>`}
+      </div>
       <div id="pack-summary">${opened ? summary(result) : ''}</div>
-    </div>
-    ${locked ? `<div class="center"><a class="btn big" href="index.html?player=${playerKey}">Ir para o desafio</a></div>` : ''}`;
+    </div>`;
 
   const copy = (text) => { root.querySelector('.screen-head p').textContent = text; };
-  // O toque no pacote vale desde já: a cena 3D (e as frentes das cartas) termina de carregar enquanto ele espera.
   let packReady;
   const scene = new Promise((resolve) => { packReady = resolve; });
-  // Arrastar sobre o pacote rasga a tira junto com o dedo; um toque simples continua abrindo.
   const packEl = root.querySelector('#pack');
   let dragFrom = null;
-  packEl?.addEventListener('pointerdown', (event) => { dragFrom = event.clientX; });
-  packEl?.addEventListener('pointermove', (event) => { if (dragFrom !== null) scene.then((s) => s.drag?.(Math.abs(event.clientX - dragFrom) / 140)); });
-  root.querySelector('#pack')?.addEventListener('click', async (event) => {
+  packEl?.addEventListener('pointerdown', (e) => { dragFrom = e.clientX; });
+  packEl?.addEventListener('pointermove', (e) => { if (dragFrom !== null) scene.then((s) => s.drag?.(Math.abs(e.clientX - dragFrom) / 140)); });
+
+  packEl?.addEventListener('click', async (event) => {
     event.currentTarget.remove();
-    // Salva antes da animação: fechar a aba no meio não perde o pacote.
     const collection = readCollection(playerKey);
     const foils = readJson(foilsKey(playerKey), {});
     for (const entry of result.cards) {
@@ -271,16 +296,22 @@ async function renderReward() {
       collection[entry.id] = (collection[entry.id] || 0) + 1;
       if (entry.foil) foils[entry.id] = [...new Set([...(foils[entry.id] || []), entry.foil])];
     }
-    writeJson(boosterKey, { openedAt: new Date().toISOString(), seed: pending.seed, ...result });
+    writeJson(slot.boosterKey, { openedAt: new Date().toISOString(), seed: pending.seed, difficulty: pending.difficulty, ...result });
     writeCollection(playerKey, collection);
     writeJson(foilsKey(playerKey), foils);
     writeJson(pityKey(playerKey), result.luck ? readJson(pityKey(playerKey), 0) + result.luck : 0);
-    removeKey(rewardKey);
-    root.querySelector('#pack-row').classList.add('solo'); // as 5 cartas precisam da largura toda: a vitrine desce
+    removeKey(slot.rewardKey);
+    root.querySelector('#pack-row').classList.add('solo');
     copy('Abrindo…');
     await (await scene).open();
     root.querySelector('#pack-controls').hidden = false;
     copy('Toque nas cartas para virar, ou revele todas.');
+    // mostra "Próximo booster" se ainda tiver fila
+    const nextBtn = root.querySelector('#next-booster');
+    if (nextBtn && remaining > 0) {
+      nextBtn.hidden = false;
+      nextBtn.onclick = () => renderReward();
+    }
   });
 
   const fronts = result ? await Promise.all(result.cards.map((entry) => classicCardUrl(byId(entry.id)))) : [];
@@ -293,25 +324,25 @@ async function renderReward() {
     layout: result?.layout,
     opened: Boolean(opened),
     reduced,
-    cards: (result?.cards || []).map((entry, index) => ({ front: fronts[index], back: BACKS[entry.back] || BACK, foil: entry.foil, rare: entry.rare })),
-    piece: result && wonToday ? { index: Number(date.slice(8)) - 1, total: daysInMonth() } : null,
+    cards: (result?.cards || []).map((entry, i) => ({ front: fronts[i], back: BACKS[entry.back] || BACK, foil: entry.foil, rare: entry.rare })),
+    piece: result && wonToday && isFirst ? { index: Number(date.slice(8)) - 1, total: daysInMonth() } : null,
     onPiece: () => { location.href = `screens.html?screen=puzzle&fresh=${Number(date.slice(8)) - 1}&player=${playerKey}`; },
-    onInspect: (index) => inspect(byId(result.cards[index].id)),
+    onInspect: (i) => inspect(byId(result.cards[i].id)),
     onAllRevealed: () => {
       root.querySelector('#pack-summary').innerHTML = summary(result);
       root.querySelector('#reveal-all').hidden = true;
       const hint = root.querySelector('#pack-hint');
-      hint.textContent = wonToday ? `Peça do dia ${Number(date.slice(8))}: ela desceu sobre as cartas, toque nela para ver o Enigma.` : '';
-      hint.classList.toggle('piece-note', wonToday);
+      hint.textContent = wonToday && isFirst ? `Peça do dia ${Number(date.slice(8))}: ela desceu sobre as cartas, toque nela para ver o Enigma.` : '';
+      hint.classList.toggle('piece-note', wonToday && isFirst);
       root.querySelector('.screen-head h1').textContent = TIER_COPY[result.tier] && result.tier !== 'common' ? `${tierName}!` : 'Seu booster';
       copy('Toque numa carta para ler.');
       if (result.tier !== 'common') toast(TIER_COPY[result.tier]);
     },
   });
   sceneModule.then(({ tierShowcase }) => tierShowcase(root.querySelector('#tier-canvas'), { mark: 'src/assets/logo-mark.png', reduced }));
-  window.__packCards = (index) => pack.cardAt(index); // usado pelos testes automáticos
+  window.__packCards = (i) => pack.cardAt(i);
   window.__pack = pack;
-  root.querySelector('#pack-summary').addEventListener('click', (event) => { const item = event.target.closest('[data-id]'); if (item) inspect(byId(item.dataset.id)); });
+  root.querySelector('#pack-summary').addEventListener('click', (e) => { const item = e.target.closest('[data-id]'); if (item) inspect(byId(item.dataset.id)); });
   root.querySelector('#reveal-all').addEventListener('click', () => pack.revealAll());
   packReady(pack);
 }
