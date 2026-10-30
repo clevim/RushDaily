@@ -33,8 +33,8 @@ const rand = () => { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
 const pick = (n) => Math.floor(rand() * n);
 const sample = (list, n) => Array.from({ length: n }, () => list[pick(list.length)].id);
 // Sorteio sem cuidar de regra de deck (cópias, Lenda): o objetivo é passar por todos os scripts.
-const mainPool = pool.filter((card) => !isExtra(card));
-const extraPool = pool.filter(isExtra);
+const mainPool = pool.filter((card) => !isExtra(card, FORMAT));
+const extraPool = pool.filter((card) => isExtra(card, FORMAT));
 
 function freePlaces(mask, player, count) {
   const out = [];

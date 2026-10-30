@@ -20,7 +20,11 @@
     <header class="arena-top">
       <a class="leave" href="index.html" id="leave" aria-label="Sair da arena"><img src="src/assets/logo-mark.png" alt="" width="34" height="36" /><span>Sair da arena</span></a>
       <p class="turn-chip" id="turn-chip">Preparando o duelo…</p>
-      <button class="help-chip" id="help-toggle" type="button" aria-expanded="false" aria-controls="help">Como jogar</button>
+      <div class="top-tools">
+        <button class="help-chip" id="help-toggle" type="button" aria-expanded="false" aria-controls="help">Como jogar</button>
+        <button class="help-chip menu-chip" id="speed-toggle" type="button" aria-label="Velocidade das animações" title="Velocidade das animações">1x</button>
+        <button class="help-chip menu-chip" id="menu-toggle" type="button" aria-label="Opções da partida" title="Opções da partida">⋯</button>
+      </div>
     </header>
 
     <main class="rush-table">
@@ -76,6 +80,8 @@
           <p class="chain-title">Corrente</p>
           <ol class="chain-links" id="chain-links"></ol>
         </section>
+        <!-- Leitura fixa (PC): a carta em foco; no celular a leitura segue na folha #zoom -->
+        <section class="reader" id="reader" aria-label="Carta em foco"><p class="reader-empty">Passe o mouse ou clique numa carta para lê-la aqui.</p></section>
         <section class="story" aria-label="Narração do duelo">
           <p class="story-title">Narração</p>
           <ol class="history" id="history"></ol>
@@ -100,15 +106,18 @@
 
     <aside class="help scroll" id="help" hidden>
       <h2>Como jogar</h2>
+      <p class="help-goal"><b>Objetivo:</b> zerar os PV (pontos de vida) do rival atacando com seus monstros.</p>
       <ul>
         <li><b>Toque</b> numa carta para ler e ver o que ela pode fazer agora (ou use Tab e Enter).</li>
         <li><b>Arraste</b> da mão até uma zona acesa: monstros são Invocados, Magias são ativadas. Solte um monstro de Nível 5 ou mais <b>em cima</b> do monstro que vai virar tributo.</li>
-        <li><b>Toque duas vezes</b> (ou segure) uma carta da mão para alternar entre jogar e <b>baixar virada</b>.</li>
-        <li>No campo, <b>toque duas vezes</b> no seu monstro para mudar a posição; <b>segure</b> o virado para virá-lo.</li>
+        <li><b>Segure</b> (ou clique com o botão direito) qualquer carta para ler o texto dela.</li>
+        <li><b>Toque duas vezes</b> numa carta da mão para alternar entre jogar e <b>baixar virada</b>.</li>
+        <li>No campo, <b>toque duas vezes</b> no seu monstro para mudar a posição (ou virá-lo). O selo <b>↻</b> marca quem ainda pode mudar.</li>
         <li>Na Batalha, <b>arraste</b> seu monstro até o alvo, ou até a placa do rival para o ataque direto.</li>
         <li>Toque no <b>Cemitério</b> ou no <b>Deck Adicional</b> para ver as cartas e usar as Fusões disponíveis.</li>
       </ul>
-      <p>Rush Duel: Invocações-Normais <b>ilimitadas</b>, compra até ficar com 5 cartas, campo de 3 colunas e sem Fase Principal 2. Nível 5 e 6 pedem 1 tributo; Nível 7 ou mais, 2. Quem começa não ataca no primeiro turno. No limite de turnos, vence quem tiver mais PV.</p>
+      <p>Rush Duel: Invocações-Normais <b>ilimitadas</b>, compra até ficar com 5 cartas, campo de 3 colunas e sem Fase Principal 2. Nível 5 e 6 pedem 1 tributo; Nível 7 ou mais, 2. Quem começa não ataca no primeiro turno. No limite de turnos, vence quem tiver mais PV; o turno no topo soma as vezes dos dois (Turno 7 é a 7ª vez de alguém jogar).</p>
+      <details class="glossary"><summary>Palavras do jogo</summary><dl><dt>PV</dt><dd>Pontos de vida. Quem chegar a zero perde.</dd><dt>ATK / DEF</dt><dd>Força de ataque e de defesa do monstro. Em pé (Ataque) ele usa o ATK; deitado (Defesa), a DEF.</dd><dt>Batalha</dt><dd>O ATK maior destrói o outro monstro e a diferença sai dos PV do dono. Monstro em Defesa que perde não tira PV; se a DEF for maior que o ATK do atacante, quem atacou perde a diferença.</dd><dt>Ataque direto</dt><dd>Sem monstros do rival no campo, o ATK inteiro sai dos PV dele.</dd><dt>Tributo</dt><dd>Monstro seu que vai para o Cemitério para um monstro forte (Nível 5 ou mais) entrar.</dd><dt>Baixar</dt><dd>Pôr a carta virada para baixo. Monstro baixado fica em Defesa; Armadilha baixada espera a hora certa.</dd><dt>Magia / Armadilha</dt><dd>Magia você usa na sua vez. Armadilha precisa ser baixada antes e dispara depois, muitas vezes na vez do rival.</dd><dt>Cemitério</dt><dd>Pilha das cartas destruídas ou já usadas.</dd><dt>Deck Adicional</dt><dd>Monstros de Fusão, fora do deck. A Magia Fusão junta os monstros pedidos (os materiais) num só.</dd><dt>Corrente</dt><dd>Uma carta respondendo a outra. A última ativada resolve primeiro.</dd><dt>Fases</dt><dd>Compra (você compra), Principal (joga cartas), Batalha (ataca) e Final (passa a vez).</dd><dt>Requisito</dt><dd>O que a carta pede para usar o efeito (por exemplo, mandar uma carta da mão para o Cemitério).</dd><dt>Lenda</dt><dd>Carta marcada LENDA. O deck (contando o Adicional) aceita no máximo uma Lenda de cada tipo: 1 monstro, 1 Magia e 1 Armadilha, e só 1 cópia de cada.</dd><dt>Máximo</dt><dd>Monstro de 3 peças: [L], o centro e [R]. Na Fase Principal, com as 3 na mão, você faz a Invocação-Máximo: elas ocupam as 3 zonas de monstro como um monstro só, em Ataque e com o ATK MÁXIMO (o Modo Máximo). Os monstros que você tinha no campo vão para o Cemitério.</dd></dl></details>
     </aside>
 
     <div class="zoom" id="zoom" aria-hidden="true"></div>

@@ -4,6 +4,7 @@ import test from 'node:test';
 import createCore, { OcgMessageType as M, OcgResponseType as R } from '../src/vendor/ocgcore/index.js';
 import { RUSH_ZONES, createDuel } from '../src/engine/ocg.mjs';
 import { DAILY_FORMAT, DIFFICULTY_IDS, PLAYER_LP, generateDailyMatch, getDifficulty, listDifficulties, validateDailyDeck } from '../src/engine/daily-generator.mjs';
+import { meetsRequirements, requirementsOf, useless } from '../src/engine/rush-deck.mjs';
 import { AI_LEVELS, decideRush } from '../src/engine/rush-ai.mjs';
 import { HEART_CARD, HEART_CODE, withHeart } from '../src/engine/heart.mjs';
 
@@ -49,6 +50,33 @@ test('o desafio é o mesmo para todos no dia, legal e com confronto de Tipos dif
   }
   const days = new Set(Array.from({ length: 20 }, (_, d) => generateDailyMatch({ date: `2026-03-${String(d + 1).padStart(2, '0')}`, pool }).player.label));
   assert.ok(days.size >= 6, `só ${days.size} Tipos em 20 dias`);
+});
+
+test('requisitos: lidos do texto, sem contar o que é do oponente', () => {
+  const byName = (name) => pool.find((card) => card.name === name);
+  // "Monstro do Tipo Aqua de Nível 8 ou mais" é um monstro só; o Mago citado é do oponente.
+  assert.deepEqual(requirementsOf(byName('Bruxa Bela Aprisionada')).map((options) => options.map((o) => [o.races, o.levels])), [[[['Aqua'], [[8, 'mais']]]]]);
+  const aqua = (lv) => ({ ...byName('Bruxa Bela Aprisionada'), type: 0x21, race: 0x40, level: lv, desc: '' });
+  assert.ok(meetsRequirements(byName('Bruxa Bela Aprisionada'), [aqua(8)]));
+  assert.ok(!meetsRequirements(byName('Bruxa Bela Aprisionada'), [aqua(4)]), 'Aqua de Nível 4 não basta');
+  // "Dos Tipos Peixe, Serpente Marinha, Trovão e Aqua" é uma lista só; "o nome desta carta se torna" não é requisito.
+  assert.deepEqual(requirementsOf(byName('Correnteza'))[0][0].races, ['Peixe', 'Serpente Marinha', 'Trovão', 'Aqua']);
+  assert.deepEqual(requirementsOf(byName('Sprite Espiritual das Estrelas')), []);
+});
+
+test('decks do diário (seu e o rival mais fraco e o mais forte) sem carta de efeito impossível', () => {
+  for (let d = 0; d < 20; d += 1) {
+    const date = new Date(Date.UTC(2026, 0, 1 + d * 17)).toISOString().slice(0, 10);
+    for (const difficulty of ['apprentice', 'chaos']) {
+      const match = generateDailyMatch({ date, difficulty, pool });
+      for (const deck of [match.player.deck, match.enemy.deck]) {
+        const main = deck.main.map((id) => cards.get(id));
+        const extra = deck.extra.map((id) => cards.get(id));
+        const bad = main.filter((card) => !meetsRequirements(card, main, extra)).map((card) => card.name);
+        assert.equal(useless(main, extra), 0, `${date}/${difficulty}: ${[...new Set(bad)].join(', ')}`);
+      }
+    }
+  }
 });
 
 /** Joga um desafio inteiro com a IA do Rush nos dois lados. heart: põe o Coração das Cartas no deck do jogador. */
@@ -134,4 +162,32 @@ test('a IA do Rush ganha da IA gulosa do clássico com os mesmos decks', () => {
     if (result.winner === seat) wins += 1;
   }
   assert.ok(wins > total / 2, `IA do Rush venceu só ${wins} de ${total}`);
+});
+
+test('Aprendiz: não ataca no primeiro turno dele e às vezes encerra a Batalha cedo', () => {
+  // Jogador passivo (só encerra): sem o freio, o Aprendiz matava até o turno 6.
+  let firstTurnHits = 0, lossTurns = 0, duels = 0;
+  for (let n = 0; n < 6; n += 1) {
+    const match = generateDailyMatch({ date: `2026-03-${String(n + 1).padStart(2, '0')}`, difficulty: 'apprentice', pool });
+    const duel = createDuel(lib, { seed: `aprendiz:${n}`, format: DAILY_FORMAT, decks: [match.player.deck, match.enemy.deck], lp: [match.player.lp, match.enemy.lp], cards, readScript });
+    const memory = {};
+    let result;
+    for (let step = 0; step < 6000; step += 1) {
+      result = duel.next();
+      if (result.winner !== null) break;
+      const prompt = result.prompt;
+      if ((prompt.player ?? duel.state.active) === 0) {
+        const pass = { [M.SELECT_IDLECMD]: { type: R.SELECT_IDLECMD, action: prompt.to_ep ? 7 : 6, index: null }, [M.SELECT_BATTLECMD]: { type: R.SELECT_BATTLECMD, action: prompt.to_m2 ? 2 : 3, index: null }, [M.SELECT_CHAIN]: { type: R.SELECT_CHAIN, index: prompt.forced ? 0 : null } }[prompt.type];
+        duel.respond(pass ?? decideRush(prompt, { view: duel.snapshot(), me: 0, cards, state: duel.state, memory: {}, level: 'aprendiz' }));
+        continue;
+      }
+      const response = decideRush(prompt, { view: duel.snapshot(), me: 1, cards, state: duel.state, memory, level: 'aprendiz' });
+      if (duel.state.turn === 2 && response.type === R.SELECT_BATTLECMD && response.action === 1) firstTurnHits += 1;
+      duel.respond(response);
+    }
+    if (result.winner === 1) { lossTurns += duel.state.turn; duels += 1; }
+    duel.destroy();
+  }
+  assert.equal(firstTurnHits, 0, 'o Aprendiz atacou no primeiro turno dele');
+  assert.ok(!duels || lossTurns / duels >= 8, `jogador passivo caiu em média no turno ${lossTurns / duels}`);
 });

@@ -9,6 +9,7 @@ const ATTRIBUTE = { 1: 'earth', 2: 'water', 4: 'fire', 8: 'wind', 16: 'light', 3
 const T = { MONSTER: 0x1, SPELL: 0x2, TRAP: 0x4, NORMAL: 0x10, EFFECT: 0x20, FUSION: 0x40, RITUAL: 0x80, MAXIMUM: 0x8000, QUICK: 0x10000, CONTINUOUS: 0x20000, EQUIP: 0x40000, FIELD: 0x80000, COUNTER: 0x100000 };
 const ICONS = [[T.QUICK, 'quick-play', 'Rápida'], [T.CONTINUOUS, 'continuous', 'Contínua'], [T.EQUIP, 'equip', 'Equipamento'], [T.FIELD, 'field', 'Campo'], [T.COUNTER, 'counter', 'Resposta'], [T.RITUAL, 'ritual', 'Ritual']];
 const LABEL = Object.fromEntries(ICONS.map(([, icon, label]) => [icon, label]));
+const ATTRIBUTE_PT = { earth: 'TERRA', water: 'ÁGUA', fire: 'FOGO', wind: 'VENTO', light: 'LUZ', dark: 'TREVAS', divine: 'DIVINO', spell: 'MAGIA', trap: 'ARMADILHA' };
 
 // Estilo latino (a biblioteca só traz chinês e japonês para o Rush): fontes Matrix/Stone do yugioh-card, só os números do rd-atk-def.
 const STYLE = {
@@ -40,17 +41,33 @@ export function patchRushCard(RushDuelCard) {
     close.text = ']';
     close.x = icon.x + (this.data.icon ? 60 + gap.marginRight : 0);
   };
-  // Atributo com o nome em inglês (LIGHT, TRAP...), o mesmo ícone das cartas clássicas, no tamanho do círculo do Rush.
+  // Atributo: o ícone clássico sem texto (só o kanji), no tamanho do círculo do Rush, com o nome em PT por cima
+  // (TREVAS, LUZ, MAGIA...), como nas cartas impressas em português. "LEVEL" e "MAXIMUM ATK" ficam: são parte das imagens da moldura.
   Object.defineProperty(proto, 'attributeUrl', {
     get() {
       const name = this.data.type === 'monster' ? this.data.attribute : this.data.type;
-      return name ? `${this.resourcePath}/yugioh/image/attribute-${name}-en.png` : '';
+      return name ? `${this.resourcePath}/yugioh/image/attribute-${name}.png` : '';
     },
   });
   const drawAttribute = proto.drawAttribute;
   proto.drawAttribute = function () {
     drawAttribute.call(this);
     this.attributeLeaf.set({ width: 178, height: 178, x: 1142, y: 72 });
+  };
+  // O rótulo é um Text da própria biblioteca (a classe vem do número do Nível, desenhado logo depois do atributo).
+  const drawLevel = proto.drawLevel;
+  proto.drawLevel = function () {
+    drawLevel.call(this);
+    if (!this.attributeLabelLeaf) {
+      this.attributeLabelLeaf = new this.levelLeaf.children[1].constructor();
+      this.leafer.add(this.attributeLabelLeaf);
+    }
+    const label = ATTRIBUTE_PT[this.data.type === 'monster' ? this.data.attribute : this.data.type] || '';
+    this.attributeLabelLeaf.set({
+      text: label, fontFamily: 'ygo-en-name', fontSize: Math.min(40, Math.floor(300 / Math.max(label.length, 1))), fontWeight: 'bold',
+      fill: 'white', stroke: 'black', strokeWidth: 3, x: 1231, y: 78, around: { type: 'percent', x: 0.5, y: 0 },
+      visible: Boolean(label) && this.showAttribute !== false, zIndex: 31,
+    });
   };
   const drawEffect = proto.drawEffect;
   proto.drawEffect = function () {

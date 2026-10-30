@@ -171,7 +171,9 @@ def traducao():
 
 def build():
     pt = translations()
-    memoria = traducao().Memoria()
+    modulo = traducao()
+    memoria = modulo.Memoria()
+    rotulos = modulo.Rotulos(memoria.nome)  # rótulos das perguntas do motor (str1..str16) em PT
 
     cards = []
     skipped = {}
@@ -187,7 +189,8 @@ def build():
             'desc': local.get('desc') or desc, 'pt': bool(local.get('desc')),
             **({'legend': True} if ot & OT_LEGEND else {}),
             **({'maximum': piece} if (piece := maximum_piece(name_en, kind)) else {}),
-            **({'strings': trimmed} if (trimmed := trim([s or '' for s in strings])) else {}),
+            **({'strings': [rotulos.traduzir(s, local.get('name') or name_en, i) for i, s in enumerate(trimmed)]}
+               if (trimmed := trim([s or '' for s in strings])) else {}),
         })
 
     OUT.mkdir(parents=True, exist_ok=True)
@@ -220,6 +223,7 @@ def build():
     print(f"{len(cards)} cartas ({dict(kinds)}) | Normais {sum(1 for c in monsters if c['type'] & TYPE_NORMAL)} | "
           f"Fusão {sum(1 for c in monsters if c['type'] & 0x40)} | Lenda {sum(1 for c in cards if c.get('legend'))} | "
           f"peças de Máximo {sum(1 for c in cards if c.get('maximum'))}")
+    print(f"rótulos das perguntas: {dict(rotulos.contagem)} (generico = 'Efeito de \"carta\"', sem tradução)")
     print(f"em PT: {sum(c['pt'] for c in cards)} de {len(cards)} | ignoradas: {skipped} | scripts copiados: {copied} | utilitários: {len(root_lua)}")
 
 

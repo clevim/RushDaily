@@ -9,7 +9,6 @@
 }
 
 .challenge { position: relative; z-index: 2; display: grid; justify-items: start; gap: 18px; width: 100%; max-width: 640px; min-width: 0; container-type: inline-size; }
-.wordmark { width: clamp(200px, 22vw, 320px); height: auto; margin: 0 0 4px -10px; filter: drop-shadow(0 10px 24px rgb(var(--ink) / 0.6)); }
 
 .date {
   margin: 0;
@@ -138,14 +137,12 @@ body.launching::after {
 
 /* PC baixo (ex.: 1280x800): logo menor para o botão e o status do dia caberem sem rolar. */
 @media (min-width: 961px) and (max-height: 860px) {
-  .wordmark { width: clamp(150px, 14vw, 210px); }
-  .challenge { gap: 14px; }
+    .challenge { gap: 14px; }
 }
 @media (max-width: 960px) {
   .hero { grid-template-columns: minmax(0, 1fr); min-height: 0; padding: 0 clamp(18px, 5vw, 40px) 24px; gap: 8px; }
   .stage { order: -1; min-height: 0; height: clamp(190px, 30svh, 420px); margin: 0; }
-  .wordmark { display: none; }
-  .challenge { max-width: none; justify-items: stretch; }
+    .challenge { max-width: none; justify-items: stretch; }
   .difficulty { min-width: 0; width: 100%; }
   .ledger { grid-template-columns: minmax(0, 1fr); padding-inline: clamp(18px, 5vw, 40px); }
 }
@@ -175,3 +172,9 @@ body.launching::after {
 .rival-stats dd small { display: block; margin-top: 4px; color: var(--ivory-dim); font: 600 0.72rem/1 var(--body); text-align: right; }
 .rival-stats dd { text-align: right; }
 .rival-stats div:last-child dd { font: 700 0.95rem/1.2 var(--body); font-stretch: 85%; color: var(--gold-hi); }
+
+.kicker { margin: 0; color: var(--ivory-dim); font-size: 0.95rem; }
+.kicker span { color: var(--ivory); font-weight: 700; }
+.classic-card { display: grid; gap: 2px; padding: 10px 14px; border: 1px solid rgb(var(--gold-rgb) / 0.35); text-decoration: none; color: var(--ivory-dim); font-size: 0.92rem; max-width: 100%; }
+.classic-card b { color: var(--gold); font: 400 1rem/1.2 var(--display); }
+.classic-card:hover { border-color: var(--gold); color: var(--ivory); }

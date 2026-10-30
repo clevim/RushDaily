@@ -318,6 +318,8 @@ button { font: inherit; color: inherit; }
   .key-chip span { display: none; }
   .tabs { display: none; }
   body:has(.bar-nav) { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+  /* foco por teclado / scrollIntoView param acima da barra fixa (ex.: "Quer treinar?" na home não fica sob ela) */
+  html:has(.bar-nav) { scroll-padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
   .bar-nav {
     position: fixed;
     inset: auto 0 0 0;

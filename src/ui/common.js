@@ -103,6 +103,39 @@ export function toast(message) {
   node.timer = setTimeout(() => node.classList.remove('show'), 2400);
 }
 
+/**
+ * Confirmação de dois toques num botão (ação que não volta atrás, ex.: encerrar o turno com ataques sobrando):
+ * o 1º toque troca o rótulo por `text` e devolve false; um 2º toque em até 3 s devolve true. Sem diálogo, sem bloquear a mesa.
+ */
+export function armConfirm(button, text) {
+  if (button.dataset.armed) { disarmConfirm(button); return true; }
+  button.dataset.armed = button.textContent;
+  button.textContent = text;
+  button.classList.add('armed');
+  button.armTimer = setTimeout(() => disarmConfirm(button), 3000);
+  return false;
+}
+export function disarmConfirm(button) {
+  if (!button.dataset.armed) return;
+  clearTimeout(button.armTimer);
+  button.textContent = button.dataset.armed;
+  delete button.dataset.armed;
+  button.classList.remove('armed');
+}
+
+/**
+ * Previsão do combate pelos números atuais (efeitos e Armadilhas ainda podem mudar o resultado): rótulo curto para o alvo aceso.
+ * target: null (ataque direto) ou { hidden, defense (bool), attack, def }. tone: 'win' (você vence) | 'lose' | ''.
+ */
+export function battleForecast(atk, target) {
+  const pts = (n) => n.toLocaleString('pt-BR');
+  if (!target) return { text: `Direto\n−${pts(atk)}`, tone: 'win' };
+  if (target.hidden) return { text: '?', tone: '' };
+  const diff = atk - (target.defense ? target.def : target.attack);
+  if (target.defense) return diff > 0 ? { text: 'Vence', tone: 'win' } : { text: diff ? `Não passa\n−${pts(-diff)}` : 'Não passa', tone: diff ? 'lose' : '' };
+  return diff > 0 ? { text: `Vence\n−${pts(diff)}`, tone: 'win' } : diff ? { text: `Perde\n−${pts(-diff)}`, tone: 'lose' } : { text: 'Empate', tone: '' };
+}
+
 // Ícones da barra inferior do celular (traço simples, herdam a cor do texto).
 const ICONS = {
   today: '<path d="M12 3 21 19H3Z"/><path d="M12 10v4"/>',
@@ -113,7 +146,7 @@ const ICONS = {
 };
 
 export function nav(active, playerKey) {
-  const links = [['index.html', 'today', 'Hoje'], ['screens.html?screen=collection', 'collection', 'Coleção'], ['screens.html?screen=deck', 'deck', 'Deck'], ['screens.html?screen=history', 'history', 'Histórico'], ['screens.html?screen=reward', 'reward', 'Booster'], ['screens.html?screen=puzzle', 'puzzle', 'Enigma'], ['screens.html?screen=settings', 'settings', 'Ajustes']];
+  const links = [['index.html', 'today', 'Hoje'], ['screens.html?screen=collection', 'collection', 'Coleção'], ['screens.html?screen=deck', 'deck', 'Deck'], ['screens.html?screen=history', 'history', 'Histórico'], ['screens.html?screen=reward', 'reward', 'Booster'], ['arena.html', 'classic', 'Clássico'], ['screens.html?screen=puzzle', 'puzzle', 'Enigma'], ['screens.html?screen=settings', 'settings', 'Ajustes']];
   const href = (url) => `${url}${url.includes('?') ? '&' : '?'}player=${playerKey}`;
   const main = ['today', 'collection', 'deck', 'reward'];
   const icon = (id) => `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">${ICONS[id]}</svg>`;
@@ -121,7 +154,7 @@ export function nav(active, playerKey) {
   return `<header class="topbar">
     <a class="brand" href="index.html" aria-label="RushDaily, início"><img src="src/assets/logo-mark.png" alt="" width="40" height="42"><span>RushDaily</span></a>
     <nav class="tabs" aria-label="Navegação principal">${links.map(([url, id, label]) => `<a href="${href(url)}" ${id === active ? 'aria-current="page"' : ''}>${label}</a>`).join('')}</nav>
-    <button class="key-chip" type="button" data-copy-key title="Copiar link com sua chave">Chave <b>${playerKey}</b></button>
+    <button class="key-chip" type="button" data-copy-key title="Seu código de jogador. Toque para copiar o link e continuar em outro aparelho.">Seu código <b>${playerKey}</b></button>
     <nav class="bar-nav" aria-label="Navegação no celular">
       ${links.filter(([, id]) => main.includes(id)).map(([url, id, label]) => `<a href="${href(url)}" ${id === active ? 'aria-current="page"' : ''}>${icon(id)}<span>${label}</span></a>`).join('')}
       <button type="button" class="bar-more" aria-expanded="false" aria-controls="bar-menu" ${rest.some(([, id]) => id === active) ? 'aria-current="page"' : ''}>${icon('more')}<span>Mais</span></button>
@@ -308,4 +341,26 @@ export function glove(rating, max = 4) {
     <path d="M6 14 Q100 2 194 14" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="1"/>
     ${slots}
   </svg>`;
+}
+
+/**
+ * Ritmo do duelo (Rush e clássico): espera com velocidade 1x/2x lembrada por jogador e "pular" (toque na mesa).
+ * wait(ms) resolve true se foi encurtada por skip(). Sem animação (motion falso) as esperas são zero.
+ */
+export function createPacer(playerKey, motion) {
+  const key = `rushdaily-speed:${playerKey}`;
+  let speed = readJson(key, 1) === 2 ? 2 : 1;
+  const pending = new Set();
+  const wait = (ms) => new Promise((resolve) => {
+    if (!motion) { resolve(false); return; }
+    const done = (skipped) => { clearTimeout(timer); pending.delete(done); resolve(skipped === true); };
+    const timer = setTimeout(done, ms / speed);
+    pending.add(done);
+  });
+  return {
+    wait,
+    skip: () => { for (const done of [...pending]) done(true); },
+    get speed() { return speed; },
+    toggle() { speed = speed === 1 ? 2 : 1; writeJson(key, speed); return speed; },
+  };
 }

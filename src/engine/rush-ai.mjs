@@ -1,7 +1,7 @@
 // IA do rival no Rush Duel (motor do EDOPro). Usa as regras do Rush a seu favor: Invocações-Normais ilimitadas,
 // campo de 3 colunas, sem Fase Principal 2 (posições e baixas antes da Batalha) e efeitos de monstro no campo.
 // O que não é específico do Rush (anúncios, somas, contadores) cai na IA gulosa do clássico (ocg-ai.mjs).
-// Níveis: aprendiz (a IA gulosa do clássico, sem plano), duelista, elite e caos (mais agressiva nas trocas).
+// Níveis: aprendiz (a IA gulosa do clássico, sem plano e com freio nos ataques), duelista, elite e caos (mais agressiva nas trocas).
 import { OcgLocation as L, OcgMessageType as M, OcgPosition as P, OcgResponseType as R } from '../vendor/ocgcore/index.js';
 import { decide as greedy } from './ocg-ai.mjs';
 import { RUSH_ZONES, TYPE } from './ocg.mjs';
@@ -22,12 +22,28 @@ function chance(memory, p) {
 }
 
 /**
+ * Aprendiz: a IA gulosa do clássico, mais branda para quem está aprendendo. Não ataca no primeiro turno dela
+ * e, a cada ataque, pode encerrar a Batalha antes da hora (APPRENTICE_STOP). Medido em tools/rush/simulate.mjs (curva).
+ */
+const APPRENTICE_STOP = 0.4;
+function apprentice(prompt, context) {
+  const { state, memory } = context;
+  // Encerrar só quando o motor deixa (ataque obrigatório por efeito segue a gulosa).
+  const canStop = prompt.type === M.SELECT_BATTLECMD && (prompt.to_m2 || prompt.to_ep);
+  if (canStop && prompt.attacks.length) {
+    memory.firstTurn ??= state.turn;
+    if (state.turn === memory.firstTurn || chance(memory, APPRENTICE_STOP)) return { type: R.SELECT_BATTLECMD, action: prompt.to_m2 ? 2 : 3, index: null };
+  }
+  return greedy(prompt, context);
+}
+
+/**
  * Responde `prompt` jogando como `me`. Mesmo contrato do decide() do clássico, mais `level`.
  * view: snapshot() do duelo; cards: Map id -> carta; memory: objeto mantido pelo chamador entre perguntas.
  */
 export function decideRush(prompt, context) {
   const level = context.level || 'duelista';
-  if (level === 'aprendiz') return greedy(prompt, context);
+  if (level === 'aprendiz') return apprentice(prompt, context);
   const { view, me, cards, state, memory } = context;
   const foe = 1 - me;
   const mine = view[me];
@@ -151,6 +167,8 @@ export function decideRush(prompt, context) {
         memory.target = best.target;
         return { type: R.SELECT_BATTLECMD, action: 1, index: best.index };
       }
+      // Ataque obrigatório por efeito (sem Fase Final): encerrar dá RETRY sem fim. Ataca com o primeiro.
+      if (!prompt.to_m2 && !prompt.to_ep && prompt.attacks.length) return { type: R.SELECT_BATTLECMD, action: 1, index: 0 };
       return { type: R.SELECT_BATTLECMD, action: prompt.to_m2 ? 2 : 3, index: null };
     }
     case M.SELECT_CHAIN: {

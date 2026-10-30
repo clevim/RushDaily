@@ -8,11 +8,11 @@ import { buildDeck, seeded } from '../engine/classic-deck.mjs';
 import { ATTRIBUTES, RACES, describe } from '../data/classic/strings-pt.mjs';
 import { cardBack, cardFace, cardStats } from './classic-card.js';
 import { PVP_FORMAT, decodeDeck, deckById, ensureStarter, loadDeckHints, loadSeasonPool, readCollection, readDecks, validDeck } from './classic-store.js';
-import { paintCards, warmCards } from './classic-render.js';
-import { escape, getPlayerKey, longDate, monthName, monthOf, puzzleFor, readJson, recoverDay, reducedMotion, today, toast, writeJson } from './common.js';
+import { classicCardUrl, paintCards, warmCards } from './classic-render.js';
+import { armConfirm, battleForecast, createPacer, disarmConfirm, escape, getPlayerKey, longDate, monthName, monthOf, puzzleFor, readJson, recoverDay, reducedMotion, today, toast, writeJson } from './common.js';
 import { decodeReplay, encodeReplay } from './share.js';
-import { answerCommon, createAsk } from './ocg-ask.js';
-import { bindCardGestures } from './card-gestures.js';
+import { answerCommon, chainSkipper, createAsk, soleChoice } from './ocg-ask.js';
+import { POS_TITLE, RIVAL_TURN, TRAP_SET_WHY, addMenuCorner, bindCardGestures, bindSurrender, confirmSurrender, monsterWhyNot, openDuelMenu, runTips, tapText, turnChipTitle, whereLabel } from './card-gestures.js';
 import { queueSync, syncNow } from './sync.js';
 import { duelScene } from './scene.js';
 
@@ -23,7 +23,8 @@ const date = today();
 const motion = !reducedMotion();
 const $ = (selector) => document.querySelector(selector);
 let speed = 1; // replay: 1x, 2x, 4x
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, motion ? ms / speed : 0));
+const pacer = createPacer(playerKey, motion); // velocidade 1x/2x e "pular" (toque na mesa)
+const wait = (ms) => pacer.wait(ms / speed); // speed: só o replay (até 4x)
 const GOLD = 0xf5b21a;
 const RED = 0xe0303f;
 const hashOf = (text) => { let value = 2166136261; for (const char of text) { value ^= char.charCodeAt(0); value = Math.imul(value, 16777619); } return (value >>> 0).toString(36); };
@@ -197,7 +198,7 @@ const isDefense = (card) => card.position & (P.FACEUP_DEFENSE | P.FACEDOWN_DEFEN
 
 const at = (row, col) => `style="grid-area:${row}/${col}"`;
 
-const lastDef = new Map();
+const lastDef = new Map(), lastDown = new Map();
 function slot(controller, location, sequence, card, place, extraClass = '') {
   const key = locKey(controller, location, sequence);
   const spell = location === L.SZONE;
@@ -212,20 +213,31 @@ function slot(controller, location, sequence, card, place, extraClass = '') {
     const def = Boolean(isDefense(card)), was = lastDef.get(key);
     lastDef.set(key, def);
     if (was !== undefined && was !== def) classes.push('spin'); // giro de 90° ao trocar de posição
+    const down = Boolean(isFaceDown(card)), wasDown = lastDown.get(key);
+    lastDown.set(key, down);
+    if (wasDown !== undefined && wasDown !== down) classes.push('flip'); // vira (ou baixa) a carta
     if (controller === ME && actionsFor(key).some((item) => item.action === 2)) classes.push('can-pos'); // ainda pode mudar de posição
+    if (controller === ME && actionsFor(key).some((item) => item.action === 'attack')) classes.push('ready'); // Batalha: pode atacar
   }
-  if (controller === ME && actionsFor(key).some((item) => item.action === 5)) classes.push('can-act'); // efeito ativável agora (vem do prompt do motor)
+  if (actionsFor(key).some((item) => item.action === 5)) classes.push('can-act'); // efeito ativável agora (vem do prompt do motor; vale carta do rival, ex.: Magia de Campo que os dois usam)
   const label = hidden ? (spell ? 'Carta baixada do rival' : 'Monstro virado do rival') : `${data.name}${isFaceDown(card) ? ', virada' : ''}`;
   const materials = card.overlayCards?.length ? `<span class="xyz-mats">${card.overlayCards.length}</span>` : '';
-  return `<div class="${classes.join(' ')}" data-loc="${key}" ${place}>
+  return `<div class="${classes.join(' ')}" data-loc="${key}" ${place}${classes.includes('can-pos') ? ` title="${POS_TITLE}"` : ''}>
     <button class="card face" type="button" data-loc="${key}" data-gesture aria-label="${escape(label)}">${isFaceDown(card) ? cardBack() : cardFace(data, { live: card })}</button>${materials}</div>`;
 }
 
+const PILE_LOCATION = { deck: L.DECK, extra: L.EXTRA, grave: L.GRAVE, banished: L.REMOVED };
+/** Cartas desta pilha com ação na pergunta atual (efeito do Cemitério/banidas, Invocação do Adicional ou do Deck). */
+function pileActions(controller, kind) {
+  const prompt = current?.prompt;
+  const lists = prompt?.type === M.SELECT_IDLECMD ? [prompt.summons, prompt.special_summons, prompt.activates] : prompt?.type === M.SELECT_BATTLECMD ? [prompt.chains] : [];
+  return lists.flat().filter((loc) => loc.controller === controller && loc.location === PILE_LOCATION[kind]);
+}
 function pile(controller, kind, count, top, place) {
   const labels = { deck: 'Deck', extra: 'Adicional', grave: 'Cemitério' };
   const short = { deck: 'Deck', extra: 'Adic.', grave: 'Cem.' };
   const face = kind === 'grave' ? (top ? cardFace(cardOf(top.code)) : '') : count ? cardBack() : '';
-  return `<button class="pile ${kind} ${controller === ME ? 'mine' : 'theirs'}" type="button" data-pile="${controller}:${kind}" ${place} aria-label="${labels[kind]}: ${count} cartas">${face}<span class="pile-name" data-short="${short[kind]}">${labels[kind]}</span><span class="pile-count">${count}</span></button>`;
+  return `<button class="pile ${kind} ${controller === ME ? 'mine' : 'theirs'} ${pileActions(controller, kind).length ? 'can-act' : ''}" type="button" data-pile="${controller}:${kind}" ${place} aria-label="${labels[kind]}: ${count} cartas${kind === 'deck' && controller === ME ? '. Segure para desistir' : ''}">${face}<span class="pile-name" data-short="${short[kind]}">${labels[kind]}</span><span class="pile-count">${count}</span></button>`;
 }
 
 /**
@@ -253,11 +265,13 @@ function renderField() {
     cells.push(pile(controller, 'deck', side.deck, null, at(spellRow, mine ? 7 : 1)));
     const id = mine ? 'me' : 'foe';
     const lp = Math.max(0, side.lp | 0); // o motor manda PV sem sinal: abaixo de zero vira 4 bilhões
-    $(`#${id}-lp`).textContent = lp.toLocaleString('pt-BR');
+    tweenLp($(`#${id}-lp`), shownLp[id], lp);
+    shownLp[id] = lp;
     $(`#${id}-bar`).style.width = `${Math.min(100, (lp / FORMAT.lp) * 100)}%`;
     const banished = side.banished.filter(Boolean).length;
     $(`#${id}-banished`).hidden = !banished;
     $(`#${id}-banished`).textContent = `Banidas: ${banished}`;
+    $(`#${id}-banished`).classList.toggle('can-act', pileActions(controller, 'banished').length > 0);
   }
   // Zonas de Monstro Extra: a 5 (esquerda) e a 6 (direita) de quem olha; as do rival vêm espelhadas.
   for (const [col, mineSeq, theirSeq] of [[3, 5, 6], [5, 6, 5]]) {
@@ -286,8 +300,10 @@ function renderHand() {
 }
 
 /** Acende a fase atual na barra (fases do ocgcore: 1 compra, 2 apoio, 4 principal 1, 8–0x80 batalha, 0x100 principal 2, 0x200 final). */
+let phaseNow = 0; // a fase dos eventos já narrados (duel.state.phase já está no fim do lote)
 function setPhase(phase, active) {
-  const name = !phase ? '' : phase <= 2 ? 'draw' : phase === 4 ? 'main' : phase < 0x100 ? 'battle' : phase === 0x100 ? 'main2' : 'end';
+  phaseNow = phase;
+  const name = !phase ? '' : phase === 1 ? 'draw' : phase === 2 ? 'standby' : phase === 4 ? 'main' : phase < 0x100 ? 'battle' : phase === 0x100 ? 'main2' : 'end';
   $('#phases').dataset.owner = active === ME ? 'player' : 'enemy';
   for (const node of document.querySelectorAll('#phases li')) node.toggleAttribute('aria-current', node.dataset.phase === name);
 }
@@ -302,27 +318,56 @@ function render() {
   $('#turn-chip').innerHTML = isPuzzle ? `<b>${replay ? 'Replay · ' : ''}Vença neste turno</b> ${whose}`
     : replay ? `<b>Replay · Turno ${Math.max(1, turn)}</b> ${whose}` : `<b>Turno ${Math.max(1, turn)}${FORMAT.turnLimit ? `/${FORMAT.turnLimit}` : ''}</b> ${whose}`;
   $('#turn-chip').dataset.owner = active === ME ? 'player' : 'enemy';
-  setPhase(duel.state.phase, active);
+  $('#turn-chip').title = isPuzzle ? '' : turnChipTitle(FORMAT.turnLimit);
+  setPhase(phaseNow, active);
   gestures?.mark();
   paintCards(document.body);
 }
 
 /* ---------- Efeitos visuais e registro ---------- */
 
-function log(message) {
+// A pergunta de resposta diz o que acabou de acontecer (a última linha do registro).
+const lastPlay = () => { const text = $('#log span')?.textContent; return text ? `Agora: ${escape(text)}` : ''; };
+let historyTurn = 0;
+function log(message, story = true) {
   const node = $('#log');
   node.innerHTML = `<span>${escape(message)}</span>${[...node.children].slice(0, 2).map((child) => child.outerHTML).join('')}`;
+  if (!story || !duel) return; // só o topo (a narração já marca a virada do turno)
+  // Narração (coluna da direita no PC), como na arena Rush: as últimas jogadas, com o turno marcado na virada.
+  const list = $('#history');
+  const turn = Math.max(1, duel.state.turn);
+  if (turn !== historyTurn) list.insertAdjacentHTML('beforeend', `<li class="turn-mark">Turno ${turn} · ${duel.state.active === ME ? 'você' : 'rival'}</li>`);
+  historyTurn = turn;
+  list.insertAdjacentHTML('beforeend', `<li class="${duel.state.active === ME ? 'mine' : 'theirs'}">${escape(message)}</li>`);
+  while (list.children.length > 16) list.firstElementChild.remove();
 }
 function center(node) { const rect = node.getBoundingClientRect(); return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }; }
+// PV contando até o novo valor (o número flutuante fica ao lado da placa, não em cima).
+const shownLp = {};
+function tweenLp(node, from, to) {
+  if (from === undefined || from === to || !motion) { node.textContent = to.toLocaleString('pt-BR'); return; }
+  const start = performance.now();
+  const step = (now) => {
+    const t = Math.min(1, (now - start) / (750 / pacer.speed));
+    node.textContent = Math.round(from + (to - from) * (1 - (1 - t) ** 3)).toLocaleString('pt-BR');
+    if (t < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
 function floatText(text, node, kind) {
   if (!node) return;
-  const { x, y } = center(node);
+  // Sobre a borda da placa voltada para a mesa (não em cima do valor): o PV segue legível e conta o número.
+  const seat = node.closest('.seat') || node;
+  const rect = seat.getBoundingClientRect();
+  const { x } = center(node);
+  const down = seat.classList.contains('foe') || rect.top < innerHeight / 2; // placa do rival: o número desce para a mesa
   const label = document.createElement('div');
   label.className = `float ${kind}`;
   label.textContent = text;
-  Object.assign(label.style, { left: `${x}px`, top: `${y}px` });
+  Object.assign(label.style, { left: `${x}px`, top: `${down ? rect.bottom + 18 : rect.top - 18}px` });
+  label.style.setProperty('--dy', down ? '60px' : '-60px');
   document.body.append(label);
-  setTimeout(() => label.remove(), 1400);
+  setTimeout(() => label.remove(), 1400 / pacer.speed);
 }
 async function banner(text, owner) {
   scene.setTurn(owner);
@@ -332,19 +377,36 @@ async function banner(text, owner) {
   node.classList.remove('run');
   void node.offsetWidth;
   node.classList.add('run');
-  await wait(900);
+  // A vez do rival não segura a mesa: a faixa termina de passar enquanto ele joga (se ele só passar, a sua vem logo).
+  if (await wait(owner === 'enemy' ? 450 : 700)) node.classList.remove('run');
 }
 async function cast(code, controller) {
   const node = $('#cast');
-  node.innerHTML = `<div class="card">${cardFace(cardOf(code))}</div><p>${controller === ME ? 'Você ativou' : 'O rival ativou'} ${escape(cardOf(code).name)}</p>`;
-  node.classList.add('show');
+  const data = cardOf(code);
+  node.dataset.owner = controller === ME ? 'player' : 'enemy';
+  node.innerHTML = `<div class="card">${cardFace(data)}</div><p>${controller === ME ? 'Você ativou' : 'O rival ativou'} ${escape(data.name)}</p>`;
   paintCards(node);
-  await wait(900);
+  // Espera o desenho (até 600 ms); sem ele mostra o nome em destaque, nunca o verso.
+  const img = node.querySelector('img[data-classic-id]');
+  if (img) {
+    const url = await Promise.race([classicCardUrl(data).catch(() => null), new Promise((resolve) => setTimeout(resolve, motion ? 600 : 0))]);
+    if (url) img.src = url; else node.querySelector('.card').innerHTML = `<span class="cast-name">${escape(data.name)}</span>`;
+  }
+  node.classList.add('show');
+  await wait(controller === ME ? 450 : 900); // a sua ativação você já sabe: destaque curto
   const { x, y } = center(node);
   scene.pulse(x, y, controller === ME ? GOLD : RED, 10, 220);
   node.classList.remove('show');
 }
 
+// Linha do dano no registro; no dano de batalha que volta para quem atacou, diz o porquê.
+let fightBy = null;
+function damageLine(event) {
+  const backfire = fightBy !== null && event.player === fightBy;
+  fightBy = null;
+  const line = `${event.player === ME ? 'Você levou' : 'O rival levou'} ${event.amount.toLocaleString('pt-BR')} de dano`;
+  return backfire ? `${line}: o monstro atacado era mais forte que o atacante.` : `${line}.`;
+}
 const who = (player) => (player === ME ? 'Você' : 'O rival');
 const plateOf = (player) => (player === ME ? $('#me-lp') : $('#foe-lp'));
 
@@ -353,9 +415,13 @@ async function play(events, quick) {
   for (const event of events) {
     switch (event.type) {
       case M.NEW_TURN:
-        if (!quick) { render(); await banner(event.player === ME ? 'Sua vez' : 'Vez do rival', event.player === ME ? 'player' : 'enemy'); }
+        setPhase(1, event.player); // a vez começa na Compra (não fica no Final do turno anterior)
+        if (!quick) {
+          log(`Turno ${Math.max(1, duel.state.turn)}: ${event.player === ME ? 'sua vez' : 'vez do rival'}.`, false); // não fica a última jogada do turno anterior
+          render(); await banner(event.player === ME ? 'Sua vez' : 'Vez do rival', event.player === ME ? 'player' : 'enemy');
+        }
         break;
-      case M.NEW_PHASE: setPhase(event.phase, duel.state.active); break;
+      case M.NEW_PHASE: setPhase(event.phase, duel.state.active); fightBy = null; break;
       case M.SUMMONING: log(`${who(event.controller)} invocou ${cardOf(event.code).name}.`); break;
       case M.SPSUMMONING: log(`${who(event.controller)} invocou por Especial ${cardOf(event.code).name}.`); break;
       case M.FLIPSUMMONING: log(`${who(event.controller)} desvirou ${cardOf(event.code).name}.`); break;
@@ -367,11 +433,13 @@ async function play(events, quick) {
       case M.ATTACK: {
         const attacker = view?.[event.card.controller]?.monsters[event.card.sequence];
         log(`${who(event.card.controller)} atacou${event.target ? '' : ' direto'}${attacker ? ` com ${cardOf(attacker.code).name}` : ''}.`);
+        fightBy = event.target ? event.card.controller : null; // dano no próprio atacante: o alvo era mais forte
         if (!quick) await wait(250);
         break;
       }
       case M.DAMAGE: case M.PAY_LPCOST:
         if (!quick) { floatText(`−${event.amount}`, plateOf(event.player), 'damage'); scene.shake(Math.min(1, event.amount / 2500)); }
+        if (event.type === M.DAMAGE) log(damageLine(event));
         break;
       case M.RECOVER: if (!quick) floatText(`+${event.amount}`, plateOf(event.player), 'heal'); break;
       default:
@@ -387,7 +455,7 @@ const poses = new Map(); // carta da mão -> { set }
 const defaultPose = (card) => ({ set: Boolean(card.type & TYPE.TRAP) });
 // O que o gesto já decidiu: alvo do ataque arrastado, tributo solto em cima e zona onde a carta caiu.
 const plan = { target: null, tributes: null, zone: null };
-let skipChainTurn = null; // turno em que o jogador pediu para não ser perguntado de novo sobre respostas
+const chainSkip = chainSkipper(); // "Não responder mais": vale para as cartas já oferecidas nesta fase (ocg-ask.js)
 
 const IDLE_LABELS = { 0: 'Invocar por Normal', 1: 'Invocar por Especial', 2: 'Mudar posição', 3: 'Baixar em defesa (virado)', 4: 'Baixar', 5: 'Ativar' };
 const sameLoc = (loc, key) => locKey(loc.controller, loc.location, loc.sequence) === key;
@@ -434,6 +502,9 @@ function respond(response) {
 
 /* ---------- Alvos de arrastar ---------- */
 
+/** Previsão do combate no alvo aceso (common.js). */
+const forecast = (attacker, target) => battleForecast(attacker.attack, target && { hidden: isFaceDown(target), defense: isDefense(target), attack: target.attack, def: target.defense });
+
 function dropTargets(key) {
   const prompt = current?.prompt;
   if (!prompt) return [];
@@ -443,8 +514,9 @@ function dropTargets(key) {
     const attack = actionsFor(key).find((item) => item.action === 'attack');
     if (!attack) return [];
     const loc = prompt.attacks[attack.response.index];
-    const targets = view[FOE].monsters.map((card, seq) => (card ? { node: `[data-loc="${locKey(FOE, L.MZONE, seq)}"]`, target: { controller: FOE, sequence: seq }, response: attack.response } : null)).filter(Boolean);
-    if (loc.can_direct) targets.push({ node: '#foe-plate', target: null, response: attack.response });
+    const attacker = view[ME].monsters[Number(key.split(':')[2])];
+    const targets = view[FOE].monsters.map((card, seq) => (card ? { node: `[data-loc="${locKey(FOE, L.MZONE, seq)}"]`, target: { controller: FOE, sequence: seq }, response: attack.response, forecast: attacker && forecast(attacker, card) } : null)).filter(Boolean);
+    if (loc.can_direct) targets.push({ node: '#foe-plate', target: null, response: attack.response, forecast: attacker && forecast(attacker, null) });
     return targets;
   }
   if (prompt.type !== M.SELECT_IDLECMD || location !== L.HAND) return [];
@@ -461,7 +533,7 @@ function dropTargets(key) {
     view[ME].monsters.slice(0, 5).forEach((slotCard, seq) => {
       const node = `[data-loc="${locKey(ME, L.MZONE, seq)}"]`;
       if (!slotCard) zones.push({ node, zone: { location: L.MZONE, sequence: seq }, response: pick.response });
-      else if (card.level >= 5 && pick.action !== 1) zones.push({ node, tribute: seq, response: pick.response }); // solta em cima = tributo
+      else if ((card.level & 0xff) >= 5 && pick.action !== 1) zones.push({ node, tribute: seq, response: pick.response }); // solta em cima = tributo
     });
   } else if (card.type & 0x80000) {
     zones.push({ node: `[data-loc="${locKey(ME, L.SZONE, 5)}"]`, zone: { location: L.SZONE, sequence: 5 }, response: pick.response });
@@ -486,10 +558,10 @@ function bindGestures() {
       respond(target.response);
     },
     describe: describeCard,
+    whyNot,
     paint: paintCards,
     doubleTap: onDoubleTap,
-    hold: onHold,
-    dragHint: (key) => (cardOf(cardAt(key)?.code).level >= 5 && key.split(':')[1] === String(L.HAND) ? 'Solte numa zona livre ou em cima do monstro que vai virar tributo.' : null),
+    dragHint: (key) => ((cardOf(cardAt(key)?.code).level & 0xff) >= 5 && key.split(':')[1] === String(L.HAND) ? 'Solte numa zona livre ou em cima do monstro que vai virar tributo.' : null),
   });
 }
 
@@ -506,13 +578,6 @@ function onDoubleTap(key) {
   const change = actionsFor(key).find((item) => item.action === 2);
   if (change) respond(change.response);
 }
-function onHold(key) {
-  const [controller, location] = key.split(':').map(Number);
-  if (controller !== ME) { showZoom(key); return; }
-  if (location === L.HAND) { togglePose(key); return; }
-  const flip = actionsFor(key).find((item) => item.action === 2 && item.label === 'Invocar por Virada');
-  if (flip) respond(flip.response); else showZoom(key);
-}
 
 /* ---------- Zoom com ações ---------- */
 
@@ -521,6 +586,33 @@ function cardAt(key) {
   const side = view[controller];
   const list = { [L.HAND]: side.hand, [L.MZONE]: side.monsters, [L.SZONE]: side.spells, [L.GRAVE]: side.grave, [L.REMOVED]: side.banished, [L.EXTRA]: side.extra }[location];
   return list?.find((item) => item?.sequence === sequence) || list?.[sequence];
+}
+
+/** Por que uma carta sua está sem ação agora (leitura sem botões): explica a regra ao novato. */
+function whyNot(key) {
+  const [controller, location] = key.split(':').map(Number);
+  if (controller !== ME || ![L.HAND, L.MZONE, L.SZONE].includes(location)) return null;
+  const prompt = current?.prompt;
+  if (!prompt) return duel.state.active === FOE ? RIVAL_TURN : null;
+  const battle = prompt.type === M.SELECT_BATTLECMD;
+  const live = cardAt(key);
+  const card = cardOf(live?.code);
+  // Campo: o mesmo texto do Rush (card-gestures.js), a partir do que o motor marcou neste turno.
+  const { marks } = duel.state;
+  if (location === L.SZONE) return live && isFaceDown(live) && card.type & TYPE.TRAP && marks.set.has(key) ? TRAP_SET_WHY : null;
+  if (location === L.MZONE) {
+    return monsterWhyNot({ battle, canBattle: Boolean(prompt.to_bp), firstTurn: duel.state.turn === 1, summoned: marks.summoned.has(key), set: marks.set.has(key),
+      moved: marks.moved.has(key), attacked: marks.attacked.has(key), attackPos: Boolean(live) && !isDefense(live) });
+  }
+  if (battle) return 'Na Batalha só dá para atacar. Cartas da mão são jogadas na Fase Principal.';
+  if (card.type & TYPE.MONSTER) {
+    const level = card.level & 0xff;
+    const need = level >= 7 ? 2 : level >= 5 ? 1 : 0;
+    const have = view[ME].monsters.slice(0, 5).filter(Boolean).length;
+    if (!prompt.summons.length && !prompt.monster_sets.length) return 'No clássico é uma Invocação-Normal (ou um monstro baixado) por turno, e você já fez a sua.';
+    if (need > have) return `Monstro de Nível ${level} pede ${need} tributo${need > 1 ? 's' : ''}: ${need > 1 ? 'monstros seus' : 'um monstro seu'} no campo que vai para o Cemitério para ele entrar. Você tem ${have} no campo.`;
+  }
+  return 'O que a carta pede ainda não aconteceu: leia o texto acima (condições, custos ou materiais).';
 }
 
 /** Conteúdo da leitura (card-gestures.js mostra e liga as ações). */
@@ -537,20 +629,26 @@ const showZoom = (key, options) => gestures.info(key, options);
 /* ---------- Diálogo genérico ---------- */
 
 /** Lista de escolhas (ocg-ask.js): devolve os índices escolhidos ou null (cancelar). */
-const ask = createAsk({ dialog: $('#ask'), title: $('#ask-title'), items: $('#ask-items'), actions: $('#ask-actions'), paint: paintCards });
+const askBase = createAsk({ dialog: $('#ask'), title: $('#ask-title'), items: $('#ask-items'), actions: $('#ask-actions'), note: $('#ask-note'), paint: paintCards });
+// Pergunta aberta: o topo e o Deck ficam inertes atrás do modal; o "⋯" no canto leva às opções (desistir), sem assustar.
+const ask = (options) => { const choice = askBase(options); addMenuCorner($('#ask'), canSurrender() ? surrender : null); return choice; };
 
 function cardItem(loc) {
   const live = loc.location === L.MZONE || loc.location === L.SZONE ? cardAt(locKey(loc.controller, loc.location, loc.sequence)) : null;
   const hidden = loc.controller !== ME && ((live && isFaceDown(live)) || loc.location === L.HAND || loc.location === L.DECK);
-  const where = { [L.HAND]: 'mão', [L.MZONE]: 'campo', [L.SZONE]: 'campo', [L.GRAVE]: 'cemitério', [L.REMOVED]: 'banida', [L.EXTRA]: 'Adicional', [L.DECK]: 'deck' }[loc.location] || '';
-  const side = loc.controller === ME ? 'sua' : 'do rival';
-  return { html: hidden || !loc.code ? cardBack() : cardFace(cardOf(loc.code), { live }), label: hidden ? `Carta ${side} (${where})` : `${cardOf(loc.code).name} · ${where} ${side}` };
+  const where = whereLabel(loc.location, loc.controller === ME);
+  return { html: hidden || !loc.code ? cardBack() : cardFace(cardOf(loc.code), { live }), label: hidden ? `Carta virada · ${where}` : `${cardOf(loc.code).name} · ${where}`,
+    info: hidden || !loc.code ? null : { name: cardOf(loc.code).name, stats: cardStats(cardOf(loc.code), live), text: cardOf(loc.code).desc } };
 }
 
-const hint = (fallback) => (duel.state.hint && describe(duel.state.hint, cards)) || fallback;
+// Título das seleções: a dica do motor (ou o genérico) e, quando se sabe, a carta cujo efeito pediu.
+const hint = (fallback) => {
+  const text = (duel.state.hint && describe(duel.state.hint, cards)) || fallback;
+  return duel.state.source ? `${cardOf(duel.state.source).name}: ${text}` : text;
+};
 // Contexto das perguntas comuns (ocg-ask.js).
 const askContext = () => ({
-  ask, me: ME, cards, cardOf, cardItem, face: (card) => cardFace(card), back: cardBack, hint, plan,
+  ask, me: ME, cards, cardOf, cardItem, face: (card) => cardFace(card), back: cardBack, hint, plan, toast,
   describe: (description, args) => describe(description, cards, args), races: RACES, attributes: ATTRIBUTES, inDuel: new Set(deckIds),
 });
 
@@ -565,18 +663,26 @@ async function answer(prompt) {
         $('#to-battle').hidden = !(idle && prompt.to_bp);
         $('#to-m2').hidden = !(!idle && prompt.to_m2);
         $('#to-end').hidden = !prompt.to_ep;
+        disarmConfirm($('#to-end'));
+        // Sem mais nada a fazer, Encerrar vira o botão principal.
+        const moves = idle ? [prompt.summons, prompt.special_summons, prompt.pos_changes, prompt.monster_sets, prompt.spell_sets, prompt.activates].some((list) => list.length) : prompt.attacks.length || prompt.chains.length;
+        $('#to-end').classList.toggle('ghost', Boolean(moves || (idle && prompt.to_bp)));
+        $('#hint').classList.toggle('live', !idle); // celular: na Batalha a dica (como atacar / nenhum ataque) aparece mesmo com a dica escondida
         $('#hint').textContent = (isPuzzle ? `${puzzle.goal} ` : '') + (idle
-          ? 'Toque numa carta para ver as ações, ou arraste da mão para o campo. Toque duas vezes: jogar ou baixar.'
-          : prompt.attacks.length ? 'Toque no seu monstro e em Atacar, ou arraste-o até o alvo (ou o rival).' : 'Nenhum ataque disponível.');
+          ? tapText('Toque numa carta para ver as ações, ou arraste da mão para o campo. Toque duas vezes: jogar ou baixar.')
+          : prompt.attacks.length ? tapText('Toque no seu monstro aceso para atacar (ou arraste-o até o alvo).') : 'Nenhum ataque disponível.');
         render();
+        if (idle) maybeTips();
       });
     case M.SELECT_CHAIN: {
       if (!prompt.selects.length) return { type: R.SELECT_CHAIN, index: null };
-      if (!prompt.forced && skipChainTurn === duel.state.turn) return { type: R.SELECT_CHAIN, index: null };
+      if (chainSkip.skips(prompt, duel.state)) return { type: R.SELECT_CHAIN, index: null };
+      // Efeito obrigatório com uma opção só: não há o que escolher, só avisa.
+      if (soleChoice(prompt) >= 0) { toast(`Efeito obrigatório: ${cardOf(prompt.selects[0].code).name}.`); return { type: R.SELECT_CHAIN, index: 0 }; }
       const items = prompt.selects.map((loc) => ({ ...cardItem(loc), label: `${cardOf(loc.code).name}: ${describeActivate(loc).replace(/^Ativar: ?/, '') || 'ativar'}` }));
-      if (!prompt.forced) items.push({ label: 'Não responder mais neste turno' });
-      const chosen = await ask({ title: prompt.forced ? 'Escolha o efeito obrigatório' : 'Responder com uma carta?', items, cancel: !prompt.forced });
-      if (chosen && chosen[0] === prompt.selects.length) { skipChainTurn = duel.state.turn; return { type: R.SELECT_CHAIN, index: null }; }
+      if (!prompt.forced) items.push({ label: 'Não responder mais com estas cartas nesta fase' });
+      const chosen = await ask({ title: prompt.forced ? 'Escolha o efeito obrigatório' : 'Responder com uma carta?', note: lastPlay(), items, cancel: !prompt.forced });
+      if (chosen && chosen[0] === prompt.selects.length) { chainSkip.remember(prompt, duel.state); return { type: R.SELECT_CHAIN, index: null }; }
       return { type: R.SELECT_CHAIN, index: chosen ? chosen[0] : null };
     }
     default: {
@@ -590,7 +696,15 @@ async function answer(prompt) {
 /* ---------- Visualizar pilhas (Adicional, Cemitério, Banidas) ---------- */
 
 async function openPile(controller, kind) {
-  if (kind === 'deck') return;
+  if (kind === 'deck') {
+    // O Deck não aparece no snapshot: oferece só as cartas que a pergunta atual deixa usar de lá.
+    const options = pileActions(controller, kind).flatMap((loc) => actionsFor(locKey(loc.controller, loc.location, loc.sequence)).map((item) => ({ loc, item })))
+      .filter((option, index, all) => all.findIndex((other) => other.item.response.action === option.item.response.action && other.item.response.index === option.item.response.index) === index);
+    if (!options.length) return;
+    const chosen = await ask({ title: 'Do seu Deck', items: options.map(({ loc, item }) => ({ html: cardFace(cardOf(loc.code)), label: `${cardOf(loc.code).name} · ${item.label}` })), cancel: true });
+    if (chosen && current) respond(options[chosen[0]].item.response);
+    return;
+  }
   const location = { extra: L.EXTRA, grave: L.GRAVE, banished: L.REMOVED }[kind];
   const list = view[controller][{ extra: 'extra', grave: 'grave', banished: 'banished' }[kind]].filter(Boolean);
   if (controller !== ME && kind === 'extra') { toast(`Deck Adicional do rival: ${list.length} cartas.`); return; }
@@ -598,10 +712,11 @@ async function openPile(controller, kind) {
   const entries = list.map((card) => ({ card, key: locKey(controller, location, card.sequence) }));
   const items = entries.map(({ card, key }) => {
     const actions = controller === ME ? actionsFor(key) : [];
-    return { html: cardFace(cardOf(card.code)), label: actions.length ? `${cardOf(card.code).name} · ${actions[0].label}` : cardOf(card.code).name };
+    // info: segurar (ou o "i") lê a carta sem escolher, como em qualquer outro lugar.
+    return { ...cardItem({ controller, location, sequence: card.sequence, code: card.code }), label: actions.length ? `${cardOf(card.code).name} · ${actions[0].label}` : cardOf(card.code).name };
   });
   const title = { extra: 'Seu Deck Adicional', grave: controller === ME ? 'Seu Cemitério' : 'Cemitério do rival', banished: controller === ME ? 'Suas cartas banidas' : 'Banidas do rival' }[kind];
-  const chosen = await ask({ title: `${title}: toque numa carta`, items, cancel: true });
+  const chosen = await ask({ title: tapText(`${title}: toque numa carta`), items, cancel: true });
   if (!chosen) return;
   const { key } = entries[chosen[0]];
   const actions = controller === ME ? actionsFor(key) : [];
@@ -610,6 +725,23 @@ async function openPile(controller, kind) {
 }
 
 /* ---------- Laço do duelo ---------- */
+
+let surrendered = false;
+const canSurrender = () => !surrendered && duel.state.winner === null && !puzzle && !replay; // a qualquer momento; sem puzzle nem replay
+function surrender() {
+  if (surrendered || duel.state.winner !== null) return;
+  surrendered = true;
+  duel.state.winner = FOE;
+  duel.state.reason = 'desistiu';
+  if ($('#ask').open) $('#ask').close(); // pergunta do motor aberta: fica sem resposta (o duelo acabou)
+  current = null;
+  render();
+  finish(FOE);
+}
+bindSurrender({
+  enabled: canSurrender,
+  async onHold() { if (await confirmSurrender()) surrender(); },
+});
 
 let pumping = false;
 async function pump({ replay: redo = [] } = {}) {
@@ -620,18 +752,23 @@ async function pump({ replay: redo = [] } = {}) {
     const result = duel.next();
     const quick = replayAt < redo.length;
     await play(result.events, quick);
+    if (surrendered) break; // desistiu durante as animações
     if (result.winner !== null) { render(); finish(result.winner); break; }
     const { prompt } = result;
     let response;
     if (quick) response = redo[replayAt++];
     else if (prompt.player === FOE) {
-      render();
-      await wait(prompt.type === M.SELECT_CHAIN ? 60 : 380);
+      // Pausa só antes de uma jogada nova (~250 ms); zona, posição e alvo seguem a jogada, e Corrente vazia passa direto.
+      const pause = prompt.type === M.SELECT_IDLECMD || prompt.type === M.SELECT_BATTLECMD ? 250 : prompt.type === M.SELECT_CHAIN && prompt.selects.length ? 60 : 0;
+      if (pause) { render(); await wait(pause); }
+      if (surrendered) break;
       response = decide(prompt, { view: duel.snapshot(), me: FOE, cards, state: duel.state, memory: aiMemory });
     } else {
+      if (saved?.surrender) { surrender(); break; } // desistiu antes de recarregar
       if (result.retry) toast('Essa jogada não vale agora. Tente outra.');
       response = await answer(prompt);
     }
+    if (surrendered) break;
     if (!response) { console.warn('sem resposta para', prompt); break; }
     responses.push(response);
     if (!quick) writeJson(saveKey, { responses, round, ...mark });
@@ -693,7 +830,7 @@ async function shareReplay() {
 }
 
 async function finish(winner) {
-  writeJson(saveKey, { responses, done: true, round, ...mark });
+  writeJson(saveKey, { responses, done: true, round, ...mark, ...(surrendered && { surrender: true }) });
   const result = winner === ME ? 'win' : winner === FOE ? 'loss' : 'draw';
   if (puzzle) { finishPuzzle(result); return; }
   // Só o PvP entra no histórico, e uma vez só (a partida terminada é repetida ao reabrir a página).
@@ -704,7 +841,7 @@ async function finish(winner) {
   }
   $('#result-kicker').textContent = `${rival ? `Desafio de ${rival.key}` : 'Treino'} · turno ${duel.state.turn}`;
   $('#result-title').textContent = winner === ME ? 'Vitória!' : winner === FOE ? 'Derrota' : 'Empate';
-  $('#result-copy').textContent = `${duel.state.reason === 'turnos' ? `Chegou o limite de ${FORMAT.turnLimit} turnos: vence quem tem mais PV. ` : ''}Você terminou com ${Math.max(0, duel.state.lp[ME]).toLocaleString('pt-BR')} PV; o rival com ${Math.max(0, duel.state.lp[FOE]).toLocaleString('pt-BR')}.`;
+  $('#result-copy').textContent = `${duel.state.reason === 'desistiu' ? 'Você desistiu da partida. ' : ''}${duel.state.reason === 'turnos' ? `Chegou o limite de ${FORMAT.turnLimit} turnos: vence quem tem mais PV. ` : ''}Você terminou com ${Math.max(0, duel.state.lp[ME]).toLocaleString('pt-BR')} PV; o rival com ${Math.max(0, duel.state.lp[FOE]).toLocaleString('pt-BR')}.`;
   queueSync(0);
   $('#result').showModal();
 }
@@ -732,14 +869,45 @@ function restartPuzzle() { writeJson(saveKey, { responses: [] }); location.reloa
 
 $('#to-battle').addEventListener('click', () => respond({ type: R.SELECT_IDLECMD, action: 6, index: null }));
 $('#to-m2').addEventListener('click', () => respond({ type: R.SELECT_BATTLECMD, action: 2, index: null }));
-$('#to-end').addEventListener('click', () => {
+$('#to-end').addEventListener('click', (event) => {
   const prompt = current?.prompt;
+  // Encerrar com ataque ainda possível pede um 2º toque (sem diálogo): o turno não volta.
+  const canAttack = prompt?.type === M.SELECT_BATTLECMD ? prompt.attacks.length > 0
+    : prompt?.to_bp && view[ME].monsters.some((card) => card && !isFaceDown(card) && !isDefense(card));
+  if (prompt && canAttack && !isPuzzle && !armConfirm(event.currentTarget, 'Encerrar sem atacar?')) return;
   if (prompt) respond(prompt.type === M.SELECT_IDLECMD ? { type: R.SELECT_IDLECMD, action: 7, index: null } : { type: R.SELECT_BATTLECMD, action: 3, index: null });
 });
 document.addEventListener('click', (event) => {
   const pileNode = event.target.closest('[data-pile]');
   if (pileNode) { const [controller, kind] = pileNode.dataset.pile.split(':'); openPile(Number(controller), kind); }
 });
+// Velocidade 1x/2x (lembrada por jogador) e toque na mesa: pula a espera da animação atual (a lógica segue igual).
+const speedButton = $('#speed-toggle');
+const showSpeed = () => { speedButton.textContent = `${pacer.speed}x`; speedButton.setAttribute('aria-pressed', String(pacer.speed === 2)); };
+showSpeed();
+speedButton.addEventListener('click', () => { pacer.toggle(); showSpeed(); });
+const menuSpeed = (toggle) => { if (toggle) pacer.toggle(); showSpeed(); return pacer.speed; }; // no celular o botão do topo some: a velocidade fica no "⋯"
+document.addEventListener('pointerdown', (event) => { if (!event.target.closest('button, a, dialog, .help-chip')) pacer.skip(); });
+$('#menu-toggle').addEventListener('click', () => openDuelMenu({
+  onSpeed: menuSpeed,
+  onHelp: () => { if ($('#help').hidden) $('#help-toggle').click(); },
+  onSurrender: canSurrender() ? surrender : null,
+}));
+// Primeiro duelo clássico: as mesmas dicas do Rush, com as regras daqui; aparecem na sua primeira Fase Principal.
+let tipsShown = false;
+function maybeTips() {
+  const key = `rushdaily-seen-tips:classic:${playerKey}`;
+  if (tipsShown || isPuzzle || replay || readJson(key, false)) return;
+  tipsShown = true;
+  writeJson(key, true);
+  runTips([
+    ['Objetivo: zerar os 8000 PV (pontos de vida) do rival. Seus monstros atacam; o de ATK maior vence a luta.', '#foe-plate'],
+    ['Toque numa carta da mão e escolha Invocar. No clássico é uma Invocação-Normal (ou um monstro baixado) por turno.', '#hand'],
+    ['Magias e Armadilhas: toque e escolha Ativar ou Baixar. A Armadilha baixada só pode ser ativada a partir do turno seguinte.', '#hand'],
+    ['O turno passa por Compra, Apoio, Principal 1, Batalha, Principal 2 e Final. Na Batalha, toque no seu monstro aceso para atacar.', '#phases'],
+    ['Quem começa não ataca no primeiro turno. Encerre quando terminar. Dúvida? "Como jogar" tem as palavras do jogo.', '#to-end'],
+  ]);
+}
 $('#help-toggle').addEventListener('click', (event) => {
   const open = $('#help').hidden;
   $('#help').hidden = !open;
@@ -768,7 +936,7 @@ warmCards([...view[ME].hand, ...view[ME].extra].filter(Boolean).map((card) => ca
 if (replay) {
   $('#replay-bar').hidden = false;
   document.querySelector('.seat.me .who').textContent = 'Quem gravou';
-  $('#hint').textContent = `Replay de ${longDate(replay.date)}: só para assistir. Toque nas cartas para ler.`;
+  $('#hint').textContent = tapText(`Replay de ${longDate(replay.date)}: só para assistir. Toque nas cartas para ler.`);
   watch(replay.responses);
 } else {
   $('#restart').hidden = !isPuzzle;

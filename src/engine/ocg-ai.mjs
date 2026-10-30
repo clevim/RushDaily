@@ -106,6 +106,8 @@ export function decide(prompt, { view, me, cards, state, memory }) {
         return { type: R.SELECT_BATTLECMD, action: 1, index: best.index };
       }
       if (prompt.chains.length && !memory.tried.has('battle-chain')) { memory.tried.add('battle-chain'); return { type: R.SELECT_BATTLECMD, action: 0, index: 0 }; }
+      // Sem Principal 2 nem Fase Final (ataque obrigatório por efeito): encerrar dá RETRY e o rival ficava preso. Ataca com o primeiro.
+      if (!prompt.to_m2 && !prompt.to_ep && prompt.attacks.length) return { type: R.SELECT_BATTLECMD, action: 1, index: 0 };
       return { type: R.SELECT_BATTLECMD, action: prompt.to_m2 ? 2 : 3, index: null };
     }
     case M.SELECT_CHAIN: {

@@ -4,7 +4,7 @@ import test from 'node:test';
 // localStorage mínimo para o common.js no Node.
 const store = new Map();
 globalThis.localStorage = { getItem: (key) => (store.has(key) ? store.get(key) : null), setItem: (key, value) => store.set(key, String(value)), removeItem: (key) => store.delete(key) };
-const { canRecover, heartCharges, monthPieces, puzzleFor, recoverKey } = await import('../src/ui/common.js');
+const { battleForecast, canRecover, heartCharges, monthPieces, puzzleFor, recoverKey } = await import('../src/ui/common.js');
 const { decodeReplay, encodeReplay, resultGrid } = await import('../src/ui/share.js');
 
 test('puzzle do dia: mesma data, mesmo puzzle; datas diferentes espalham', () => {
@@ -53,4 +53,16 @@ test('resumo do Rush: barras de PV e maior golpe, sem cartas', () => {
     'RushDaily 23/10 · Duelista ★★☆☆', 'Dragão 🆚 Guerreiro', '🏆 Vitória em 6 turnos',
     'Você ❤️❤️❤️🖤🖤 3.000 PV', 'Rival 🖤🖤🖤🖤🖤 0 PV', '💥 Maior golpe: 2.000 de dano', '', 'Consegue melhor? http://x/',
   ].join('\n'));
+});
+
+test('previsão do combate no alvo: vence, perde, empate, defesa, virado e direto', () => {
+  const atk = (attack) => ({ hidden: false, defense: false, attack, def: 0 });
+  const def = (value) => ({ hidden: false, defense: true, attack: 0, def: value });
+  assert.deepEqual(battleForecast(1900, atk(1500)), { text: 'Vence\n−400', tone: 'win' });
+  assert.deepEqual(battleForecast(200, atk(2100)), { text: 'Perde\n−1.900', tone: 'lose' });
+  assert.equal(battleForecast(1500, atk(1500)).text, 'Empate');
+  assert.deepEqual(battleForecast(1600, def(1200)), { text: 'Vence', tone: 'win' });
+  assert.deepEqual(battleForecast(1000, def(1200)), { text: 'Não passa\n−200', tone: 'lose' });
+  assert.equal(battleForecast(1000, { hidden: true }).text, '?');
+  assert.deepEqual(battleForecast(1900, null), { text: 'Direto\n−1.900', tone: 'win' });
 });

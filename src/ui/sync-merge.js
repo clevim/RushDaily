@@ -112,7 +112,7 @@ const countCards = (boosters, days) => {
  * Pacote antigo, sem luck: o comum vale 1 e qualquer outro zera (a regra de antes). */
 function pityOf(boosters) {
   let points = 0;
-  for (const day of Object.keys(boosters).sort().reverse()) {
+  for (const day of Object.keys(boosters).sort((a, b) => (boosters[b].openedAt || '').localeCompare(boosters[a].openedAt || '') || b.localeCompare(a))) {
     const luck = boosters[day].luck ?? (boosters[day].tier === 'common' ? 1 : 0);
     if (!luck) break;
     points += luck;

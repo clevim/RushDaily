@@ -56,11 +56,28 @@ html:has(.arena) { overflow: clip; }
   cursor: pointer;
 }
 .help-chip[aria-expanded='true'], .help-chip:hover { color: var(--gold); border-color: var(--gold); }
+/* Como jogar + "⋯" (opções da partida: desistir) no canto direito do topo */
+.top-tools { justify-self: end; display: flex; align-items: center; gap: 6px; }
+.menu-chip { min-width: 40px; padding-inline: 8px; font-size: 1.25rem; line-height: 1; }
+@media (max-width: 860px) {
+  .top-tools { gap: 4px; }
+  .menu-chip { min-width: 36px; padding-inline: 4px; }
+  #speed-toggle { display: none; } /* a velocidade vai para o menu "⋯" (não disputa o topo com o chip de turno) */
+  .arena .turn-chip { white-space: nowrap; gap: 6px; padding-inline: 10px; min-width: 0; }
+  .arena .turn-chip b { font-size: 0.92rem; }
+}
 .help { position: fixed; z-index: 20; top: 58px; right: clamp(12px, 3vw, 32px); width: min(360px, calc(100vw - 24px)); padding: 18px 20px; }
 .help h2 { margin: 0 0 10px; font: 400 1.15rem/1 var(--display); }
 .help ul { margin: 0 0 10px; padding-left: 18px; display: grid; gap: 6px; color: var(--ivory-dim); font-size: 0.92rem; }
 .help b { color: var(--ivory); }
 .help p { margin: 0; color: var(--ivory-dim); font-size: 0.85rem; }
+.help { max-height: calc(100dvh - 80px); overflow: auto; overscroll-behavior: contain; }
+.help .help-goal { margin: 0 0 12px; padding: 8px 10px; border-left: 3px solid var(--gold); background: rgb(var(--gold-rgb) / 0.08); color: var(--ivory); font-size: 0.95rem; }
+.glossary { margin-top: 12px; border-top: 1px solid var(--rule); padding-top: 10px; }
+.glossary summary { cursor: pointer; color: var(--gold); font-weight: 700; min-height: 32px; display: flex; align-items: center; }
+.glossary dl { margin: 6px 0 0; font-size: 0.88rem; }
+.glossary dt { color: var(--ivory); font-weight: 700; }
+.glossary dd { margin: 2px 0 10px; color: var(--ivory-dim); line-height: 1.4; }
 
 /* Mesa */
 .board {
@@ -196,8 +213,9 @@ html:has(.arena) { overflow: clip; }
   position: relative;
   z-index: 4;
   display: grid;
-  grid-template-columns: minmax(220px, 300px) 1fr minmax(220px, 300px);
-  grid-template-areas: 'dock hand .';
+  /* PC: as mesmas colunas laterais da mesa (--side); botões do turno à direita, colados na mão (padrão dos card games) */
+  grid-template-columns: var(--side) minmax(0, 1fr) var(--side);
+  grid-template-areas: '. hand dock';
   align-items: end;
   gap: 12px;
   padding: 0 clamp(12px, 3vw, 32px) max(10px, env(safe-area-inset-bottom));
@@ -226,10 +244,10 @@ html:has(.arena) { overflow: clip; }
 }
 .hand-card:first-child { margin-left: 0; }
 .hand-card.playable { filter: none; box-shadow: 0 0 0 1.5px rgb(var(--gold-rgb) / 0.75), 0 14px 28px -12px rgb(var(--ink) / 0.9); }
-.zone.can-act .face, .hand-card.can-act { outline: 2px solid #b58cff; outline-offset: 2px; animation: can-act 1.8s ease-in-out infinite; }
+.zone.can-act .face, .hand-card.can-act, .pile.can-act, .banish-chip.can-act { outline: 2px solid #b58cff; outline-offset: 2px; animation: can-act 1.8s ease-in-out infinite; }
 @keyframes can-act { 50% { outline-color: #e3d2ff; outline-offset: 4px; } }
 .calm .can-act, .calm .can-act .face { animation: none !important; }
-@media (prefers-reduced-motion: reduce) { .zone.can-act .face, .hand-card.can-act { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .zone.can-act .face, .hand-card.can-act, .pile.can-act, .banish-chip.can-act { animation: none; } }
 .hand-card:hover, .hand-card:focus-visible { z-index: 5; transform: translateY(-14px) scale(1.12) rotate(0); filter: none; }
 .hand-card.selected { z-index: 6; transform: translateY(-30px) scale(1.16) rotate(0); filter: none; box-shadow: 0 0 0 3px var(--gold-hi), 0 0 40px 8px rgb(var(--gold-rgb) / 0.7); }
 .hand-card.lifting { opacity: 0.25; }
@@ -257,6 +275,9 @@ html:has(.arena) { overflow: clip; }
   transition: opacity 0.18s;
 }
 .zoom.show { opacity: 1; pointer-events: auto; }
+/* Prévia do mouse (PC, card-gestures.js): só leitura, não bloqueia o campo nem mostra botões. O layout posiciona. */
+.zoom.preview { pointer-events: none; background: none; }
+.zoom.preview .zoom-actions { display: none; }
 .zoom-panel {
   --c: 18px;
   position: relative;
@@ -286,6 +307,8 @@ html:has(.arena) { overflow: clip; }
 .zoom-meta { margin: 0 0 8px; color: var(--ivory-dim); font-weight: 600; font-size: 0.95rem; font-stretch: 85%; }
 .zoom-power { display: inline-block; margin: 0 0 14px; padding: 4px 12px; background: rgb(var(--gold-rgb) / 0.12); border-left: 3px solid var(--gold); color: var(--gold-hi); font: 400 1.05rem/1.3 var(--display); }
 .zoom-text { margin: 0; color: var(--ivory); font-size: 1rem; line-height: 1.55; white-space: pre-line; }
+.zoom-why { margin: 14px 0 0; padding: 10px 12px; background: rgb(var(--gold-rgb) / 0.08); border-left: 3px solid var(--gold); color: var(--ivory); font-size: 0.95rem; line-height: 1.45; }
+.zoom-why b { display: block; color: var(--gold-hi); font-weight: 700; }
 .zoom-actions { grid-area: actions; display: grid; gap: 8px; }
 .zoom-act {
   --c: 10px;
@@ -337,7 +360,10 @@ html:has(.arena) { overflow: clip; }
 .zone.spin .face { animation: pos-to-def 0.3s ease-out; }
 .zone.spin:not(.defense) .face { animation-name: pos-to-atk; }
 .zone.can-pos::before { content: '↻'; position: absolute; right: 4%; top: 2%; z-index: 3; width: 1.2em; height: 1.2em; display: grid; place-items: center; border-radius: 50%; background: var(--sky, #4fb3e8); color: #06121c; font: 800 0.7rem/1 var(--body); pointer-events: none; }
-@media (prefers-reduced-motion: reduce) { .zone.spin .face { animation: none; } }
+/* Virar a carta (baixar/revelar): meio giro no eixo Y. */
+@keyframes card-flip { from { transform: perspective(500px) rotateY(90deg); opacity: 0.4; } }
+.zone.flip:not(.defense) .face { animation: card-flip 0.32s ease-out; }
+@media (prefers-reduced-motion: reduce) { .zone.spin .face, .zone.flip .face { animation: none; } }
 
 @media (max-width: 700px) {
   .zoom { align-items: flex-end; padding: 0; background: rgb(2 6 5 / 0.62); }
@@ -373,12 +399,13 @@ html:has(.arena) { overflow: clip; }
   box-shadow: 0 30px 60px -20px rgb(var(--ink) / 0.9);
 }
 .banner[data-owner='enemy'] span { background: linear-gradient(160deg, #ff6b74, var(--blood) 45%, #7d0f19); color: var(--ivory); }
-.banner.run span { animation: sweep 1.05s cubic-bezier(0.7, 0, 0.2, 1) both; }
+.banner.run span { animation: sweep 0.78s cubic-bezier(0.7, 0, 0.2, 1) both; }
 @keyframes sweep { 0% { transform: skewX(-12deg) translateX(-130vw); } 32%, 68% { transform: skewX(-12deg) translateX(0); } 100% { transform: skewX(-12deg) translateX(130vw); } }
 
 /* Magia/armadilha ativada */
 .cast { position: fixed; inset: 0; z-index: 25; display: grid; place-content: center; justify-items: center; gap: 14px; pointer-events: none; opacity: 0; }
 .cast .card { width: min(260px, 52vw); box-shadow: 0 0 0 2px var(--gold), 0 0 80px 20px rgb(var(--gold-rgb) / 0.45); }
+.cast-name { display: grid; place-items: center; aspect-ratio: 418 / 609; padding: 14px; background: var(--lacquer); font: 400 1.3rem/1.2 var(--display); text-align: center; }
 .cast p { margin: 0; padding: 0 16px; font: 400 clamp(1rem, 3vw, 1.3rem)/1.2 var(--display); text-align: center; text-shadow: 0 3px 0 var(--ink-solid); }
 .cast.show { opacity: 1; animation: castIn 0.55s var(--ease-snap); }
 @keyframes castIn { from { opacity: 0; transform: perspective(900px) rotateY(80deg) scale(0.7); } }
@@ -387,7 +414,7 @@ html:has(.arena) { overflow: clip; }
 .float { position: fixed; z-index: 35; translate: -50% -50%; font: 400 clamp(1.8rem, 4vw, 3rem)/1 var(--display); pointer-events: none; animation: floatUp 1.35s var(--ease-out) forwards; text-shadow: 0 4px 0 var(--ink-solid), 0 0 30px currentColor; }
 .float.damage { color: #ff5a66; }
 .float.deal { color: var(--gold-hi); }
-@keyframes floatUp { 0% { opacity: 0; transform: scale(0.4); } 15% { opacity: 1; transform: scale(1.25); } 100% { opacity: 0; transform: translateY(-70px) scale(1); } }
+@keyframes floatUp { 0% { opacity: 0; transform: scale(0.4); } 15% { opacity: 1; transform: scale(1.25); } 100% { opacity: 0; transform: translateY(var(--dy, -70px)) scale(1); } }
 
 /* Pergunta de armadilha */
 .prompt { width: min(92vw, 440px); padding: 26px 24px 24px; border: 0; color: var(--ivory); text-align: center; }
@@ -483,11 +510,28 @@ body.entering.reveal .board, body.entering.reveal .rush-table, body.entering.rev
 @keyframes boardIn { from { opacity: 0; transform: scale(0.94); } }
 
 /* Dicas do primeiro duelo: faixa curta sobre a bandeja, apontando a mão ou o botão de encerrar */
-.tip { position: absolute; z-index: 15; left: 50%; bottom: calc(100% + 6px); translate: -50% 0; width: min(440px, calc(100vw - 16px)); display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--lacquer); border: 1px solid var(--gold); clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); }
+.tip { position: fixed; z-index: 15; left: 50%; translate: -50% 0; width: min(440px, calc(100vw - 16px)); box-shadow: 0 14px 30px -10px var(--ink-solid); display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--lacquer); border: 1px solid var(--gold); clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); }
 .tip p { margin: 0; flex: 1; font-size: 0.9rem; line-height: 1.3; }
 .tip-actions { display: flex; gap: 6px; }
 .tip .btn { min-height: 40px; padding: 0 14px; font-size: 0.85rem; }
-.tip-target { outline: 2px dashed var(--gold-hi); outline-offset: 4px; }
+/* Posição (card-gestures.js, runTips): presa acima da mão no PC e acima dos botões do turno no celular, fora das fileiras.
+   No celular fica compacta: texto menor e "Pular" vira um X de fechar, para caber entre o tapete e os botões. */
+@media (min-width: 861px) {
+  .tip { width: var(--side); flex-wrap: wrap; justify-content: flex-end; }
+  .tip p { flex: 1 1 100%; }
+}
+@media (max-width: 860px) {
+  .tip { gap: 8px; padding: 6px 8px 6px 10px; }
+  .tip p { font-size: 0.8rem; line-height: 1.25; }
+  .tip .btn { min-height: 36px; padding: 0 10px; font-size: 0.78rem; }
+  .tip #tip-skip { order: 2; width: 36px; padding: 0; font-size: 0; }
+  .tip #tip-skip::after { content: '✕'; font-size: 1rem; }
+}
+/* O elemento citado pela dica ganha contorno dourado pulsante (spotlight) */
+/* (placas e tapete têm clip-path, que corta o contorno de fora: o brilho de dentro, inset, aparece sempre) */
+.tip-target { position: relative; z-index: 3; outline: 3px solid var(--gold-hi); outline-offset: 4px; box-shadow: inset 0 0 0 3px var(--gold-hi), inset 0 0 28px rgb(var(--gold-rgb) / 0.45), 0 0 34px 10px rgb(var(--gold-rgb) / 0.55); animation: tipSpot 1.4s ease-in-out infinite; }
+@keyframes tipSpot { 50% { outline-offset: 8px; box-shadow: inset 0 0 0 3px var(--gold-hi), inset 0 0 40px rgb(var(--gold-rgb) / 0.65), 0 0 46px 16px rgb(var(--gold-rgb) / 0.7); } }
+@media (prefers-reduced-motion: reduce) { .tip-target { animation: none; } }
 
 /* Fases do turno numa chapa inclinada (as duas arenas) */
 .phases { display: flex; margin: 0; padding: 0; list-style: none; transform: skewX(-14deg); box-shadow: 0 6px 18px -8px var(--ink-solid); }
@@ -505,3 +549,115 @@ body.entering.reveal .board, body.entering.reveal .rush-table, body.entering.rev
 .phases li:first-child { border-left-width: 1px; }
 .phases li[aria-current] { background: var(--foil); color: var(--lacquer); border-color: var(--gold-hi); }
 .phases[data-owner='enemy'] li[aria-current] { background: linear-gradient(160deg, #ff8a5c, var(--blood) 55%, #7d0f19); color: var(--ivory); border-color: #ff8a92; }
+
+/* Desistir: anel que enche enquanto o Deck é segurado (card-gestures.js, bindSurrender) */
+[data-pile="0:deck"] { touch-action: manipulation; -webkit-touch-callout: none; user-select: none; }
+.surrender-ring { position: fixed; z-index: 60; translate: -50% -50%; pointer-events: none; filter: drop-shadow(0 0 6px rgb(0 0 0 / 0.8)); }
+.surrender-ring svg { width: 100%; height: 100%; rotate: -90deg; overflow: visible; }
+.surrender-ring circle { fill: rgb(0 0 0 / 0.35); stroke: var(--blood, #e0414e); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 100; animation: surrenderFill var(--hold) linear forwards; }
+@keyframes surrenderFill { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) { .surrender-ring circle { animation-timing-function: steps(6, end); } }
+
+/* Seleção de cartas pedida pelo motor (ocg-ask.js): contador fixo no topo, ordem marcada, "i" para ler a carta */
+.ask .ask-count { position: sticky; top: -26px; z-index: 3; margin: -6px -22px 12px; padding: 8px 22px; background: rgb(16 12 10 / 0.97); border-bottom: 1px solid rgb(var(--gold-rgb) / 0.25); color: var(--ivory); font: 700 0.95rem/1.25 var(--body); }
+.ask .ask-count.ready { color: var(--gold-hi); }
+.ask .ask-count[hidden] { display: none; }
+.ask .result-actions { position: sticky; bottom: -22px; z-index: 3; margin: 0 -22px -22px; padding: 12px 22px 22px; background: rgb(12 9 8 / 0.97); }
+.ask .result-actions:empty { display: none; }
+.ask-cell { position: relative; display: grid; }
+.ask-cell[hidden] { display: none; }
+.ask .ask-item { position: relative; min-height: 44px; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+.ask .ask-item:focus-visible, .ask-info:focus-visible { outline: 3px solid var(--gold-hi); outline-offset: 2px; }
+.ask .ask-item[disabled] { cursor: default; opacity: 0.85; }
+.ask .ask-items[data-many='true'] .ask-item.with-card .rcard, .ask .ask-items[data-many='true'] .ask-item.with-card .ycard { width: 100%; max-width: 124px; }
+.ask .ask-item[aria-pressed='true'] { border-color: var(--gold-hi); background: rgb(var(--gold-rgb) / 0.2); box-shadow: 0 0 0 3px var(--gold-hi), 0 0 18px rgb(var(--gold-rgb) / 0.45); }
+.ask .ask-item[data-order]::after { content: attr(data-order); position: absolute; top: 6px; left: 6px; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--gold-hi); color: #1a120a; font: 800 0.95rem/1 var(--body); box-shadow: 0 2px 6px rgb(0 0 0 / 0.6); }
+.ask-info { position: absolute; top: 0; right: 0; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; background: none; cursor: pointer; }
+.ask-info b { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: rgb(0 0 0 / 0.72); border: 1px solid rgb(var(--gold-rgb) / 0.7); color: var(--ivory); font: italic 700 0.9rem/1 Georgia, serif; }
+.ask-info:hover b { border-color: var(--gold-hi); }
+.ask.reading .ask-items, .ask.reading .ask-count, .ask.reading .ask-note, .ask.reading #ask-actions { display: none; }
+.ask-detail { display: grid; grid-template-columns: minmax(0, 200px) 1fr; gap: 16px; align-items: start; text-align: left; }
+.ask-detail[hidden] { display: none; }
+.ask-detail-art .rcard, .ask-detail-art .ycard { width: 100%; }
+.ask-detail h3 { margin: 0 0 6px; font: 400 1.15rem/1.2 var(--display); }
+.ask-detail-meta { margin: 0 0 8px; color: var(--gold-hi); font-size: 0.85rem; font-weight: 600; }
+.ask-detail-text { margin: 0; color: var(--ivory); font-size: 0.92rem; line-height: 1.45; white-space: pre-line; }
+.ask-detail .result-actions { grid-column: 1 / -1; position: static; margin: 4px 0 0; padding: 0; background: none; }
+@media (max-width: 560px) {
+  .ask-detail { grid-template-columns: 1fr; justify-items: center; }
+  .ask-detail-art { width: min(220px, 60vw); }
+}
+
+/* Previsão do combate no alvo aceso (card-gestures.js: data-forecast/data-tone). Verde: você vence; vermelho: você perde. */
+.drop-ok[data-forecast]::after {
+  content: attr(data-forecast); position: absolute; inset: auto; left: 50%; top: 50%; z-index: 6; translate: -50% -50%;
+  width: max-content; max-width: 160%; padding: 3px 7px; border: 1px solid var(--rule); border-radius: 4px; clip-path: none;
+  background: rgb(var(--ink) / 0.9); color: var(--ivory); box-shadow: 0 4px 12px rgb(0 0 0 / 0.6);
+  font: 800 clamp(0.62rem, calc(var(--card) * 0.15), 0.9rem)/1.15 var(--body); font-variant-numeric: tabular-nums;
+  text-align: center; white-space: pre; pointer-events: none;
+}
+.drop-ok[data-tone='win']::after { border-color: #7dffa4; color: #b6ffcb; }
+.drop-ok[data-tone='lose']::after { border-color: #ff7a84; color: #ffb3b9; background: rgb(60 6 12 / 0.92); }
+.plate.drop-ok[data-forecast]::after { left: auto; right: 14px; translate: 0 -50%; }
+
+/* Encerrar com ataque sobrando: o 1º toque arma (vermelho) e pede o 2º */
+.btn.armed { color: var(--ivory); }
+.btn.armed::before { background: linear-gradient(160deg, #ff6b74, var(--blood) 50%, #7d0f19); border-color: #ff8a92; }
+
+/* Celular: a dica do dock fica escondida; a do gesto (mirar, arrastar) e a da Batalha ("toque no seu monstro aceso",
+   "nenhum ataque") aparecem na linha dos botões, à esquerda deles (não cobre a placa de PV nem a mão). */
+@media (max-width: 860px) {
+  body.arena .hint.live {
+    display: -webkit-box; min-height: 0; margin: 0; padding: 2px 0 2px 9px; border-left: 3px solid var(--gold); color: var(--ivory);
+    font: 600 0.74rem/1.25 var(--body); -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; pointer-events: none; animation: logIn 0.25s var(--ease-out);
+  }
+  body.arena .dock:has(> .hint.live) { grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 8px; }
+  body.arena .dock:has(> .hint.live) .btn { flex: none; }
+}
+
+/* Opções da partida: "⋯" discreto no canto da pergunta aberta e o menu (card-gestures.js, openDuelMenu) */
+.ask-menu { position: absolute; top: 6px; right: 6px; z-index: 4; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid transparent; background: none; color: var(--ivory-dim); font: 700 1.2rem/1 var(--body); cursor: pointer; opacity: 0.75; }
+.ask-menu:hover, .ask-menu:focus-visible { opacity: 1; color: var(--gold); border-color: var(--rule); }
+.ask:has(> .ask-menu) .prompt-kicker { padding-inline: 34px; }
+.duel-menu { width: min(92vw, 340px); }
+.duel-menu .result-actions { flex-direction: column; align-items: stretch; gap: 10px; }
+
+/* Leitura da carta: termos do glossário tocáveis e a definição embaixo do texto */
+.term { display: inline; padding: 0; border: 0; border-bottom: 1px dotted rgb(var(--gold-rgb) / 0.8); background: none; color: inherit; font: inherit; letter-spacing: inherit; cursor: help; }
+.term:hover, .term:focus-visible, .term[aria-expanded='true'] { color: var(--gold-hi); border-bottom-style: solid; outline: none; }
+.zoom-def { margin: 10px 0 0; padding: 8px 12px; border-left: 3px solid var(--gold); background: rgb(var(--gold-rgb) / 0.1); color: var(--ivory); font-size: 0.9rem; line-height: 1.4; animation: logIn 0.25s var(--ease-out); }
+.zoom-def b { color: var(--gold-hi); margin-right: 4px; }
+
+/* ---------- Coluna da direita no PC (as duas arenas): leitura fixa da carta em foco + narração ---------- */
+/* Layout único no PC: placas (rival em cima, você embaixo) à esquerda, tapete no centro, leitura + narração à direita,
+   mão embaixo do tapete e botões do turno à direita da mão. --side é a largura das duas colunas laterais. */
+.arena { --side: clamp(200px, 21vw, 400px); }
+.chronicle > .chain { flex: none; }
+.chronicle { grid-area: chain; align-self: stretch; display: flex; flex-direction: column; gap: 10px; min-height: 0; max-height: 100%; padding: 8px 0; }
+.reader { flex: 0 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 12px 14px; border-left: 3px solid var(--gold); background: linear-gradient(160deg, rgb(15 42 37 / 0.9), rgb(6 19 15 / 0.92)); }
+.reader-empty { margin: 0; padding: 18px 4px; color: var(--ivory-dim); font-size: 0.85rem; line-height: 1.4; text-align: center; }
+/* Arte à esquerda com nome, tipo e ATK/DEF ao lado; efeito, "por que não" e ações em largura total embaixo. */
+.reader-card { display: grid; grid-template-columns: minmax(0, 44%) minmax(0, 1fr); grid-template-rows: auto auto auto minmax(0, 1fr); column-gap: 12px; align-items: start; }
+.reader-card .zoom-copy { display: contents; }
+:where(.reader-card > *, .reader-card .zoom-copy > *) { grid-column: 1 / -1; }
+.reader-card .zoom-art { grid-column: 1; grid-row: 1 / span 4; margin-bottom: 10px; }
+.reader-card .zoom-art .card { width: 100%; box-shadow: 0 16px 30px -14px var(--ink-solid), 0 0 0 1px rgb(var(--gold-rgb) / 0.4); }
+.rush-arena .reader .card { background: none; }
+.reader-card h2, .reader-card .zoom-meta, .reader-card .zoom-power { grid-column: 2; }
+.reader-card h2 { margin: 0 0 6px; font: 400 clamp(1rem, 1.25vw, 1.3rem)/1.1 var(--display); color: var(--ivory); overflow-wrap: anywhere; }
+.reader-card .zoom-meta { margin-bottom: 6px; font-size: 0.82rem; }
+.reader-card .zoom-power { justify-self: start; margin-bottom: 8px; padding: 3px 8px; font-size: 0.9rem; }
+.reader-card .zoom-text { font-size: 0.9rem; line-height: 1.45; }
+.reader-card .zoom-why { margin-top: 10px; font-size: 0.85rem; }
+.reader-card .zoom-actions { grid-area: auto / 1 / auto / -1; margin-top: 12px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+.reader-card .zoom-act { min-height: 40px; gap: 8px; padding: 0 10px; font-size: 0.85rem; }
+.story { flex: 1 1 140px; min-height: 110px; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 6px; padding: 12px 14px; border-left: 3px solid var(--rule); background: rgb(var(--ink) / 0.38); }
+.story-title { margin: 0; font: 400 0.9rem/1 var(--display); color: var(--ivory-dim); }
+.history { margin: 0; padding: 0; list-style: none; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; gap: 5px; mask-image: linear-gradient(0deg, var(--ink-solid) 70%, transparent); }
+.history li { position: relative; flex: none; padding-left: 10px; color: var(--ivory-dim); font: 500 0.8rem/1.3 var(--body); }
+.history li::before { content: ''; position: absolute; left: 0; top: 0.45em; width: 4px; height: 4px; background: var(--gold); transform: rotate(45deg); }
+.history li.theirs::before { background: var(--blood); }
+.history li:last-child { color: var(--ivory); animation: logIn 0.35s var(--ease-out); }
+.history li.turn-mark { margin-top: 6px; padding-left: 0; color: var(--gold); font: 700 0.66rem/1 var(--body); letter-spacing: 0.06em; text-transform: uppercase; }
+.history li.turn-mark::before { display: none; }
+@media (max-width: 860px) { .reader { display: none; } }

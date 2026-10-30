@@ -7,15 +7,19 @@ import { OcgDuelMode, OcgLocation, OcgMessageType, OcgPosition, OcgProcessResult
  * Formato do desafio diário: campo completo do clássico (5 colunas, Pêndulo, zona extra) com o ritmo do Speed Duel.
  * Uma Invocação Normal por turno, como no clássico. Medido: mediana de 9 turnos, igual ao Speed Duel.
  */
+// DUEL_EXTRA_DECK_RITUAL do constant.lua: faz parte do DUEL_MODE_RUSH, mas falta no OcgDuelMode.MODE_RUSH do binding.
+// Com ela os Monstros de Ritual ficam no Deck Adicional e proc_ritual.lua invoca de lá. Flags do binding são BigInt (64 bits).
+const EXTRA_DECK_RITUAL = 0x800000000n;
+
 export const FORMATS = {
   // O motor não embaralha o deck no início (o servidor do EDOPro faz isso antes): shuffle embaralha pela seed do duelo.
   // createDuel aceita shuffle: false para repetir partidas e replays gravados antes do embaralhamento.
   rapido: { flags: OcgDuelMode.MODE_MR5 | OcgDuelMode.NO_MAIN_PHASE_2, lp: 4000, hand: 4, main: 20, extra: 5, turnLimit: 20 },
   classico: { flags: OcgDuelMode.MODE_MR5, lp: 8000, hand: 5, main: 40, extra: 15, turnLimit: 40, shuffle: true }, // 40: corta a cauda longa (mediana 16)
   puzzle: { flags: OcgDuelMode.MODE_MR5, lp: 8000, hand: 0, main: 0, extra: 0, turnLimit: 0 }, // o script do puzzle troca regras, PV e campo
-  // Rush Duel oficial: deck de 40 a 60, adicional até 15 (só Fusão), mão inicial 4 e compra até ter 5 (DRAW_UNTIL_5),
+  // Rush Duel oficial: deck de 40 a 60, adicional até 15 (Fusão e Ritual), mão inicial 4 e compra até ter 5 (DRAW_UNTIL_5),
   // campo de 3 colunas, sem Fase de Apoio nem Fase Principal 2, Invocações Normais ilimitadas. Scripts em card-scripts/rush/.
-  rush: { flags: OcgDuelMode.MODE_RUSH, lp: 8000, hand: 4, main: 40, extra: 15, turnLimit: 40, scripts: 'rush', shuffle: true },
+  rush: { flags: OcgDuelMode.MODE_RUSH | EXTRA_DECK_RITUAL, lp: 8000, hand: 4, main: 40, extra: 15, turnLimit: 40, scripts: 'rush', shuffle: true },
 };
 
 /**
@@ -27,7 +31,9 @@ export const RUSH_ZONES = { monsters: [1, 2, 3], spells: [1, 2, 3], field: 5 };
 
 export const TYPE = { MONSTER: 0x1, SPELL: 0x2, TRAP: 0x4, NORMAL: 0x10, EFFECT: 0x20, FUSION: 0x40, RITUAL: 0x80, TOKEN: 0x4000, SYNCHRO: 0x2000, XYZ: 0x800000, PENDULUM: 0x1000000, LINK: 0x4000000 };
 const EXTRA_TYPES = TYPE.FUSION | TYPE.SYNCHRO | TYPE.XYZ | TYPE.LINK;
-export const isExtra = (card) => Boolean(card.type & EXTRA_TYPES);
+/** Vai no Deck Adicional? Com format de Rituais no Adicional (FORMATS.rush), os Monstros de Ritual também; no clássico, não. */
+export const isExtra = (card, format) => Boolean(card.type & EXTRA_TYPES
+  || (card.type & TYPE.MONSTER && card.type & TYPE.RITUAL && (format?.flags ?? 0n) & EXTRA_DECK_RITUAL));
 
 /** Linha do pool (s1.json etc.) no formato que o motor lê. */
 export function toCoreCard(card) {
@@ -108,10 +114,23 @@ export function createDuel(lib, { seed, format = FORMATS.rapido, decks = [], puz
 
   let lastPrompt = null;
   let promptHint = 0n; // dica da pergunta respondida: volta se o motor recusar (RETRY) e repetir a mesma pergunta
-  const state = { turn: 0, active: 0, phase: 0, hint: 0n, lp: [...startLp], winner: null, reason: null };
+  // marks: o que cada zona fez neste turno ("controlador:local:sequência"), para a interface explicar por que uma carta
+  // está sem ação (Invocada/baixada agora, já mudou de posição, já atacou). source: carta cujo efeito está pedindo a escolha.
+  const freshMarks = () => ({ summoned: new Set(), set: new Set(), moved: new Set(), attacked: new Set() });
+  const state = { turn: 0, active: 0, phase: 0, hint: 0n, lp: [...startLp], winner: null, reason: null, marks: freshMarks(), source: null };
+  const at = (loc) => `${loc.controller}:${loc.location}:${loc.sequence}`;
+  const chainCodes = [];
   const track = (message) => {
     switch (message.type) {
-      case OcgMessageType.NEW_TURN: state.turn += 1; state.active = message.player; break;
+      case OcgMessageType.NEW_TURN: state.turn += 1; state.active = message.player; state.marks = freshMarks(); break;
+      case OcgMessageType.SUMMONING: case OcgMessageType.SPSUMMONING: state.marks.summoned.add(at(message)); break;
+      case OcgMessageType.FLIPSUMMONING: state.marks.moved.add(at(message)); break; // Invocar por Virada conta como a mudança do turno
+      case OcgMessageType.SET: state.marks.set.add(at(message)); break;
+      case OcgMessageType.ATTACK: state.marks.attacked.add(at(message.card)); break;
+      case OcgMessageType.MOVE: if (message.from.location !== message.to.location) for (const marks of Object.values(state.marks)) marks.delete(at(message.from)); break;
+      case OcgMessageType.CHAINING: chainCodes.push(message.code); break;
+      case OcgMessageType.CHAIN_SOLVING: state.source = chainCodes[message.chain_size - 1] ?? null; break;
+      case OcgMessageType.CHAIN_END: chainCodes.length = 0; state.source = null; break;
       case OcgMessageType.NEW_PHASE: state.phase = message.phase; break;
       case OcgMessageType.HINT: if (message.hint_type === 3) state.hint = message.hint; break; // SELECTMSG: texto da próxima pergunta
       case OcgMessageType.DAMAGE: case OcgMessageType.PAY_LPCOST: state.lp[message.player] = Math.max(0, state.lp[message.player] - message.amount); break;
@@ -168,7 +187,18 @@ export function createDuel(lib, { seed, format = FORMATS.rapido, decks = [], puz
     // A dica (SELECTMSG) vale só para a pergunta seguinte, como no cliente do EDOPro: muitos scripts Rush fazem
     // Select sem Duel.Hint, e a dica velha virava o título errado (ex.: "devolver ao Deck" ao escolher o que destruir)
     // e enganava a IA sobre custo ou ganho.
-    respond(response) { promptHint = state.hint; state.hint = 0n; lib.duelSetResponse(handle, response); },
+    respond(response) {
+      promptHint = state.hint;
+      state.hint = 0n;
+      const prompt = lastPrompt;
+      if (prompt?.type === OcgMessageType.SELECT_IDLECMD || prompt?.type === OcgMessageType.SELECT_BATTLECMD) {
+        // Ativou agora: custos e alvos são pedidos por esta carta. Invocar, atacar ou passar: ninguém.
+        const idle = prompt.type === OcgMessageType.SELECT_IDLECMD;
+        state.source = (idle ? response.action === 5 && prompt.activates[response.index] : response.action === 0 && prompt.chains[response.index])?.code ?? null;
+        if (idle && response.action === 2 && prompt.pos_changes[response.index]) state.marks.moved.add(at(prompt.pos_changes[response.index]));
+      } else if (prompt?.type === OcgMessageType.SELECT_CHAIN && response.index !== null && prompt.selects[response.index]) state.source = prompt.selects[response.index].code;
+      lib.duelSetResponse(handle, response);
+    },
     destroy() { lib.destroyDuel(handle); },
   };
 }

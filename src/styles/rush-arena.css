@@ -4,7 +4,7 @@
   --hand: clamp(64px, min(7.6vw, 12.5dvh), 108px);
   --gap: clamp(5px, 0.75vw, 10px);
   /* Carta: o que couber em 5 colunas na largura e em 4 linhas + faixa do meio + mão na altura. */
-  --card: clamp(44px, min((100vw - 600px) / 5.6, (100dvh - 150px - var(--hand) * 1.4 - 7 * var(--gap)) / 5.95), 112px);
+  --card: clamp(44px, min((100vw - 2 * var(--side) - 110px) / 5.6, (100dvh - 150px - var(--hand) * 1.4 - 7 * var(--gap)) / 5.95), 150px);
   --ch: calc(var(--card) * 1.457);
   --rush: #ff5a2a;
 }
@@ -14,7 +14,7 @@
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: minmax(170px, 230px) auto minmax(170px, 230px);
+  grid-template-columns: var(--side) auto var(--side);
   grid-template-rows: 1fr 1fr;
   grid-template-areas: 'foe field chain' 'me field chain';
   justify-content: center;
@@ -118,7 +118,6 @@ polygon.fly-piece.top { fill: var(--gold-lo); }
 .rush-arena .zone.defense .face { transform: rotate(90deg) scale(0.686); }
 .rush-arena .zone.facedown .rcard { box-shadow: 0 0 0 2px var(--sky), 0 0 14px 1px rgb(79 179 232 / 0.5); }
 .rush-arena .zone.theirs.facedown .rcard { box-shadow: 0 0 0 1.5px rgb(224 48 63 / 0.7), 0 8px 16px -8px var(--ink-solid); }
-.rush-arena .zone.facedown.mine .rcard:not(.back) > img { filter: brightness(0.62) saturate(0.6); }
 .zone.arrive { animation: arrive 0.5s var(--ease-snap); }
 @keyframes arrive { 0% { transform: scale(1.35) translateY(-14px); filter: brightness(2.2) sepia(0.6); } 100% { transform: none; filter: none; } }
 
@@ -137,6 +136,12 @@ polygon.fly-piece.top { fill: var(--gold-lo); }
 .rcard { position: relative; display: block; width: 100%; aspect-ratio: 418 / 609; border-radius: 4.5% / 3.1%; overflow: hidden; background: #120c07; }
 .rcard > img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .rush-arena .card:has(> .rcard) { background: none; overflow: visible; box-shadow: none; }
+/* A regra acima tem o mesmo peso que os brilhos do duel.css (.zone.ready/.tributable/.selected .face) e vinha depois,
+   apagando-os no Rush: os monstros que podem atacar não acendiam na Batalha. Reaplica com mais peso. */
+.rush-arena .zone.ready .card.face { box-shadow: 0 0 0 2px var(--gold), 0 0 22px 2px rgb(var(--gold-rgb) / 0.55); animation: ready 1.8s ease-in-out infinite; }
+.rush-arena .zone.tributable .card.face { box-shadow: 0 0 0 2px var(--gold), 0 0 18px 2px rgb(var(--gold-rgb) / 0.5); animation: ready 1.4s ease-in-out infinite; }
+.rush-arena .zone.tribute-picked .card.face { box-shadow: 0 0 0 3px var(--blood), 0 0 30px 8px rgb(224 48 63 / 0.7); animation: none; }
+.rush-arena .zone.selected .card.face { box-shadow: 0 0 0 3px var(--gold-hi), 0 0 40px 10px rgb(var(--gold-rgb) / 0.75); animation: none; }
 .zone .rcard, .pile .rcard { box-shadow: 0 6px 14px -6px var(--ink-solid); }
 .live-stats { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; gap: 2px; padding: 2px 4px; background: linear-gradient(0deg, rgb(var(--ink) / 0.92), rgb(var(--ink) / 0.66)); font: 800 clamp(0.52rem, calc(var(--card) * 0.155), 0.84rem)/1.15 var(--body); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: var(--ivory); }
 .live-stats b { font-weight: 800; }
@@ -162,17 +167,7 @@ polygon.fly-piece.top { fill: var(--gold-lo); }
 .rush-arena .zone.filled.mine.drop-ok .face { box-shadow: 0 0 0 3px var(--sky), 0 0 28px 6px rgb(79 179 232 / 0.55); }
 
 /* ---------- Corrente ---------- */
-/* Coluna da direita: Corrente (quando há) em cima e a narração embaixo */
-.chronicle { grid-area: chain; align-self: stretch; display: flex; flex-direction: column; gap: 12px; min-height: 0; max-height: 100%; padding: 8px 0; }
-.story { flex: 1; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 6px; padding: 12px 14px; border-left: 3px solid var(--rule); background: rgb(var(--ink) / 0.38); }
-.story-title { margin: 0; font: 400 0.9rem/1 var(--display); color: var(--ivory-dim); }
-.history { margin: 0; padding: 0; list-style: none; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; gap: 5px; mask-image: linear-gradient(0deg, var(--ink-solid) 70%, transparent); }
-.history li { position: relative; flex: none; padding-left: 10px; color: var(--ivory-dim); font: 500 0.8rem/1.3 var(--body); }
-.history li::before { content: ''; position: absolute; left: 0; top: 0.45em; width: 4px; height: 4px; background: var(--gold); transform: rotate(45deg); }
-.history li.theirs::before { background: var(--blood); }
-.history li:last-child { color: var(--ivory); animation: logIn 0.35s var(--ease-out); }
-.history li.turn-mark { margin-top: 6px; padding-left: 0; color: var(--gold); font: 700 0.66rem/1 var(--body); letter-spacing: 0.06em; text-transform: uppercase; }
-.history li.turn-mark::before { display: none; }
+/* Coluna da direita: Corrente (quando há) em cima, depois a leitura e a narração (estilos em duel.css) */
 .chain { --c: 12px; display: grid; gap: 10px; padding: 14px 14px 16px; background: linear-gradient(160deg, rgb(26 20 14 / 0.94), rgb(10 8 7 / 0.94)); clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px); box-shadow: inset 0 0 0 1px rgb(var(--gold-rgb) / 0.35); animation: chainIn 0.35s var(--ease-snap); }
 @keyframes chainIn { from { opacity: 0; transform: translateX(24px); } }
 .chain-title { margin: 0; font: 400 1rem/1 var(--display); color: var(--gold); letter-spacing: 0.02em; }
@@ -214,7 +209,6 @@ polygon.fly-piece.top { fill: var(--gold-lo); }
 .result[data-result='draw'] .result-title { background: linear-gradient(160deg, #e9e3d6, #9c9384); -webkit-background-clip: text; background-clip: text; }
 
 /* Dock: Batalha e Encerrar numa linha quando cabem */
-.rush-arena .tray { grid-template-columns: minmax(220px, min(360px, 25vw)) 1fr minmax(220px, min(360px, 25vw)); }
 .rush-arena .dock-actions { flex-wrap: wrap; }
 .rush-arena .dock .btn { flex: 1 1 auto; padding: 0 12px; font-size: 0.88rem; white-space: nowrap; }
 .rush-arena .hint { min-height: calc(3 * 1.3em); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
@@ -237,8 +231,17 @@ polygon.fly-piece.top { fill: var(--gold-lo); }
     --hand: min(20vw, 12.5dvh);
     /* Largura: 5 colunas. Altura: o que sobra para as 4 linhas de cartas depois do topo, das placas, da faixa do meio,
        dos botões e da mão (no tablet em pé é a altura que manda). */
-    --card: min((100vw - 20px - 4 * var(--gap)) / 5.25, (100dvh - 326px - var(--hand) * 1.4) / 5.83);
+    --card: min((100vw - 20px - 4 * var(--gap)) / 4.49, (100dvh - 350px - var(--hand) * 1.4) / 5.83);
+    --pw: calc(var(--card) * 0.62); /* coluna das pilhas */
   }
+  /* Pilhas (Deck, Adicional, Cemitério) e a zona de Campo numa coluna estreita nas pontas: a largura vai para as 3 zonas de jogo. */
+  .field { grid-template-columns: var(--pw) repeat(3, var(--card)) var(--pw); }
+  .rush-arena .pile, .rush-arena .zone.fzone { width: var(--pw); height: calc(var(--pw) * 1.457); align-self: center; justify-self: center; }
+  /* Respiro entre os botões e a mão: as cartas não sobem até a bandeja, nem a selecionada (a altura extra sai da mesa). */
+  .rush-arena .hand { height: calc(var(--hand) * 1.46 + 30px); padding: 22px 0 8px; }
+  /* Leque com queda limitada: com 7-8 cartas as das pontas não descem para fora da tela (a mão inteira sempre visível) */
+  .rush-arena .hand-card { transform: translateY(calc(min(var(--o) * var(--o) * 1.5px, 8px) - var(--w) * 0.06)) rotate(calc(var(--o) * 2deg)); }
+  .rush-arena .hand-card:hover, .rush-arena .hand-card:focus-visible, .rush-arena .hand-card.selected { transform: translateY(-6px) scale(1.06) rotate(0); }
   .rush-arena .arena-top { padding: 2px 8px; gap: 8px; }
   .rush-arena .leave { min-width: 44px; min-height: 44px; justify-content: center; } /* alvo de toque: só o logo aparece */
   .rush-arena .dock .btn { min-height: 40px; }
@@ -262,8 +265,9 @@ polygon.fly-piece.top { fill: var(--gold-lo); }
   .enigma-live { inset: 0; width: 100%; height: 100%; } /* dentro do chanfro da placa, sem ser cortada */
   .skill-note { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* só para leitor de tela */
   .seat.foe, .seat.me { align-self: stretch; }
-  .phases li { padding: 3px 7px; font-size: 0.58rem; }
-  .rush-arena .log span:first-child { font-size: 0.72rem; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .phases li { padding: 3px 7px; font-size: 0.64rem; }
+  /* Sem a narração ao lado: a jogada inteira tem que caber (2 linhas reservadas, a mesa não pula; até 3 se precisar). */
+  .rush-arena .log span:first-child { font-size: 0.72rem; white-space: normal; min-height: 2.5em; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
   .rush-arena .pile .pile-name { font-size: 0; padding: 1px 3px; top: 2px; }
   .rush-arena .pile .pile-name::after { content: attr(data-short); font-size: 0.46rem; }
   .rush-arena .pile .pile-count { min-width: 16px; padding: 2px 3px; right: 2px; bottom: 2px; }
@@ -286,3 +290,22 @@ polygon.fly-piece.top { fill: var(--gold-lo); }
   .ask-item.with-card .rcard { width: 72px; }
 }
 
+
+/* ---------- Monstro Máximo: três zonas, um monstro só ---------- */
+.zone.max { z-index: 1; }
+.zone.max::before { content: ''; position: absolute; top: -4px; bottom: -4px; left: calc(var(--gap) * -0.5); right: calc(var(--gap) * -0.5); pointer-events: none; border: 2px solid var(--gold); border-left: 0; border-right: 0; background: linear-gradient(180deg, rgb(var(--gold-rgb) / 0.2), rgb(var(--gold-rgb) / 0.06)); box-shadow: 0 0 20px 1px rgb(var(--gold-rgb) / 0.5); }
+.zone.max.theirs::before { border-color: #e0303f; background: linear-gradient(180deg, rgb(224 48 63 / 0.22), rgb(224 48 63 / 0.07)); box-shadow: 0 0 20px 1px rgb(224 48 63 / 0.5); }
+.zone.max-l::before { left: -4px; border-left: 2px solid; border-radius: 9px 0 0 9px; }
+.zone.max-r::before { right: -4px; border-right: 2px solid; border-radius: 0 9px 9px 0; }
+.zone.max-l .face, .zone.max-r .face { filter: saturate(0.8) brightness(0.88); }
+.zone.max .face { position: relative; }
+.zone.max .rcard { box-shadow: none; }
+.max-badge { position: absolute; left: 50%; bottom: 3px; transform: translateX(-50%); display: grid; justify-items: center; padding: 1px 8px 2px; border-radius: 5px; background: rgb(var(--ink) / 0.94); border: 1.5px solid var(--gold-hi); color: var(--gold-hi); font-variant-numeric: tabular-nums; line-height: 1.05; white-space: nowrap; z-index: 2; }
+.max-badge i { font: 800 clamp(0.42rem, calc(var(--card) * 0.1), 0.6rem)/1 var(--body); font-style: normal; letter-spacing: 0.08em; color: var(--ivory-dim); }
+.max-badge b { font: 900 clamp(0.7rem, calc(var(--card) * 0.22), 1.1rem)/1.1 var(--body); }
+.zone.theirs.max .max-badge { border-color: #ff7a84; color: #ff7a84; }
+.zone.max-arrive { animation: maxArrive 0.9s var(--ease-snap); }
+.zone.max-arrive::before { animation: maxFlash 1.2s ease-out; }
+@keyframes maxArrive { 0% { transform: scale(1.5) translateY(-30px); filter: brightness(3) sepia(0.7); opacity: 0.2; } 55% { transform: scale(0.96); filter: brightness(1.4); opacity: 1; } 100% { transform: none; filter: none; } }
+@keyframes maxFlash { 0% { box-shadow: 0 0 70px 20px rgb(var(--gold-rgb) / 0.95); } 100% { } }
+@media (prefers-reduced-motion: reduce) { .zone.max-arrive, .zone.max-arrive::before { animation: none; } }

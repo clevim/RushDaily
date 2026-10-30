@@ -21,11 +21,15 @@
       <div class="top-center">
         <p class="turn-chip" id="turn-chip">Preparando o duelo…</p>
         <ol class="phases" id="phases" aria-label="Fases do turno">
-          <li data-phase="draw" data-short="Comp">Compra</li><li data-phase="main" data-short="P1">Principal 1</li><li data-phase="battle" data-short="Bat">Batalha</li><li data-phase="main2" data-short="P2">Principal 2</li><li data-phase="end" data-short="Fim">Final</li>
+          <li data-phase="draw" data-short="Comp">Compra</li><li data-phase="standby" data-short="Apoio">Apoio</li><li data-phase="main" data-short="P1">Principal 1</li><li data-phase="battle" data-short="Bat">Batalha</li><li data-phase="main2" data-short="P2">Principal 2</li><li data-phase="end" data-short="Fim">Final</li>
         </ol>
         <p class="log" id="log" aria-live="polite"></p>
       </div>
-      <button class="help-chip" id="help-toggle" type="button" aria-expanded="false" aria-controls="help">Como jogar</button>
+      <div class="top-tools">
+        <button class="help-chip" id="help-toggle" type="button" aria-expanded="false" aria-controls="help">Como jogar</button>
+        <button class="help-chip menu-chip" id="speed-toggle" type="button" aria-label="Velocidade das animações" title="Velocidade das animações">1x</button>
+        <button class="help-chip menu-chip" id="menu-toggle" type="button" aria-label="Opções da partida" title="Opções da partida">⋯</button>
+      </div>
     </header>
 
     <main class="table">
@@ -42,10 +46,22 @@
         <div class="lp-bar"><i id="me-bar"></i></div>
         <div class="seat-extra"><button class="banish-chip" type="button" data-pile="0:banished" id="me-banished"></button></div>
       </section>
+      <!-- Coluna da direita (PC), igual à arena Rush: leitura da carta em foco + narração -->
+      <aside class="chronicle" aria-label="Leitura e narração">
+        <section class="reader" id="reader" aria-label="Carta em foco"><p class="reader-empty">Passe o mouse ou clique numa carta para lê-la aqui.</p></section>
+        <section class="story" aria-label="Narração do duelo">
+          <p class="story-title">Narração</p>
+          <ol class="history" id="history"></ol>
+        </section>
+      </aside>
     </main>
 
     <footer class="tray">
       <div class="dock">
+        <div class="tip" id="tip" role="status" hidden>
+          <p id="tip-text"></p>
+          <div class="tip-actions"><button class="btn ghost" id="tip-skip" type="button">Pular</button><button class="btn" id="tip-next" type="button">Próxima</button></div>
+        </div>
         <p class="hint" id="hint"></p>
         <div class="dock-actions">
           <button class="btn" id="to-battle" type="button" hidden>Ir para a Batalha</button>
@@ -64,15 +80,18 @@
 
     <aside class="help plate" id="help" hidden>
       <h2>Como jogar</h2>
+      <p class="help-goal"><b>Objetivo:</b> zerar os PV (pontos de vida) do rival atacando com seus monstros.</p>
       <ul>
         <li><b>Toque</b> numa carta para ler e ver o que ela pode fazer agora.</li>
         <li><b>Arraste</b> da mão até uma zona acesa: monstros são Invocados, magias são ativadas.</li>
-        <li><b>Toque duas vezes ou segure</b> uma carta da mão para alternar entre jogar e <b>baixar virada</b>.</li>
-        <li>No campo, <b>toque duas vezes</b> no seu monstro para mudar a posição; <b>segure</b> o virado para Invocar por Virada.</li>
+        <li><b>Segure</b> (ou clique com o botão direito) qualquer carta para ler o texto dela.</li>
+        <li><b>Toque duas vezes</b> numa carta da mão para alternar entre jogar e <b>baixar virada</b>.</li>
+        <li>No campo, <b>toque duas vezes</b> no seu monstro para mudar a posição (ou Invocar por Virada). O selo <b>↻</b> marca quem ainda pode mudar.</li>
         <li>Na Batalha, <b>arraste</b> seu monstro até o alvo (ou até o rival para ataque direto).</li>
         <li>Toque no <b>Deck Adicional</b> ou no <b>Cemitério</b> para ver as cartas e usar as que estiverem disponíveis.</li>
       </ul>
-      <p>Formato clássico: 8000 PV, deck de 40 a 60 cartas, uma Invocação-Normal por turno, duas Fases Principais e até 40 turnos (no limite, vence quem tiver mais PV). Depois da Batalha, use <b>Fase Principal 2</b> para baixar cartas ou invocar mais.</p>
+      <p>Formato clássico: 8000 PV, deck de 40 a 60 cartas, uma Invocação-Normal por turno, duas Fases Principais e até 40 turnos (no limite, vence quem tiver mais PV). O turno no topo soma as vezes dos dois: Turno 7 é a 7ª vez de alguém jogar. Depois da Batalha, use <b>Fase Principal 2</b> para baixar cartas ou invocar mais.</p>
+      <details class="glossary"><summary>Palavras do jogo</summary><dl><dt>PV</dt><dd>Pontos de vida. Quem chegar a zero perde.</dd><dt>ATK / DEF</dt><dd>Força de ataque e de defesa do monstro. Em pé (Ataque) ele usa o ATK; deitado (Defesa), a DEF.</dd><dt>Batalha</dt><dd>O ATK maior destrói o outro monstro e a diferença sai dos PV do dono. Monstro em Defesa que perde não tira PV; se a DEF for maior que o ATK do atacante, quem atacou perde a diferença.</dd><dt>Ataque direto</dt><dd>Sem monstros do rival no campo, o ATK inteiro sai dos PV dele.</dd><dt>Tributo</dt><dd>Monstro seu que vai para o Cemitério para um monstro forte (Nível 5 ou mais) entrar.</dd><dt>Baixar</dt><dd>Pôr a carta virada para baixo. Monstro baixado fica em Defesa; Armadilha baixada espera a hora certa.</dd><dt>Magia / Armadilha</dt><dd>Magia você usa na sua vez. Armadilha precisa ser baixada antes e dispara depois, muitas vezes na vez do rival.</dd><dt>Cemitério</dt><dd>Pilha das cartas destruídas ou já usadas.</dd><dt>Deck Adicional</dt><dd>Monstros de Fusão, fora do deck. A Magia Fusão junta os monstros pedidos (os materiais) num só.</dd><dt>Corrente</dt><dd>Uma carta respondendo a outra. A última ativada resolve primeiro.</dd><dt>Fases</dt><dd>Compra (você compra), Apoio (efeitos do começo do turno), Principal (joga cartas), Batalha (ataca) e Final (passa a vez).</dd><dt>Invocação-Normal</dt><dd>Pôr um monstro da mão no campo. No clássico, só uma por turno.</dd></dl></details>
     </aside>
 
     <div class="zoom" id="zoom" aria-hidden="true"></div>
@@ -81,6 +100,7 @@
 
     <dialog class="prompt plate ask" id="ask">
       <p class="prompt-kicker" id="ask-title"></p>
+      <p class="ask-note" id="ask-note" hidden></p>
       <div class="ask-items" id="ask-items"></div>
       <div class="result-actions" id="ask-actions"></div>
     </dialog>

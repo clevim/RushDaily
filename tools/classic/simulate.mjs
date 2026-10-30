@@ -1,9 +1,12 @@
 // Estresse do pool clássico: duelos com decks sorteados da temporada e escolhas aleatórias.
 //   node tools/classic/simulate.mjs [duelos=100] [temporada=1]
 // Conta erros de script, perguntas que o bot não soube responder e a duração dos duelos.
+// Fora Principal/Batalha/Corrente, responde pelo answerCommon da arena (ocg-ask.js) com escolhas aleatórias válidas no diálogo.
 import { readFileSync } from 'node:fs';
-import createCore, { OcgLocation as L, OcgMessageType as M, OcgResponseType as R } from '../../src/vendor/ocgcore/index.js';
+import createCore, { OcgMessageType as M, OcgResponseType as R } from '../../src/vendor/ocgcore/index.js';
 import { FORMATS, createDuel, isExtra } from '../../src/engine/ocg.mjs';
+import { ATTRIBUTES, RACES } from '../../src/data/classic/strings-pt.mjs';
+import { answerCommon } from '../../src/ui/ocg-ask.js';
 
 const ROOT = new URL('../../', import.meta.url);
 const duels = Number(process.argv[2] || 100);
@@ -24,17 +27,23 @@ const sample = (list, n) => Array.from({ length: n }, () => list[pick(list.lengt
 const mainPool = pool.filter((card) => !isExtra(card));
 const extraPool = pool.filter(isExtra);
 
-function freePlaces(mask, player, count) {
-  const out = [];
-  for (const [side, owner] of [[0, player], [1, 1 - player]]) {
-    for (const [location, offset, size] of [[L.MZONE, 0, 7], [L.SZONE, 8, 8]]) {
-      for (let seq = 0; seq < size && out.length < count; seq += 1) if (!(mask & (1 << (offset + seq + side * 16)))) out.push({ player: owner, location, sequence: seq });
-    }
+// O diálogo da arena (createAsk) com escolhas aleatórias: só devolve o que o botão Confirmar deixaria.
+async function ask({ items, min = 1, max = 1, cancel = false, valid = (chosen) => chosen.length >= min && chosen.length <= max, instant = max === 1 && min === 1, chosen: initial = [] }) {
+  // Um toque responde; prefere o que não está marcado (o sorteio marcava e desmarcava o mesmo tributo para sempre).
+  if (instant) { const fresh = [...items.keys()].filter((i) => !initial.includes(i)); return [fresh.length ? fresh[pick(fresh.length)] : pick(items.length)]; }
+  for (let tries = 0; tries < 400; tries += 1) {
+    const n = min + pick(Math.max(1, Math.min(max, items.length) - min + 1));
+    const chosen = [...initial, ...[...items.keys()].filter((i) => !initial.includes(i)).sort(() => rand() - 0.5)].slice(0, Math.max(n, initial.length));
+    if (valid(chosen)) return chosen;
   }
-  return out;
+  return cancel ? null : [0];
 }
+const commonContext = (me) => ({
+  ask, me, cards, cardOf: (code) => cards.get(code) || { name: String(code) }, cardItem: () => ({ label: '' }), face: () => '', back: () => '',
+  describe: () => '', hint: (text) => text, plan: { target: null, tributes: null, zone: null }, races: RACES, attributes: ATTRIBUTES, inDuel: new Set(),
+});
 
-function respond(m) {
+async function respond(m) {
   switch (m.type) {
     case M.SELECT_IDLECMD:
       if (m.special_summons.length && rand() < 0.5) return { type: R.SELECT_IDLECMD, action: 1, index: pick(m.special_summons.length) };
@@ -47,34 +56,8 @@ function respond(m) {
       if (m.attacks.length) return { type: R.SELECT_BATTLECMD, action: 1, index: pick(m.attacks.length) };
       return { type: R.SELECT_BATTLECMD, action: m.to_m2 ? 2 : 3, index: null };
     case M.SELECT_CHAIN: return { type: R.SELECT_CHAIN, index: m.selects.length && (m.forced || rand() < 0.5) ? pick(m.selects.length) : null };
-    case M.SELECT_EFFECTYN: return { type: R.SELECT_EFFECTYN, yes: rand() < 0.8 };
-    case M.SELECT_YESNO: return { type: R.SELECT_YESNO, yes: rand() < 0.8 };
-    case M.SELECT_OPTION: return { type: R.SELECT_OPTION, index: pick(m.options.length) };
-    case M.SELECT_CARD: return { type: R.SELECT_CARD, indicies: Array.from({ length: m.min }, (_, i) => i) };
-    case M.SELECT_TRIBUTE: return { type: R.SELECT_TRIBUTE, indicies: Array.from({ length: m.min }, (_, i) => i) };
-    case M.SELECT_UNSELECT_CARD: return { type: R.SELECT_UNSELECT_CARD, index: m.can_finish || !m.select_cards.length ? null : 0 };
-    case M.SELECT_PLACE: case M.SELECT_DISFIELD: return { type: m.type === M.SELECT_PLACE ? R.SELECT_PLACE : R.SELECT_DISFIELD, places: freePlaces(m.field_mask, m.player, m.count || 1) };
-    case M.SELECT_POSITION: for (const p of [1, 4, 8, 2]) if (m.positions & p) return { type: R.SELECT_POSITION, position: p }; break;
-    case M.SELECT_SUM: {
-      const level = (card) => card.amount & 0xffff;
-      const need = m.amount - m.selects_must.reduce((sum, card) => sum + level(card), 0);
-      for (let mask = 1; mask < 1 << Math.min(m.selects.length, 14); mask += 1) {
-        const idx = []; let sum = 0;
-        for (let i = 0; i < m.selects.length; i += 1) if (mask & (1 << i)) { idx.push(i); sum += level(m.selects[i]); }
-        if (m.select_max ? sum >= need : sum === need) return { type: R.SELECT_SUM, indicies: idx };
-      }
-      return { type: R.SELECT_SUM, indicies: [0] };
-    }
-    case M.SELECT_COUNTER: { let left = m.count; return { type: R.SELECT_COUNTER, counters: m.cards.map((card) => { const take = Math.min(left, card.count ?? left); left -= take; return take; }) }; }
-    case M.SORT_CARD: case M.SORT_CHAIN: return { type: R.SORT_CARD, order: null };
-    case M.ANNOUNCE_NUMBER: return { type: R.ANNOUNCE_NUMBER, value: 0 };
-    case M.ANNOUNCE_RACE: return { type: R.ANNOUNCE_RACE, races: [1n] };
-    case M.ANNOUNCE_ATTRIB: return { type: R.ANNOUNCE_ATTRIB, attributes: [1] };
-    case M.ANNOUNCE_CARD: return { type: R.ANNOUNCE_CARD, card: mainPool[0].id };
-    case M.ROCK_PAPER_SCISSORS: return { type: R.ROCK_PAPER_SCISSORS, value: 1 + pick(3) };
-    default:
+    default: return (await answerCommon(m, commonContext(m.player))) ?? null;
   }
-  return null;
 }
 
 const lib = await createCore({ sync: true });
@@ -91,7 +74,7 @@ for (let n = 0; n < duels; n += 1) {
     const { prompt, winner, events } = duel.next();
     if (winner !== null) { turns.push(duel.state.turn); break; }
     if (events.some((e) => e.type === M.RETRY)) { retries += 1; repeat += 1; } else repeat = 0;
-    const response = repeat > 3 ? null : respond(repeat ? last : prompt);
+    const response = repeat > 3 ? null : await respond(repeat ? last : prompt);
     if (!response || steps++ > 5000) {
       if (!response && repeat <= 3) unanswered.set(prompt.type, (unanswered.get(prompt.type) || 0) + 1);
       stuck += 1; break;

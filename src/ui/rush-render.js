@@ -14,7 +14,7 @@ export const RUSH_BACK = 'src/assets/card-back.svg';
 
 // Subir CACHE_VERSION ao mudar moldura/estilo/dados das cartas: caches de versões antigas são apagados ao abrir.
 const CACHE_PREFIX = 'rushdaily-rush-cards-';
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 3; // 3: atributo em PT (TREVAS, LUZ...) no desenho
 const CACHE_NAME = `${CACHE_PREFIX}v${CACHE_VERSION}`;
 const CACHE_MAX = 800;
 const READY_MAX = 400;
@@ -79,6 +79,8 @@ function remember(id, url) {
 }
 
 async function createRenderer() {
+  // Sem os recursos do yugioh-card (npm run setup) o desenho trava: falha já, e a fila usa a frente simples.
+  if (!(await fetch(rel('src/vendor/yugioh-card/assets/rush-duel/font/font-list.json'), { method: 'HEAD' }).then((r) => r.ok, () => false))) throw new Error('recursos do yugioh-card ausentes');
   const { RushDuelCard } = await import('../vendor/yugioh-card/yugioh-card.js');
   patchRushCard(RushDuelCard);
   const view = document.createElement('div');
@@ -128,6 +130,24 @@ async function produce(card) {
   return URL.createObjectURL(blob);
 }
 
+// Frente simples quando o desenho falha (sem yugioh-card, sem canvas): nome, Nível, ATK/DEF e a cor do tipo da carta.
+const FRAME = { normal: '#c9a24a', effect: '#c0632a', fusion: '#7b4aa6', ritual: '#3d6fb8', spell: '#1f8a7a', trap: '#a3366f' };
+const xml = (text) => String(text).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]);
+function plainFront(card) {
+  const data = rushCardData(card);
+  const monster = data.type === 'monster';
+  const stat = (value) => (value < 0 ? '?' : value);
+  const lines = monster
+    ? `<text x="209" y="128" font-size="30" fill="#ffd36a">${'★'.repeat(Math.min(12, data.level))}</text>`
+      + `<text x="209" y="470" font-size="26">${xml(data.monsterType)}</text>`
+      + `<text x="209" y="550" font-size="36" font-weight="700">ATK ${stat(data.atk)} / DEF ${stat(data.def)}</text>`
+    : `<text x="209" y="470" font-size="34">${data.type === 'spell' ? 'Carta Mágica' : 'Carta de Armadilha'}</text>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="418" height="609" viewBox="0 0 418 609" font-family="sans-serif" text-anchor="middle" fill="#fff">`
+    + `<rect width="418" height="609" rx="18" fill="${FRAME[monster ? data.cardType : data.type]}"/><rect x="22" y="150" width="374" height="270" rx="8" fill="#000" fill-opacity=".35"/>`
+    + `<text x="209" y="78" font-size="${Math.min(34, Math.floor(640 / data.name.length))}" font-weight="700">${xml(data.name)}</text>${lines}</svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
 // Fila com prioridade: a pedida por último que ainda está na tela (ou pedida por rushImg); aquecidas só sem nada esperando.
 const pending = new Map(); // id -> { card, resolve, imgs, keep, idle, seq }
 const visible = new WeakSet();
@@ -147,7 +167,7 @@ async function pump() {
     let url;
     try { url = await produce(next.card); } catch (error) {
       console.warn('rush-render: desenho falhou', next.card.id, error);
-      url = rel(RUSH_BACK);
+      url = plainFront(next.card); // nunca o verso: verso quer dizer carta virada
     }
     next.resolve(url);
     await new Promise((resolve) => setTimeout(resolve, next.idle ? 120 : 0));

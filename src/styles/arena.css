@@ -5,7 +5,7 @@
   --hand: clamp(60px, min(8.4vw, 12dvh), 104px);
   --gap: clamp(4px, 0.8vw, 10px);
   /* Altura livre = tela - topo (~92px, com as fases) - bandeja (mão + 30px) - folgas da grade. */
-  --card: clamp(40px, min((100vw - 300px) / 8.2, (100dvh - 126px - var(--hand) * 1.4 - 7 * var(--gap)) / 7.3), 104px);
+  --card: clamp(40px, min((100vw - 2 * var(--side) - 110px) / 7.6, (100dvh - 138px - var(--hand) * 1.5 - 7 * var(--gap)) / 7.3), 140px);
 }
 .classic .arena-top { padding-block: 6px; }
 .top-center { display: grid; justify-items: center; gap: 4px; min-width: 0; }
@@ -17,9 +17,9 @@
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: minmax(150px, 210px) auto minmax(150px, 210px);
+  grid-template-columns: var(--side) auto var(--side);
   grid-template-rows: 1fr 1fr;
-  grid-template-areas: 'foe field .' 'me field .';
+  grid-template-areas: 'foe field chain' 'me field chain';
   justify-content: center;
   align-items: center;
   gap: 0 clamp(12px, 2vw, 28px);
@@ -130,7 +130,7 @@
     --gap: 4px;
     --hand: min(24vw, 14dvh);
     /* topo (~80, com as fases) + 2 placas (~100) + folgas + bandeja (botões 38 + mão): o que sobrar vira altura do tabuleiro */
-    --card: min((100vw - 16px - 6 * var(--gap)) / 7.15, (100dvh - 288px - var(--hand) * 1.4) / 7.3);
+    --card: min((100vw - 16px - 6 * var(--gap)) / 7.15, (100dvh - 302px - var(--hand) * 1.4) / 7.3);
   }
   .classic .arena-top { grid-template-columns: auto minmax(0, 1fr) auto; padding: 4px 8px; gap: 8px; }
   .classic .leave img { width: 30px; }
@@ -141,9 +141,10 @@
   .classic .hint { display: none; }
   .classic .tray { padding-top: 4px; }
   .classic .log { max-width: 100%; min-width: 0; }
-  .classic .phases li { padding: 2px 7px; font-size: 0; } /* rótulo curto: o nome inteiro não cabe entre o logo e a ajuda */
-  .classic .phases li::after { content: attr(data-short); font-size: 0.58rem; }
-  .classic .log span:first-child { font-size: 0.72rem; }
+  .classic .phases { justify-self: center; max-width: 100%; }
+  .classic .phases li { padding: 2px 4px; font-size: 0; } /* rótulo curto: o nome inteiro não cabe entre o logo e a ajuda (6 fases, com o Apoio) */
+  .classic .phases li::after { content: attr(data-short); font-size: 0.64rem; }
+  .classic .log span:first-child { font-size: 0.72rem; line-height: 1.25; white-space: normal; min-height: 2.5em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; } /* a jogada em até 2 linhas (antes: 1, com reticências) */
   .table { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; grid-template-areas: 'foe' 'field' 'me'; align-content: space-evenly; gap: 6px; padding: 0 8px; min-height: 0; }
   .field { justify-self: center; padding: 4px; }
   .seat { grid-template-columns: minmax(0, auto) auto 1fr; align-items: center; column-gap: 8px; row-gap: 3px; padding: 5px 12px 6px; --c: 8px; min-width: 0; }
@@ -159,7 +160,7 @@
   .classic .enemy-hand .ycard { width: 24px; margin-left: -10px; }
   .classic .tray { padding-bottom: max(10px, env(safe-area-inset-bottom)); }
   .classic .hand { height: calc(var(--hand) * 1.457 + 26px); padding: 10px 0 12px; box-sizing: border-box; }
-  .classic .hand-card { transform: translateY(calc(var(--o) * var(--o) * 1.5px - var(--w) * 0.08)) rotate(calc(var(--o) * 2.5deg)); }
+  .classic .hand-card { transform: translateY(calc(min(var(--o) * var(--o) * 1.5px, 8px) - var(--w) * 0.08)) rotate(calc(var(--o) * 2deg)); } /* queda limitada: a mão cheia não sai da tela */
   .banish-chip { min-height: 24px; padding: 2px 8px; font-size: 0.68rem; white-space: nowrap; }
   .seat.foe, .seat.me { align-self: stretch; }
   .classic .pile .pile-name { font-size: 0; padding: 1px 3px; top: 2px; }
@@ -170,11 +171,14 @@
   .classic .dock .btn { min-height: 38px; font-size: 0.8rem; min-width: 0; }
   .ask-items { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
   .ask-item.with-card .ycard { width: 74px; }
+  .classic .chronicle { display: none; } /* celular: sem coluna lateral; a leitura é a folha #zoom */
 }
 /* Telas muito estreitas */
 @media (max-width: 380px) {
   .classic .turn-chip { padding-inline: 8px; }
   .classic .help-chip { font-size: 0.72rem; padding-inline: 8px; }
+  .classic .phases li { padding-inline: 2px; }
+  .classic .phases li::after { font-size: 0.56rem; }
 }
 
 /* Replay (só leitura): os controles ocupam a linha dos botões do turno */
@@ -186,3 +190,12 @@
 /* Títulos longos do puzzle ("Peça recuperada!", "O turno acabou") cabem no celular */
 .puzzle-mode .result-title { font-size: clamp(2.4rem, 10vw, 5.2rem); overflow-wrap: anywhere; padding-inline: 0.1em; }
 
+
+/* Contexto da pergunta de resposta ("Agora: o rival invocou..."), como na arena Rush */
+.classic .ask-note { margin: -8px 0 14px; padding: 6px 10px; border-left: 3px solid var(--gold); background: rgb(var(--gold-rgb) / 0.08); color: var(--ivory-dim); font-size: 0.85rem; text-align: left; }
+
+/* PC: o mesmo layout da arena Rush (duel.css): placas à esquerda, leitura + narração à direita, botões à direita da mão. */
+@media (min-width: 861px) {
+  .classic .dock-actions { flex-wrap: wrap; } /* coluna lateral estreita (1024): os botões quebram em vez de vazar */
+  .classic .hand { height: calc(var(--hand) * 1.5 + 16px); padding: 14px 0 8px; } /* fundo: as cartas das pontas giram para baixo */
+}

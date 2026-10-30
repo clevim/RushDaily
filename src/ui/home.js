@@ -52,12 +52,13 @@ function railItem({ id, count }) {
 function render() {
   const data = match();
   const result = readJson('rushdaily-history', {})[playerKey]?.[date];
+  $('#theme').textContent = `${data.player.label} × ${data.enemy.label}`;
   $('#you').textContent = data.player.label;
   $('#foe').textContent = data.enemy.label;
   // O nome mais longo manda no tamanho da fonte (CSS: --len), para o confronto caber na coluna.
   $('#matchup').style.setProperty('--len', Math.max(data.player.label.length, data.enemy.label.length));
   $('#matchup').setAttribute('aria-label', `${data.player.label} contra ${data.enemy.label}`);
-  $('#brief').textContent = `Rush Duel: seu deck de ${data.player.label} ${ATTRIBUTE_OF[data.player.theme.attribute] || ''} contra ${data.enemy.label} ${ATTRIBUTE_OF[data.enemy.theme.attribute] || ''}. ${data.difficulty.modifier}${heartUnlocked(playerKey) ? ' Você tem um Coração das Cartas guardado: ele entra no duelo.' : ''}`.replace(/\s+/g, ' ').replace(' .', '.');
+  $('#brief').textContent = `Hoje você joga com um deck pronto de ${data.player.label} ${ATTRIBUTE_OF[data.player.theme.attribute] || ''} e enfrenta ${data.enemy.label} ${ATTRIBUTE_OF[data.enemy.theme.attribute] || ''}, o mesmo desafio para todo mundo. ${data.difficulty.modifier}${heartUnlocked(playerKey) ? ' Você tem um Coração das Cartas guardado: ele entra no duelo.' : ''}`.replace(/\s+/g, ' ').replace(' .', '.');
   const days = [date, `${date}~2`, ...listDifficulties().map((item) => `${date}~${item.id}`)]; // = renderReward (screens.js)
   const boosterPending = days.some((day) => readJson(`rushdaily-reward:${playerKey}:${day}`, null));
   const thisTaken = Boolean(readJson(`rushdaily-classic-booster:${playerKey}:${date}~${difficulty}`, null)); // o desta dificuldade já saiu
@@ -67,7 +68,9 @@ function render() {
     : result === 'loss' ? 'Você perdeu hoje. A revanche continua aberta.'
       : result === 'draw' ? 'Empate. A revanche continua aberta.'
         : ongoing?.v === 2 && ongoing.responses?.length && !ongoing.done ? 'Sua partida de hoje está salva: entre para continuar.'
-          : 'Vença o duelo de hoje para ganhar um booster.';
+          : Object.keys(readJson('rushdaily-history', {})[playerKey] || {}).length ? 'Vença o duelo de hoje para ganhar um booster.'
+            : 'Primeira vez? Você vence zerando os PV (pontos de vida) do rival. O duelo começa com dicas, e "Como jogar" explica as palavras. Vencer dá um booster.';
+  $('#classic').href = `arena.html?player=${playerKey}`;
   $('#enter').href = `duel.html?player=${playerKey}&difficulty=${difficulty}`;
   $('#enter').textContent = ongoing?.v === 2 && ongoing.responses?.length && !ongoing.done ? 'Continuar o duelo' : 'Entrar na arena';
 

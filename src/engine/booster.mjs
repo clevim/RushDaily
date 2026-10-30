@@ -18,10 +18,12 @@ const TIER_ODDS = [['galaxy', 2], ['gold', 8], ['silver', 20], ['common', 70]];
 // Com 8 × rating pontos (o 9º pacote sem sorte), vem garantido um nível acima do piso.
 const PITY_BONUS = { silver: 5, gold: 1.5, galaxy: 0.3 };
 const PITY_CAP = 32;
-// Piso do pacote por dificuldade (rating 1 a 4: Aprendiz, Duelista, Elite, Caos) e chance extra de Galáxia por ponto de rating acima de 2.
+// Piso do pacote por dificuldade (rating 1 a 4: Aprendiz, Duelista, Elite, Caos).
 const TIER_ORDER = ['common', 'silver', 'gold', 'galaxy'];
 export const DIFFICULTY_FLOOR = ['common', 'silver', 'gold', 'gold'];
-const GALAXY_PER_RATING = 0.03;
+// Chance extra por dificuldade (índice = rating - 1): Galáxia e Ouro (sobe prata/comum para ouro).
+const GALAXY_EXTRA = [0, 0.02, 0.03, 0.06];
+const GOLD_EXTRA = [0, 0.09, 0, 0];
 // Tema de arquétipo: 35% dos pacotes, peso 20x, e no máximo THEME_MAX cartas dele por pacote (o resto varia).
 const THEME_CHANCE = 0.35;
 const THEME_WEIGHT = 20;
@@ -56,9 +58,11 @@ export function openBooster(seed, { owned = {}, pity = 0, cards, difficulty = nu
   const floor = TIER_ORDER.indexOf(DIFFICULTY_FLOOR[rating - 1]);
   const points = Math.min(pity, PITY_CAP);
   let tier = weighted(random, TIER_ODDS.map(([id, weight]) => [id, weight + (PITY_BONUS[id] || 0) * points]));
-  // Dificuldade: a partir da Elite, chance extra de Galáxia; o piso só pode melhorar o pacote.
-  const galaxyChance = rating >= 3 ? (rating - 2) * GALAXY_PER_RATING : 0;
-  if (random() < galaxyChance) tier = 'galaxy';
+  // Dificuldade: um único sorteio decide a chance extra de Galáxia (faixa baixa) ou de Ouro (faixa seguinte); o piso só pode melhorar o pacote.
+  const bump = random();
+  const galaxyChance = GALAXY_EXTRA[rating - 1];
+  if (bump < galaxyChance) tier = 'galaxy';
+  else if (bump < galaxyChance + GOLD_EXTRA[rating - 1] && tier !== 'galaxy') tier = 'gold';
   let rank = Math.max(TIER_ORDER.indexOf(tier), floor);
   if (rank === floor && pity >= 8 * rating) rank = Math.min(floor + 1, TIER_ORDER.length - 1);
   tier = TIER_ORDER[rank];

@@ -97,7 +97,7 @@ function renderCollection() {
   const have = pool.filter((card) => owned[card.id]).length;
   // Quem tem pouco da coleção abre no que tem (senão as cartas ficam enterradas atrás de centenas de versos).
   const filters = { query: '', archetype: 'all', status: have * 2 < total ? 'have' : 'all' };
-  root.innerHTML = `${head(`Coleção <small>${escape(seasonLabel)}</small>`, '', `<div class="head-meter" role="img" aria-label="${have} de ${total} cartas"><b>${have}</b><span>de ${total} cartas</span><div class="progress"><i style="width:${(have / total) * 100}%"></i></div></div>`)}
+  root.innerHTML = `${head(`Coleção <small>${escape(seasonLabel)}</small>`, 'Cartas do formato Clássico, ganhas nos boosters. O desafio do dia (Rush) não usa esta coleção.', `<div class="head-meter" role="img" aria-label="${have} de ${total} cartas"><b>${have}</b><span>de ${total} cartas</span><div class="progress"><i style="width:${(have / total) * 100}%"></i></div></div>`)}
     <div class="toolbar">
       <input type="search" id="col-search" placeholder="Buscar carta" aria-label="Buscar carta">
       <div class="chips" role="radiogroup" aria-label="Mostrar">${[['all', 'Todas'], ['have', 'Que tenho'], ['miss', 'Que faltam']].map(([value, text]) => `<button type="button" class="chip ${value === filters.status ? 'on' : ''}" data-status="${value}" role="radio" aria-checked="${value === filters.status}">${text}</button>`).join('')}</div>
@@ -234,9 +234,10 @@ async function renderReward() {
   const isFirst = openedSlots.length === (pendingSlots.length ? 0 : 1); // a peça só vai no primeiro booster do dia
 
   if (!pendingSlots.length && !openedSlots.length) {
-    root.innerHTML = `${head('Booster do dia', 'Vença o duelo de hoje para liberar 5 cartas.')}
-      <div class="pack-row"><div class="pack-stage locked"><canvas class="pack-canvas" id="pack-canvas" aria-label="Booster em 3D"></canvas></div></div>
-      <div class="center"><a class="btn big" href="index.html?player=${playerKey}">Ir para o desafio</a></div>`;
+    root.innerHTML = `${head('Booster do dia', 'Vença um desafio do dia para abrir.')}
+      <div class="locked-pack"><svg viewBox="0 0 24 24" width="72" height="72" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10"/><path d="M8 11V8a4 4 0 0 1 8 0v3M12 15v2"/></svg>
+        <p><b>Pacote fechado.</b> Cada dificuldade vencida dá um booster de 5 cartas: Aprendiz, Duelista, Elite e Caos. Quanto mais difícil, melhor a chance de cartas raras.</p></div>
+      <div class="center"><a class="btn big" href="index.html?player=${playerKey}">Jogar o desafio</a></div>`;
     return;
   }
 
@@ -453,7 +454,7 @@ function renderDeck() {
     item.extra = fit(item.extra);
   }
 
-  root.innerHTML = `${head('Seus decks', challenge ? `Escolha um deck para aceitar o desafio de ${challenge.key}.` : `Salvo na hora. O deck principal abre os desafios.`)}
+  root.innerHTML = `${head('Seus decks', challenge ? `Escolha um deck para aceitar o desafio de ${challenge.key}.` : `Formato Clássico (Yu-Gi-Oh! tradicional): vale para o Treino e para desafios de amigos. O desafio do dia é Rush e usa um deck pronto. <a href="arena.html?player=${playerKey}">Jogar o clássico</a>`)}
     <nav class="deck-tabs" id="deck-tabs" aria-label="Seus decks"></nav>
     <div class="builder">
       <section class="binder-pane" aria-label="Sua coleção">

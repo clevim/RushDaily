@@ -19,8 +19,8 @@
     <main>
       <section class="hero" aria-labelledby="matchup">
         <div class="challenge">
-          <img class="wordmark" src="src/assets/logo.png" alt="RushDaily" width="680" height="340" />
           <p class="date" id="date"></p>
+          <p class="kicker">Desafio do dia · Rush Duel · Tema: <span id="theme"></span></p>
           <h1 class="matchup" id="matchup">
             <span class="side you" id="you"></span>
             <span class="versus">contra</span>
@@ -36,6 +36,10 @@
             <a class="btn big" id="enter" href="duel.html">Entrar na arena</a>
             <p class="status" id="status" aria-live="polite"></p>
           </div>
+          <a class="classic-card" id="classic" href="arena.html">
+            <b>Quer treinar?</b>
+            <span>Duelo Clássico (Yu-Gi-Oh! tradicional) contra a IA, com o seu deck da aba Deck. Não vale para o desafio do dia.</span>
+          </a>
         </div>
         <div class="stage">
           <canvas class="stage-canvas" id="stage" aria-label="Suas três cartas mais fortes de hoje"></canvas>

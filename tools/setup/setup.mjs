@@ -18,7 +18,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash } from 'node:crypto';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { aplicar } from './patch-ocgcore.mjs';
@@ -215,7 +215,8 @@ const ETAPAS = [
   },
   {
     nome: 'classico', desc: 'Pool clássico: YGOPRODeck, BabelCDB, CardScripts, decks e puzzles -> src/data/classic, src/vendor/card-scripts, artes',
-    fontes: ['tools/classic/import_cards.py', CARDSCRIPTS_SHA], versao: 1,
+    // Os rótulos das perguntas do motor saem da gramática do Rush (tools/rush/traducao.py + strings.json).
+    fontes: ['tools/classic/import_cards.py', CARDSCRIPTS_SHA, 'tools/rush/traducao.py', 'tools/rush/traducao/strings.json'], versao: 1,
     opcoes: () => ({ temporadas }),
     host: 'ygoprodeck', cedo: true,
     refaz: 'build e puzzles (fetch só se o CARDSCRIPTS_SHA mudou; decks e artes já baixados ficam no cache)',
@@ -237,7 +238,8 @@ const ETAPAS = [
     nome: 'rush-ocg', desc: 'Rush Duel no motor do EDOPro: BabelCDB (cards-rush.cdb) e CardScripts (rush/) -> src/data/rush/cards.json, src/vendor/card-scripts/rush/',
     fontes: ['tools/rush/import_rush.py', CARDSCRIPTS_SHA, 'tools/card-render/pt-br.json', 'tools/card-render/pool-en.json',
       // Memória de tradução (tools/rush/traducao.py): traduzir ou corrigir uma frase refaz o cards.json e as cartas montadas.
-      'tools/rush/traducao.py', 'tools/rush/traducao/glossario.json', 'tools/rush/traducao/nomes.json', 'tools/rush/traducao/frases.json'], versao: 1,
+      'tools/rush/traducao.py', 'tools/rush/traducao/glossario.json', 'tools/rush/traducao/nomes.json', 'tools/rush/traducao/frases.json',
+      'tools/rush/traducao/strings.json'], versao: 1,
     cedo: true, // as artes Rush (a etapa mais longa) esperam por ela
     refaz: 'build (fetch só se o CARDSCRIPTS_SHA mudou)',
     pronto: () => existe('src/data/rush/cards.json') && existe('src/vendor/card-scripts/rush/index.json') && existe('src/vendor/card-scripts/constant.lua'),
@@ -381,6 +383,8 @@ function baixarMolduras() {
     const repo = p('tools/classic/cache/yugioh-card');
     await baixarRepo('https://github.com/kooriookami/yugioh-card', repo, SHA_YGO_CARD, ['src/assets/yugioh-card/yugioh', 'src/assets/yugioh-card/rush-duel']);
     const ponte = p('tools/classic/cache/yugioh-card-assets');
+    // Pasta real de uma versão antiga do setup (sem rush-duel) não serve: vira o link.
+    if (existsSync(ponte) && !lstatSync(ponte).isSymbolicLink()) rmSync(ponte, { recursive: true, force: true });
     if (!existsSync(ponte)) symlinkSync(join(repo, 'src/assets/yugioh-card'), ponte, 'dir');
   });
 }

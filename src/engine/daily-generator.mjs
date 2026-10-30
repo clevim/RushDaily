@@ -15,7 +15,7 @@ export const DAILY_LIMITS = { ...RUSH_LIMITS, mainMin: DAILY_FORMAT.main };
 export const PLAYER_LP = 6000;
 
 const DIFFICULTIES = {
-  apprentice: { id: 'apprentice', label: 'Aprendiz', rating: 1, enemyLp: 4000, ai: 'aprendiz', deckRank: 0, modifier: 'O rival começa com 4.000 PV, joga sem plano e recebe o deck mais fraco do dia.' },
+  apprentice: { id: 'apprentice', label: 'Aprendiz', rating: 1, enemyLp: 4000, ai: 'aprendiz', deckRank: 0, modifier: 'O rival começa com 4.000 PV, joga sem plano, recebe o deck mais fraco do dia, não ataca no primeiro turno dele e às vezes para de atacar antes da hora.' },
   duelist: { id: 'duelist', label: 'Duelista', rating: 2, enemyLp: 5000, ai: 'duelista', deckRank: 1, modifier: 'O rival começa com 5.000 PV, usa as Invocações ilimitadas do Rush e erra uma jogada em cada sete.' },
   elite: { id: 'elite', label: 'Elite', rating: 3, enemyLp: 6000, ai: 'elite', deckRank: 2, modifier: 'O rival começa com 6.000 PV, deck mais forte, olha uma jogada à frente e quase não erra.' },
   chaos: { id: 'chaos', label: 'Caos', rating: 4, enemyLp: 7000, enemyHand: DAILY_FORMAT.hand + 1, ai: 'caos', deckRank: 3, modifier: 'O rival começa com 7.000 PV, 1 carta a mais na mão inicial e o deck mais forte do dia; não erra, olha uma jogada à frente, guarda Armadilhas e troca monstros sem medo.' },

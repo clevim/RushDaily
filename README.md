@@ -229,8 +229,7 @@ O `nginx.conf` já manda o `Cache-Control` certo por tipo (sem build não há ar
 
 | O quê | `Cache-Control` do nginx | Observação |
 |---|---|---|
-| `.html`, `.js`, `.mjs`, `.css`, `.json`, `.wasm` | `no-cache` | Sempre revalida (304 se não mudou). Uma atualização chega no próximo carregamento. `.wasm` sai como `application/wasm` e tem nome fixo, por isso não fica em cache longo. |
-| `.lua` (scripts das cartas) | `public, max-age=604800, stale-while-revalidate=86400` | Sai como `text/plain` (comprime ~6x). Depois de regerar os scripts: purge. |
+| `.html`, `.js`, `.mjs`, `.css`, `.json`, `.lua`, `.wasm` | `no-cache` | Sempre revalida (304 se não mudou). Uma atualização chega no próximo carregamento. `.wasm` sai como `application/wasm` e tem nome fixo, por isso não fica em cache longo. |
 | `.webp`, `.png`, `.svg`, `.woff2`, `.bin` | `public, max-age=604800, stale-while-revalidate=86400` | Nome estável (id da carta). Para forçar uma arte nova: purge ou renomear. |
 | `ocgcore.sync-*.js` (hash no nome) | `public, max-age=31536000, immutable` | |
 

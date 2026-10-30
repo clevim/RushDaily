@@ -996,7 +996,17 @@ export function boosterScene(canvas, { mark, subtitle, tier: tierId = 'common', 
   const ease = (t) => 1 - (1 - t) ** 3;
   let cameraZ = 10;
   renderer.setAnimationLoop(() => {
+    // Foco numa rara: o canvas vira tela cheia (fixed) para o véu e o zoom não ficarem presos no retângulo do palco.
+    const full = zoom > 0.01 || dim.visible;
+    canvas.classList.toggle('full', full);
     fit(renderer, camera, canvas);
+    if (full) { // mantém a escala e o centro do palco: só ganha margem em volta
+      const s = canvas.parentElement.getBoundingClientRect();
+      const c = canvas.getBoundingClientRect();
+      camera.aspect = s.width / s.height;
+      camera.setViewOffset(s.width, s.height, c.left - s.left, c.top - s.top, c.width, c.height);
+    } else if (camera.view?.enabled) { camera.clearViewOffset(); camera.aspect = canvas.clientWidth / canvas.clientHeight || camera.aspect; }
+    camera.updateProjectionMatrix();
     const delta = Math.min(clock.getDelta(), 0.05);
     const time = clock.elapsedTime;
     shake *= 0.9;

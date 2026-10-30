@@ -11,11 +11,11 @@ export const SYSTEM = {
   93: 'Continuar escolhendo matérias?', 94: 'Ativar o efeito desta carta agora?', 95: 'Usar o efeito de "%ls"?',
   96: 'Usar o efeito de "%ls" para evitar a destruição?', 97: 'Colocar "%ls" na Zona de Magias e Armadilhas?',
   98: 'Usar um efeito que substitui o custo?',
-  200: 'Usar o efeito de "%ls" de [%ls]?', 203: 'Ativar uma carta ou efeito?',
+  200: 'Usar o efeito de "%ls" (%ls)?', 203: 'Ativar uma carta ou efeito?',
   205: 'Escolha a ordem (de cima para baixo)', 206: 'Escolha a ordem da Corrente',
   207: 'Revelando %d carta(s):', 208: 'Confirmar %d carta(s):', 210: 'Continuar escolhendo cartas?',
   212: 'Carta declarada:', 213: 'Tipo declarado:', 214: 'Atributo declarado:', 215: 'Número declarado:',
-  221: 'Ativar o efeito de gatilho de "%ls" de [%ls]?', 222: 'Ativar um efeito de gatilho?',
+  221: 'Ativar o efeito de gatilho de "%ls" (%ls)?', 222: 'Ativar um efeito de gatilho?',
   500: 'Escolha o(s) tributo(s)', 501: 'Escolha a(s) carta(s) para descartar', 502: 'Escolha a(s) carta(s) para destruir',
   503: 'Escolha a(s) carta(s) para banir', 504: 'Escolha a(s) carta(s) para mandar ao Cemitério',
   505: 'Escolha a(s) carta(s) para devolver à mão', 506: 'Escolha a(s) carta(s) para adicionar à mão',
@@ -57,7 +57,18 @@ export const RACES = [
   'Ciborgue', 'Cavaleiro Mágico', 'Dragão Supremo', 'Psíquico Ômega', 'Guerreiro Celestial', 'Galáxia', // só no Rush
 ]; // bit i = RACES[i]
 
-/** Texto de uma "description" do motor: (código da carta << 20) | índice do rótulo, ou um número de sistema. */
+/** Nome do local de uma carta (bit de OcgLocation): 1000 + posição do bit; na Zona de Magias e Armadilhas, 5 = Campo e 6/7 = Pêndulo. */
+export function placeName(location, sequence = 0) {
+  if (location === 0x08 && sequence >= 5) return SYSTEM[sequence === 5 ? 1008 : 1009];
+  const bit = Math.log2(location & -location);
+  return Number.isInteger(bit) ? SYSTEM[1000 + bit] || '' : '';
+}
+
+/**
+ * Texto de uma "description" do motor: (código da carta << 20) | índice do rótulo, ou um número de sistema.
+ * Os rótulos das cartas (strings) já vêm em PT do build (tools/rush/traducao.py). %ls/%d tomam args em ordem;
+ * argumento que faltar some junto com os parênteses em volta (nunca "()"/"[]" nem aspas vazias).
+ */
 export function describe(description, cards, args = []) {
   const value = BigInt(description ?? 0);
   const code = Number(value >> 20n);
@@ -70,5 +81,9 @@ export function describe(description, cards, args = []) {
     text = SYSTEM[index] || '';
   }
   let at = 0;
-  return text.replace(/%ls|%d/g, () => String(args[at++] ?? ''));
+  return text.replace(/ \((%ls|%d)\)|(de )?"%ls"|%ls|%d/g, (match, _, de) => {
+    const arg = args[at++];
+    if (arg !== undefined && arg !== null && arg !== '') return match.replace(/%ls|%d/, String(arg));
+    return match.includes('"') ? `${de ? 'desta' : 'esta'} carta` : '';
+  }).replace(/ {2,}/g, ' ');
 }

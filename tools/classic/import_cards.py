@@ -189,6 +189,14 @@ def build(until):
     scripts = CACHE / 'CardScripts'
     official = {int(path.stem[1:]) for path in (scripts / 'official').glob('c*.lua')}
 
+    # Rótulos das perguntas do motor em PT: mesma gramática do Rush (tools/rush/traducao.py), nomes citados pelo YGOPRODeck.
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('traducao', ROOT / 'tools' / 'rush' / 'traducao.py')
+    traducao = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(traducao)
+    nomes_pt = {card['name']: pt[card['id']]['name'] for card in en if pt.get(card['id'], {}).get('name')}
+    rotulos = traducao.Rotulos(nomes_pt.get)
+
     seasons = {number: [] for number, *_ in SEASONS}
     skipped = {'sem data': 0, 'fora do TCG/OCG': 0, 'sem dados no cdb': 0, 'sem script': 0}
     for card in en:
@@ -219,7 +227,8 @@ def build(until):
             'desc': corrigir(local.get('desc') or card['desc']), 'pt': bool(local),
             'archetype': card.get('archetype'), 'date': date, 'rarity': rarity_of(card),
             'pop': (card.get('misc_info') or [{}])[0].get('views', 0),
-            **({'strings': trimmed} if (trimmed := trim(strings.get(cid, []))) else {}),
+            **({'strings': [rotulos.traduzir(text, corrigir(local.get('name') or card['name']), i) for i, text in enumerate(trimmed)]}
+               if (trimmed := trim(strings.get(cid, []))) else {}),
         })
 
     OUT.mkdir(parents=True, exist_ok=True)
@@ -269,6 +278,7 @@ def build(until):
     for item in index:
         print(f"T{item['season']} {item['label']:<20} {item['count']:>5} cartas ({item['pt']} em PT) {'ativa' if item['enabled'] else ''}")
     print('ignoradas:', skipped, '| fichas:', len(tokens), '| scripts copiados:', copied)
+    print('rótulos das perguntas:', dict(rotulos.contagem), "(generico = 'Efeito de \"carta\"', sem tradução)")
 
 
 DECK_FORMATS = {  # formato do YGOPRODeck -> páginas (a API entrega 20 decks por página)

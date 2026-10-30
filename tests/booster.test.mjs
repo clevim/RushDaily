@@ -67,3 +67,28 @@ test('sorte aumenta a chance de galáxia no Caos', () => {
   const count = (pity) => { let n = 0; each((pack) => { if (pack.tier === 'galaxy') n++; }, { difficulty: 'chaos', pity }); return n; };
   assert.ok(count(28) > count(0));
 });
+
+test('frequência de raridade por dificuldade bate com a tabela e cresce com a dificuldade', () => {
+  const base = [0.7, 0.2, 0.08, 0.02]; // TIER_ODDS: comum, prata, ouro, galáxia (sem sorte acumulada)
+  const total = 2000;
+  // [galáxia, ouro] extra por rating (espelha GALAXY_EXTRA / GOLD_EXTRA de booster.mjs).
+  const EXTRA = { 1: [0, 0], 2: [0.02, 0.09], 3: [0.03, 0], 4: [0.06, 0] };
+  const prob = (rating, floor) => {
+    const [g, b] = EXTRA[rating];
+    const [c, s, o, gal] = base;
+    const p = [(1 - g - b) * c, (1 - g - b) * s, (1 - g) * o + b * (c + s), g + (1 - g) * gal];
+    for (let i = 0; i < floor; i++) { p[floor] += p[i]; p[i] = 0; }
+    return p;
+  };
+  let prevBetter = -1;
+  for (const [difficulty, rating] of Object.entries(RATING)) {
+    const freq = [0, 0, 0, 0];
+    for (let i = 0; i < total; i++) freq[TIERS.indexOf(openBooster(`booster:2026-10-${1 + (i % 28)}~${difficulty}:p${i}`, { cards, difficulty }).tier)]++;
+    const want = prob(rating, TIERS.indexOf(FLOOR[difficulty]));
+    assert.ok(Math.abs(want.reduce((a, b) => a + b) - 1) < 1e-9);
+    want.forEach((p, i) => assert.ok(Math.abs(freq[i] / total - p) < 0.04, `${difficulty} ${TIERS[i]}: ${freq[i] / total} vs ${p}`));
+    const better = (freq[2] + freq[3]) / total; // ouro ou melhor: não pode cair ao subir de dificuldade
+    assert.ok(better + 0.04 >= prevBetter, `${difficulty} ouro+ ${better} < ${prevBetter}`);
+    prevBetter = better;
+  }
+});
