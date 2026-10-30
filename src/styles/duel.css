@@ -207,6 +207,7 @@ html:has(.arena) { overflow: clip; }
 .log span:first-child { color: var(--ivory); font-size: 1rem; font-weight: 600; animation: logIn 0.35s var(--ease-out); }
 .log span:nth-child(3) { opacity: 0.5; }
 @keyframes logIn { from { opacity: 0; transform: translateY(6px); } }
+@keyframes logOut { to { opacity: 0; visibility: hidden; } } /* celular: a linha da jogada some sozinha */
 
 /* Bandeja: dicas, ações e mão */
 .tray {
@@ -660,4 +661,9 @@ body.entering.reveal .board, body.entering.reveal .rush-table, body.entering.rev
 .history li:last-child { color: var(--ivory); animation: logIn 0.35s var(--ease-out); }
 .history li.turn-mark { margin-top: 6px; padding-left: 0; color: var(--gold); font: 700 0.66rem/1 var(--body); letter-spacing: 0.06em; text-transform: uppercase; }
 .history li.turn-mark::before { display: none; }
-@media (max-width: 860px) { .reader { display: none; } }
+@media (max-width: 860px) {
+  .reader { display: none; }
+  /* Narração completa (as duas arenas): folha sobre a mesa ao tocar na linha da jogada; fecha tocando fora (duel.js/arena.js) */
+  .story-open .story { display: grid; position: fixed; z-index: 46; left: 8px; right: 8px; top: 52px; max-height: 60dvh; background: rgb(6 19 15 / 0.97); box-shadow: 0 20px 50px -10px var(--ink-solid); }
+  .story-open .history { overflow: auto; mask-image: none; justify-content: flex-start; }
+}

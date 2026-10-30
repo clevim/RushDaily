@@ -109,7 +109,7 @@ const back = () => `<span class="rcard back" aria-hidden="true"><img src="${RUSH
 
 /* ---------- Desenho ---------- */
 
-const at = (row, col) => `style="grid-area:${row}/${col}"`;
+const at = (row, col) => `style="grid-area:${row}/${col}" data-col="${col}"`; // data-col: no celular o lado do rival encosta no centro
 
 const lastDef = new Map(), lastDown = new Map();
 const wasMax = new Set();
@@ -222,7 +222,7 @@ function renderHand() {
     const playable = actionsFor(key).length > 0;
     const canAct = actionsFor(key).some((item) => item.action === 5);
     const stats = isMonster(data) ? `, Nível ${data.level & 0xff}, ATK ${data.atk}, DEF ${data.def}` : '';
-    return `<button class="card hand-card ${playable ? 'playable' : ''} ${canAct ? 'can-act' : ''} ${pose.set ? 'set-pose' : ''}" style="--i:${index}" type="button" data-loc="${key}" data-gesture aria-label="${escape(`${data.name}${stats}${pose.set ? ', para baixar virada' : ''}${playable ? ', jogável' : ''}`)}">${pose.set ? back() : face(data)}</button>`;
+    return `<button class="card hand-card ${playable ? 'playable' : ''} ${canAct ? 'can-act' : ''} ${pose.set ? 'set-pose' : ''}" style="--i:${index}" type="button" data-loc="${key}" data-gesture aria-label="${escape(`${data.name}${stats}${pose.set ? ', para baixar virada' : ''}${playable ? ', jogável' : ''}`)}">${pose.set ? back() : face(data)}${isMonster(data) && !pose.set ? `<span class="hand-stats" aria-hidden="true">${data.atk}</span>` : ''}</button>`; // ATK no topo: no celular a mão só mostra o topo
   }).join('');
   const foeHand = view[FOE].hand.filter(Boolean).length;
   $('#foe-hand').innerHTML = `<span class="foe-backs">${Array.from({ length: Math.min(foeHand, 8) }, () => `<img src="${RUSH_BACK}" alt="">`).join('')}</span><b>${foeHand}</b>`;
@@ -1019,6 +1019,14 @@ $('#share').addEventListener('click', async () => {
   }
 });
 $('#leave').href = `index.html?player=${playerKey}`;
+// Celular: os botões do turno vão para a lateral da faixa do meio do tapete (no PC ficam ao lado da mão).
+const phone = matchMedia('(max-width: 860px)');
+const placeActions = () => (phone.matches ? $('#midline') : $('.dock')).append($('.dock-actions'));
+phone.addEventListener('change', placeActions);
+placeActions();
+// Celular: a linha da jogada some sozinha; tocar nela (ou no lugar dela) abre a narração completa. Tocar fora fecha.
+$('#log').addEventListener('click', () => { if (document.body.classList.toggle('story-open')) $('#history').scrollTop = 1e6; });
+document.addEventListener('pointerdown', (event) => { if (!event.target.closest('.story, #log')) document.body.classList.remove('story-open'); });
 const alignMat = () => { const { x, y } = center($('#midline')); scene.centerOn(x, y); };
 addEventListener('resize', alignMat);
 

@@ -197,6 +197,8 @@ const isFaceDown = (card) => card.position & (P.FACEDOWN_ATTACK | P.FACEDOWN_DEF
 const isDefense = (card) => card.position & (P.FACEUP_DEFENSE | P.FACEDOWN_DEFENSE);
 
 const at = (row, col) => `style="grid-area:${row}/${col}"`;
+// As cartas vão num grupo próprio (display: contents) para o celular poder pôr os botões do turno dentro da grade.
+$('#field').insertAdjacentHTML('afterbegin', '<div id="zones" class="zones-grid"></div>');
 
 const lastDef = new Map(), lastDown = new Map();
 function slot(controller, location, sequence, card, place, extraClass = '') {
@@ -281,7 +283,7 @@ function renderField() {
       ? slot(FOE, L.MZONE, theirSeq, theirCard, at(3, col), 'emz-zone')
       : slot(ME, L.MZONE, mineSeq, mineCard, at(3, col), 'emz-zone'));
   }
-  $('#field').innerHTML = cells.join('');
+  $('#zones').innerHTML = cells.join('');
 }
 
 function renderHand() {
@@ -292,7 +294,7 @@ function renderHand() {
     const pose = { set: Boolean(poses.get(key)?.set) };
     const playable = actionsFor(key).length > 0;
     const canAct = actionsFor(key).some((item) => item.action === 5);
-    return `<button class="card hand-card ${playable ? 'playable' : ''} ${canAct ? 'can-act' : ''} ${pose.set ? 'facedown set-pose' : ''}" style="--i:${index}" type="button" data-loc="${key}" data-gesture aria-label="${escape(cardOf(card.code).name)}${pose.set ? ', para baixar' : ''}">${pose.set ? cardBack() : cardFace(cardOf(card.code))}</button>`;
+    return `<button class="card hand-card ${playable ? 'playable' : ''} ${canAct ? 'can-act' : ''} ${pose.set ? 'facedown set-pose' : ''}" style="--i:${index}" type="button" data-loc="${key}" data-gesture aria-label="${escape(cardOf(card.code).name)}${pose.set ? ', para baixar' : ''}">${pose.set ? cardBack() : cardFace(cardOf(card.code))}${cardOf(card.code).type & TYPE.MONSTER && !pose.set ? `<span class="hand-stats" aria-hidden="true">${cardOf(card.code).atk}</span>` : ''}</button>`; // ATK no topo: no celular a mão só mostra o topo
   }).join('');
   const foeHand = view[FOE].hand.filter(Boolean).length;
   $('#foe-hand').innerHTML = `<span class="fan">${cardBack().repeat(Math.min(foeHand, 7))}</span><b>${foeHand}</b>`;
@@ -927,6 +929,14 @@ $('#rp-speed').addEventListener('click', (event) => {
 });
 $('#rp-turn').addEventListener('click', () => { skipTo = duel.state.turn + 1; });
 
+// Celular: os botões do turno vão para a fileira do meio do tapete (no PC e no replay ficam na bandeja).
+const phone = matchMedia('(max-width: 860px)');
+const placeActions = () => (phone.matches && !replay ? $('#field') : $('.dock')).append($('.dock-actions'));
+phone.addEventListener('change', placeActions);
+placeActions();
+// Celular: a linha da jogada some sozinha; tocar nela (ou no lugar dela) abre a narração completa. Tocar fora fecha.
+$('#log').addEventListener('click', () => { if (document.body.classList.toggle('story-open')) $('#history').scrollTop = 1e6; });
+document.addEventListener('pointerdown', (event) => { if (!event.target.closest('.story, #log')) document.body.classList.remove('story-open'); });
 gestures = bindGestures();
 start();
 responses = [];

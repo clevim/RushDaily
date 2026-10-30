@@ -124,14 +124,43 @@
 .classic .dock .btn { flex: 1; padding: 0 12px; white-space: nowrap; }
 .classic .hint { min-height: calc(3 * 1.3em); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
-/* Celular: placas compactas em cima e embaixo da grade; mão e botões no rodapé */
+.classic .zones-grid { display: contents; }
+.hand-stats { display: none; } /* ATK no topo da carta da mão: só no celular (a mão espia) */
+
+/* Celular: placas compactas em cima e embaixo da grade; mão espiando no rodapé, botões do turno no meio do tapete */
 @media (max-width: 860px) {
   .classic {
     --gap: 4px;
-    --hand: min(24vw, 14dvh);
-    /* topo (~80, com as fases) + 2 placas (~100) + folgas + bandeja (botões 38 + mão): o que sobrar vira altura do tabuleiro */
-    --card: min((100vw - 16px - 6 * var(--gap)) / 7.15, (100dvh - 302px - var(--hand) * 1.4) / 7.3);
+    --hand: min(26vw, 13dvh); /* largura da carta da mão */
+    --peek0: calc(var(--hand) * 1.457 * 0.56); /* a mão "espia": só o topo da carta aparece, o resto passa da borda */
+    /* Largura: 5 colunas de jogo + 2 colunas estreitas (pilhas e Campo, 0,55 carta) nas bordas. Altura: o que sobra para as
+       5 fileiras depois do topo (turno + fases), dos selos de PV e da mão espiando. */
+    --card: min((100vw - 24px - 6 * var(--gap)) / 6.1, (100vw - 24px - 6 * var(--gap) - 88px) / 5, (100dvh - 168px - var(--peek0)) / 7.285);
+    --peek: max(var(--peek0), min(var(--hand) * 1.457, 100dvh - 168px - 7.285 * var(--card))); /* sobrou altura: a mão aparece mais */
+    --pw: max(44px, var(--card) * 0.55); /* pilhas: nunca menos de 44px (alvo de toque, rótulo e contador legíveis) */
   }
+  .field { grid-template-columns: var(--pw) repeat(5, var(--card)) var(--pw); }
+  .classic .pile, .classic .zone.fzone { width: var(--pw); height: calc(var(--pw) * 1.457); align-self: center; justify-self: center; }
+  /* Botões do turno compactos na fileira do meio, nas colunas 6-7 (vazias: as Zonas de Monstro Extra são a 3 e a 5).
+     arena.js move .dock-actions para dentro de #field no celular. */
+  .classic .field > .dock-actions { grid-area: 3 / 6 / 4 / 8; display: grid; align-content: center; gap: 4px; }
+  .classic .field > .dock-actions .btn { --skew: 0deg; min-height: min(34px, var(--card) * 0.68); padding: 0 6px; font-size: 0.62rem; line-height: 1.05; text-align: center; white-space: normal; }
+  .classic .field > .dock-actions .btn::before { border-radius: 14px; }
+  /* Mão espiando (como na arena Rush) */
+  .classic .tray { height: var(--peek); padding: 0 6px env(safe-area-inset-bottom, 0px); }
+  .classic .hand { height: var(--peek); padding: 0; align-items: flex-start; }
+  .classic .hand-card { --w: min(var(--hand), calc(100cqw / (var(--n) * 0.64 + 0.5))); margin-left: calc(var(--w) * -0.36); transform-origin: 50% 100%; }
+  .classic .hand-card:first-child { margin-left: 0; }
+  .classic .hand-card, .classic .hand-card:hover { transform: translateY(calc(min(var(--o) * var(--o) * 1.5px, 8px))) rotate(calc(var(--o) * 2deg)); }
+  .classic .hand-card:focus-visible, .classic .hand-card.selected { z-index: 6; transform: translateY(calc(var(--peek) - var(--w) * 1.457 - 10px)) scale(1.04) rotate(0); transition-duration: 0s; }
+  .classic .hand-stats { display: block; position: absolute; left: 5%; top: 14%; z-index: 1; padding: 1px 4px; border-radius: 3px; background: rgb(var(--ink) / 0.88); color: var(--ivory); font: 800 clamp(0.56rem, calc(var(--hand) * 0.12), 0.74rem)/1.15 var(--body); font-variant-numeric: tabular-nums; pointer-events: none; }
+  .classic .hand-stats::before { content: 'ATK '; color: var(--ivory-dim); font-weight: 700; }
+  /* A dica (gesto, Batalha) flutua sobre o topo da mão, sem empurrar a mesa */
+  .classic .dock { position: absolute; z-index: 7; left: 50%; top: 0; translate: -50% 0; width: max-content; max-width: calc(100% - 16px); pointer-events: none; }
+  .classic .tip { pointer-events: auto; }
+  .replay-mode.classic .tray { height: auto; }
+  .replay-mode.classic .dock { position: static; translate: none; width: auto; max-width: none; pointer-events: auto; padding-bottom: 4px; }
+  body.arena.classic .hint.live { background: rgb(var(--ink) / 0.86); padding-block: 4px; }
   .classic .arena-top { grid-template-columns: auto minmax(0, 1fr) auto; padding: 4px 8px; gap: 8px; }
   .classic .leave img { width: 30px; }
   .classic .top-center { width: 100%; justify-items: stretch; gap: 2px; }
@@ -139,39 +168,41 @@
   .classic .turn-chip b { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 0.92rem; }
   .classic .help-chip { min-height: 34px; padding: 4px 10px; white-space: nowrap; }
   .classic .hint { display: none; }
-  .classic .tray { padding-top: 4px; }
   .classic .log { max-width: 100%; min-width: 0; }
   .classic .phases { justify-self: center; max-width: 100%; }
   .classic .phases li { padding: 2px 4px; font-size: 0; } /* rótulo curto: o nome inteiro não cabe entre o logo e a ajuda (6 fases, com o Apoio) */
   .classic .phases li::after { content: attr(data-short); font-size: 0.64rem; }
-  .classic .log span:first-child { font-size: 0.72rem; line-height: 1.25; white-space: normal; min-height: 2.5em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; } /* a jogada em até 2 linhas (antes: 1, com reticências) */
+  /* A última jogada numa linha por cima das fases: some sozinha; tocar nela (ou no lugar dela) abre a narração. */
+  .classic .top-center > .phases, .classic .top-center > .log { grid-area: 2 / 1; }
+  .classic .log { align-self: stretch; display: flex; align-items: center; z-index: 1; cursor: pointer; }
+  .classic .log span:first-child { width: 100%; padding: 2px 8px; border-left: 3px solid var(--gold); background: rgb(var(--ink) / 0.9); font-size: 0.72rem; line-height: 1.25; animation: logIn 0.35s var(--ease-out), logOut 0.5s ease-in 4s forwards; }
   .table { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; grid-template-areas: 'foe' 'field' 'me'; align-content: space-evenly; gap: 6px; padding: 0 8px; min-height: 0; }
   .field { justify-self: center; padding: 4px; }
-  .seat { grid-template-columns: minmax(0, auto) auto 1fr; align-items: center; column-gap: 8px; row-gap: 3px; padding: 5px 12px 6px; --c: 8px; min-width: 0; }
+  .classic .table { gap: 4px; padding: 0 6px; align-content: center; }
+  /* Selos de PV numa linha só: nome, PV, barra e (rival) a mão e as banidas */
+  .seat { grid-template-columns: minmax(0, auto) auto minmax(24px, 1fr) auto; align-items: center; column-gap: 8px; padding: 3px 10px; --c: 7px; min-width: 0; }
   .seat .who { font-size: 0.78rem; min-width: 0; white-space: nowrap; overflow: hidden; }
   .seat .who-key { overflow: hidden; text-overflow: ellipsis; }
   .seat.foe .who { display: block; text-overflow: ellipsis; }
   .seat .lp { white-space: nowrap; }
   .seat .lp-value { font-size: 1.05rem; }
-  .seat .lp-bar { grid-column: 1 / -1; grid-row: 2; height: 5px; }
-  .seat-extra { grid-column: 3; grid-row: 1; min-height: 0; min-width: 0; justify-self: end; gap: 6px; }
+  .seat .lp-bar { grid-column: 3; grid-row: 1; height: 5px; }
+  .seat-extra { grid-column: 4; grid-row: 1; min-height: 0; min-width: 0; justify-self: end; gap: 6px; }
   .classic .enemy-hand { min-height: 0; gap: 6px; font-size: 0.74rem; white-space: nowrap; }
   .classic .enemy-hand { gap: 8px; }
   .classic .enemy-hand .ycard { width: 24px; margin-left: -10px; }
-  .classic .tray { padding-bottom: max(10px, env(safe-area-inset-bottom)); }
-  .classic .hand { height: calc(var(--hand) * 1.457 + 26px); padding: 10px 0 12px; box-sizing: border-box; }
-  .classic .hand-card { transform: translateY(calc(min(var(--o) * var(--o) * 1.5px, 8px) - var(--w) * 0.08)) rotate(calc(var(--o) * 2deg)); } /* queda limitada: a mão cheia não sai da tela */
   .banish-chip { min-height: 24px; padding: 2px 8px; font-size: 0.68rem; white-space: nowrap; }
   .seat.foe, .seat.me { align-self: stretch; }
   .classic .pile .pile-name { font-size: 0; padding: 1px 3px; top: 2px; }
-  .classic .pile .pile-name::after { content: attr(data-short); font-size: 0.46rem; }
-  .classic .pile .pile-count { min-width: 16px; padding: 2px 3px; right: 2px; bottom: 2px; }
-  .zone.fzone.empty::after, .zone.emz-zone.empty::after { font-size: 0.46rem; }
-  .classic .dock { gap: 0; padding-bottom: 4px; }
-  .classic .dock .btn { min-height: 38px; font-size: 0.8rem; min-width: 0; }
+  .classic .pile .pile-name::after { content: attr(data-short); font-size: 0.62rem; }
+  .classic .pile .pile-count { min-width: 20px; padding: 2px 4px; right: 2px; bottom: 2px; font-size: 0.74rem; }
+  .zone.fzone.empty::after { font-size: 0.62rem; }
+  .zone.emz-zone.empty::after { font-size: 0.5rem; }
+  .classic .dock .btn { min-height: 38px; font-size: 0.8rem; min-width: 0; } /* replay: os controles ficam na bandeja */
   .ask-items { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
   .ask-item.with-card .ycard { width: 74px; }
-  .classic .chronicle { display: none; } /* celular: sem coluna lateral; a leitura é a folha #zoom */
+  .classic .chronicle { display: contents; } /* celular: sem coluna lateral; a leitura é a folha #zoom e a narração abre pela linha da jogada */
+  .classic:not(.story-open) .story { display: none; }
 }
 /* Telas muito estreitas */
 @media (max-width: 380px) {
