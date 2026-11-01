@@ -756,6 +756,9 @@ async function openPile(controller, kind) {
   const chosen = await ask({ title: tapText(`${title}: toque numa carta`), items, cancel: true });
   if (!chosen) return;
   const { key } = entries[chosen[0]];
+  // Carta com uma só jogada (ex.: Fusão no Adicional): escolher já joga; ler fica no "i". Várias: abre o painel com os botões.
+  const plays = controller === ME && current ? actionsFor(key) : [];
+  if (plays.length === 1) { plan.target = null; plan.zone = null; respond(plays[0].response); return; }
   showZoom(key, { focus: true });
 }
 
