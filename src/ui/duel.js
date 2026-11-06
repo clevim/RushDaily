@@ -2,6 +2,7 @@
 // O motor pergunta, a arena responde com gestos, diálogos (ocg-ask.js) ou a IA do rival (rush-ai.mjs).
 // O duelo é determinístico: salvar a lista de respostas basta para retomar a partida do dia.
 import createCore, { OcgLocation as L, OcgMessageType as M, OcgPosition as P, OcgResponseType as R } from '../vendor/ocgcore/index.js';
+import { loadPool } from './pwa.js';
 import { RUSH_ZONES, TYPE, createDuel } from '../engine/ocg.mjs';
 import { decideRush } from '../engine/rush-ai.mjs';
 import { DIFFICULTY_IDS, GEN_VERSION, generateDailyMatch, getDifficulty } from '../engine/daily-generator.mjs';
@@ -39,7 +40,7 @@ $('#result').addEventListener('cancel', (event) => event.preventDefault());
 
 /* ---------- Dados do dia ---------- */
 
-const pool = await (await fetch('src/data/rush/cards.json')).json();
+const pool = await loadPool();
 const cards = new Map(pool.map((card) => [card.id, card]));
 cards.set(HEART_CODE, HEART_CARD);
 const match = generateDailyMatch({ date, difficulty, pool });

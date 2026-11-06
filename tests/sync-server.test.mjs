@@ -16,7 +16,7 @@ async function boot(options = {}) {
   const call = (method, path, { secret, body, headers = {} } = {}) => fetch(`http://127.0.0.1:${port}${path}`, {
     method,
     headers: { ...(secret ? { Authorization: `Bearer ${secret}` } : {}), ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...headers },
-    body: body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body),
+    body: body === undefined ? undefined : typeof body === 'string' || body instanceof Uint8Array ? body : JSON.stringify(body),
   });
   return { app, call };
 }
@@ -192,7 +192,7 @@ test('estatísticas: 401 sem token, 403 com token errado, só GET, e /admin não
 test('estatísticas: resumo e usuários com dados de exemplo', async () => {
   const { call, admin, clock } = await bootAdmin();
   const history = { '2026-10-22': 'win', '2026-10-23': 'win', '2026-10-24': 'win', '2026-10-10': 'loss', '2026-09-30': 'win' };
-  await claim(call, 'AAA111', { history, collection: { 1: 2, 2: 1, 3: 1 }, decks: { list: [{ id: 'a' }, { id: 'b' }] }, pvp: [{ date: '2026-10-01' }], boosters: { '2026-10-01': {}, '2026-10-02': {} }, recover: { '2026-10-05': 'x' } });
+  await claim(call, 'AAA111', { history, collection: { 1: 2, 2: 1, 3: 1 }, decks: { list: [{ id: 'a' }, { id: 'b', updatedAt: 5 }] }, pvp: [{ date: '2026-10-01' }], boosters: { '2026-10-01': {}, '2026-10-02': {} }, recover: { '2026-10-05': 'x' } });
   clock.advance(DAY * 3);
   await claim(call, 'BBB222');
   clock.advance(DAY);
@@ -212,11 +212,106 @@ test('estatísticas: resumo e usuários com dados de exemplo', async () => {
   assert.equal(a.diasAtivos, 2);
   assert.equal(a.rev, 1);
   assert.ok(a.bytes > 50);
-  assert.deepEqual(a.progresso, { vitorias: 4, derrotas: 1, sequencia: 0, cartas: 3, decks: 2, pvp: 1, pecasEnigma: 4, boosters: 2 });
+  assert.deepEqual(a.progresso, { vitorias: 4, derrotas: 1, empates: 0, sequencia: 0, cartas: 3, decks: 2, decksEditados: 1, pvp: 1, pecasEnigma: 4, boosters: 2 });
   assert.equal((await (await admin('/admin/usuarios?busca=bbb')).json()).total, 1);
   assert.equal((await admin('/admin/usuarios?ordem=data;drop')).status, 400);
   assert.equal((await admin('/admin/usuarios?limite=1000')).status, 400);
   const detail = await (await admin('/admin/usuario/AAA111')).json();
   assert.deepEqual(detail.dias, ['2026-10-28', '2026-10-24']);
   assert.equal((await admin('/admin/usuario/ZZZ999')).status, 404);
+});
+
+// ---- Payload: 304 com If-None-Match, PUT com gzip (e teto do descomprimido) ----
+test('GET com If-None-Match da rev atual: 304 sem corpo; rev velha ou sem cabeçalho: 200 com ETag', async () => {
+  const { call } = await boot();
+  await claim(call, 'ETG001');
+  for (const tag of ['"1"', '1', 'W/"1"', '"7", "1"']) {
+    const res = await call('GET', '/api/sync/ETG001', { secret: SECRET, headers: { 'If-None-Match': tag } });
+    assert.equal(res.status, 304, tag);
+    assert.equal(await res.text(), '');
+    assert.equal(res.headers.get('etag'), '"1"');
+  }
+  const fresh = await call('GET', '/api/sync/ETG001', { secret: SECRET, headers: { 'If-None-Match': '"0"' } });
+  assert.equal(fresh.status, 200);
+  assert.equal(fresh.headers.get('etag'), '"1"');
+  assert.equal((await fresh.json()).rev, 1);
+  assert.equal((await call('GET', '/api/sync/ETG001', { secret: OTHER, headers: { 'If-None-Match': '"1"' } })).status, 403, 'o 304 também exige o segredo');
+  assert.equal((await call('GET', '/api/sync/ETG001', { headers: { 'If-None-Match': '"1"' } })).status, 401);
+});
+
+test('PUT com Content-Encoding gzip: aceita, recusa gzip quebrado (400), bomba (413) e encoding desconhecido (415)', async () => {
+  const { gzipSync } = await import('node:zlib');
+  const { call } = await boot();
+  const raw = (body, encoding) => call('PUT', '/api/sync/GZP001', { secret: SECRET, body, headers: { 'Content-Type': 'application/json', ...(encoding ? { 'Content-Encoding': encoding } : {}) } });
+  const big = data({ pity: 3, recover: Object.fromEntries(Array.from({ length: 300 }, (_, i) => [`2026-0${1 + (i % 9)}-${String(1 + (i % 28)).padStart(2, '0')}`, `p${i}`])) });
+  assert.equal((await raw(gzipSync(JSON.stringify({ data: big, baseRev: 0 })), 'gzip')).status, 201);
+  const saved = await (await call('GET', '/api/sync/GZP001', { secret: SECRET })).json();
+  assert.deepEqual(saved.data, big);
+  assert.equal((await raw(JSON.stringify({ data: data({ pity: 4 }), baseRev: 1 }))).status, 200, 'sem gzip continua valendo');
+  assert.equal((await raw(Buffer.from('não é gzip'), 'gzip')).status, 400);
+  assert.equal((await raw(JSON.stringify({ data: data(), baseRev: 2 }), 'br')).status, 415);
+  // 3 MiB de JSON viram poucos KB de gzip: passa no teto do corpo, mas não pode inflar além de 1 MiB.
+  const bomb = gzipSync(`{"data":{"v":1,"settings":{"x":"${'a'.repeat(3 * 1024 * 1024)}"}},"baseRev":2}`);
+  assert.ok(bomb.length < 64 * 1024);
+  assert.equal((await raw(bomb, 'gzip')).status, 413);
+  assert.equal((await (await call('GET', '/api/sync/GZP001', { secret: SECRET })).json()).rev, 2, 'nada gravado');
+});
+
+test('limpeza: apaga só rev 1 sem progresso e sem acesso há 90 dias; a chave volta no primeiro PUT', async () => {
+  const { app, call, clock } = await bootAdmin();
+  const starter = { v: 1, collection: { 10: 3 }, decks: { list: [{ id: 'd1', name: 'Deck inicial', main: [10], extra: [], updatedAt: 0 }] } };
+  const put = (key, body, baseRev = 0) => call('PUT', `/api/sync/${key}`, { secret: SECRET, body: { data: body, baseRev } });
+  assert.equal((await put('IDL001', starter)).status, 201); // abandonada: some
+  assert.equal((await put('IDL002', { ...starter, history: { '2026-10-24': 'loss' } })).status, 201); // tem progresso: fica
+  assert.equal((await put('IDL003', starter)).status, 201); // sem progresso, mas acessada há pouco: fica
+  assert.equal((await put('IDL004', starter)).status, 201);
+  assert.equal((await put('IDL004', starter, 1)).status, 200); // rev 2: regravada, fica
+  clock.advance(91 * DAY);
+  await call('GET', '/api/sync/IDL003', { secret: SECRET });
+  assert.equal(app.sweepIdle(), 1);
+  const keys = app.db.prepare('SELECT key FROM saves ORDER BY key').all().map((r) => r.key);
+  assert.deepEqual(keys, ['IDL002', 'IDL003', 'IDL004']);
+  for (const table of ['acessos', 'dias_ativos']) assert.equal(app.db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE key = 'IDL001'`).get().n, 0, table);
+  assert.equal((await call('GET', '/api/sync/IDL001', { secret: SECRET })).status, 404);
+  assert.equal((await put('IDL001', { ...starter, history: { '2027-01-23': 'win' } })).status, 201, 'aparelho com a credencial antiga reivindica de novo');
+  assert.equal(app.sweepIdle(), 0);
+});
+
+test('estatísticas: coortes (retenção D1/D7/D30, funil, histogramas) e desafios por dia', async () => {
+  const { call, admin, clock } = await bootAdmin(); // 2026-10-24 (sábado) 12h em Brasília
+  const put = (key, body) => call('PUT', `/api/sync/${key}`, { secret: SECRET, body: { data: { v: 1, ...body }, baseRev: 0 } });
+  await put('COH001', { history: { '2026-10-23': 'win', '2026-10-24': 'win' }, boosters: { '2026-10-24~duelist': { cards: [] } }, decks: { list: [{ id: 'a', updatedAt: 9 }] }, pvp: [{ date: '2026-10-24', vs: 'ABC123' }] });
+  await put('COH002', { history: { '2026-10-24': 'loss' } });
+  await put('COH003', { collection: { 1: 1 } });
+  clock.advance(DAY);
+  await call('GET', '/api/sync/COH001', { secret: SECRET }); // D1 da COH001
+  clock.advance(2 * DAY); // terça 27: semana nova
+  await put('COH004', { history: { '2026-10-27': 'draw' } });
+  clock.advance(5 * DAY);
+  await call('GET', '/api/sync/COH002', { secret: SECRET }); // D8: não é D7
+  const c = await (await admin('/admin/coortes')).json();
+  assert.equal(c.totalChaves, 4);
+  assert.deepEqual(c.coortes.map((w) => [w.semana, w.chaves]), [['2026-10-19', 3], ['2026-10-26', 1]]);
+  assert.deepEqual(c.coortes[0].d1, { base: 3, ativos: 1, pct: 33.3 });
+  assert.deepEqual(c.coortes[0].d7, { base: 3, ativos: 0, pct: 0 });
+  assert.deepEqual(c.coortes[0].d30, { base: 0, ativos: 0, pct: null }, 'D30 ainda não chegou: fora da base');
+  assert.deepEqual(c.coortes[1].d1, { base: 1, ativos: 0, pct: 0 });
+  assert.deepEqual(c.funil.map((s) => [s.etapa, s.chaves, s.emSequencia]), [
+    ['criouChave', 4, 4], ['primeiroDuelo', 3, 3], ['primeiraVitoria', 1, 1], ['abriuBooster', 1, 1], ['montouDeck', 1, 1], ['jogouPvp', 1, 1]]);
+  assert.equal(c.histogramas.sequencia.find((b) => b.faixa === '0').chaves, 4, 'sem vitória hoje nem ontem (01/11): sequência 0');
+  assert.equal(c.histogramas.diasAtivos.find((b) => b.faixa === '2').chaves, 2);
+  assert.equal(c.histogramas.diasAtivos.find((b) => b.faixa === '1').chaves, 2);
+  assert.equal(c.histogramas.diasAtivos.at(-1).faixa, '60+');
+  assert.ok(!JSON.stringify(c).includes('COH00'), 'só agregados: nenhuma chave');
+
+  const d = await (await admin('/admin/desafios?dias=14')).json();
+  assert.equal(d.porDia.length, 14);
+  assert.equal(d.porDia.at(-1).dia, '2026-11-01');
+  assert.deepEqual(d.porDia.find((x) => x.dia === '2026-10-24'), { dia: '2026-10-24', jogadores: 2, win: 1, loss: 1, draw: 0, pctWin: 50, pctLoss: 50, pctDraw: 0 });
+  assert.equal(d.porDia.find((x) => x.dia === '2026-10-27').draw, 1);
+  assert.equal(d.porDia.find((x) => x.dia === '2026-10-30').pctWin, null);
+  assert.equal((await (await admin('/admin/desafios')).json()).porDia.length, 60, 'padrão 60 dias');
+  for (const bad of ['0', '366', 'abc', '1.5']) assert.equal((await admin(`/admin/desafios?dias=${bad}`)).status, 400, bad);
+  assert.equal((await admin('/admin/coortes', { token: 'x'.repeat(40) })).status, 403);
+  assert.equal((await admin('/admin/desafios', { method: 'POST' })).status, 405);
 });

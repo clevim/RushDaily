@@ -172,9 +172,13 @@ export function mergeProgress(localData, remoteData, now = Date.now()) {
   }
 
   const seen = new Set();
-  const fingerprint = (duel) => [duel.date, duel.vs, duel.result, duel.turns, duel.lp, duel.replay || ''].join('|');
+  const base = (duel) => [duel.date, duel.vs, duel.result, duel.turns, duel.lp].join('|');
+  const fingerprint = (duel) => `${base(duel)}|${duel.replay || ''}`;
+  // Duelo sem replay igual a um com replay (o replay foi cortado em outro aparelho, ver trimReplays) é o mesmo duelo:
+  // fica o com replay (senão a lista ganha cópias). ponytail: dois duelos distintos idênticos tirando o replay viram um.
+  const withReplay = new Set([...local.pvp, ...remote.pvp].filter((duel) => duel.replay).map(base));
   // Mesmo dia: desempate pela impressão digital (não pela posição, que muda conforme o lado local).
-  out.pvp = [...local.pvp, ...remote.pvp].filter((duel) => !seen.has(fingerprint(duel)) && seen.add(fingerprint(duel)))
+  out.pvp = [...local.pvp, ...remote.pvp].filter((duel) => (duel.replay || !withReplay.has(base(duel))) && !seen.has(fingerprint(duel)) && seen.add(fingerprint(duel)))
     .sort((a, b) => b.date.localeCompare(a.date) || (fingerprint(a) < fingerprint(b) ? -1 : fingerprint(a) > fingerprint(b) ? 1 : 0)).slice(0, PVP_MAX);
 
   // Pacote do dia aberto nos dois aparelhos (offline): fica o primeiro aberto; as cartas dos dois continuam na coleção.
@@ -210,6 +214,34 @@ export function mergeProgress(localData, remoteData, now = Date.now()) {
   const { settings: a } = remote, { settings: b } = local;
   out.settings = a.updatedAt > b.updatedAt ? a : a.updatedAt < b.updatedAt ? b : stable(a, b);
   return out;
+}
+
+/** Tem progresso de verdade (algum evento ou deck editado)? Só a coleção e o deck inicial (updatedAt 0) não contam:
+ * é o que todo visitante ganha ao abrir a página. Decide se vale reivindicar a chave no servidor. */
+export function hasProgress(data) {
+  const p = normalize(data);
+  const any = (value) => Object.keys(value).length > 0;
+  return any(p.history) || p.pvp.length > 0 || any(p.boosters) || any(p.rewards) || any(p.recover) || p.heartUsed.length > 0
+    || p.decks.list.some((item) => item.updatedAt > 0) || any(p.decks.deleted);
+}
+
+/** Progresso grande demais para enviar: tira os replays do PvP, do duelo mais antigo para o mais novo, até caber em
+ * `maxBytes` (JSON). O resultado de cada duelo continua. Devolve { data, dropped } (dropped = replays cortados). */
+export function trimReplays(data, maxBytes) {
+  const out = normalize(data);
+  let size = JSON.stringify(out).length;
+  let dropped = 0;
+  // Mais antigo primeiro (empate: o que vem depois na lista, que já é do mais novo para o mais antigo).
+  const order = out.pvp.map((duel, index) => index).sort((a, b) => out.pvp[a].date.localeCompare(out.pvp[b].date) || b - a);
+  for (const index of order) {
+    if (size <= maxBytes) break;
+    const { replay, ...rest } = out.pvp[index];
+    if (!replay) continue;
+    out.pvp[index] = rest;
+    size -= replay.length + 12; // ,"replay":"" = 12 caracteres
+    dropped += 1;
+  }
+  return { data: out, dropped };
 }
 
 /* ---------- localStorage <-> progresso (a fase 2 liga isto às telas) ---------- */

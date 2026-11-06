@@ -7,7 +7,8 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SCHEMA_VERSION, SECTIONS } from '../src/ui/sync-merge.js';
+import { gunzipSync } from 'node:zlib';
+import { SCHEMA_VERSION, SECTIONS, hasProgress } from '../src/ui/sync-merge.js';
 
 const KEY = /^[A-Z0-9]{6}$/;
 const SECRET = /^[A-Za-z0-9_-]{22,128}$/; // base64url; 22 caracteres = 132 bits (o cliente gera 32 bytes = 43)
@@ -27,6 +28,7 @@ const DEFAULTS = {
   now: () => Date.now(),
   tzMin: -180, // fuso dos "dias ativos" (Brasília, sem horário de verão)
   accessGapMs: 5 * 60e3, // no máximo 1 acesso contado por chave a cada 5 min
+  idleDays: 90, // limpeza (ao subir e a cada 24 h): chave com rev 1, sem progresso e sem acesso há tantos dias
   adminToken: '', adminPort: 8788, adminHost: '127.0.0.1', // listener de estatísticas: só liga com adminToken (>= 32 caracteres)
 };
 
@@ -45,9 +47,10 @@ export function progressSummary(data, today) {
     const result = history[new Date(t).toISOString().slice(0, 10)];
     if (result === 'win') streak += 1; else if (!(streak === 0 && t === Date.parse(`${today}T00:00:00Z`))) break;
   }
+  const decks = Array.isArray(data?.decks?.list) ? data.decks.list : [];
   return {
-    vitorias: results.filter((r) => r === 'win').length, derrotas: results.filter((r) => r === 'loss').length, sequencia: streak,
-    cartas: count(data?.collection), decks: Array.isArray(data?.decks?.list) ? data.decks.list.length : 0,
+    vitorias: results.filter((r) => r === 'win').length, derrotas: results.filter((r) => r === 'loss').length, empates: results.filter((r) => r === 'draw').length, sequencia: streak,
+    cartas: count(data?.collection), decks: decks.length, decksEditados: decks.filter((d) => Number(d?.updatedAt) > 0).length, // o deck inicial tem updatedAt 0
     pvp: Array.isArray(data?.pvp) ? data.pvp.length : 0, pecasEnigma: pieces.size, boosters: count(data?.boosters),
   };
 }
@@ -72,8 +75,12 @@ class HttpError extends Error {
   constructor(status, message, extra = {}) { super(message); this.status = status; this.extra = extra; }
 }
 
+/** Corpo JSON, cru ou com Content-Encoding: gzip. O teto vale para o comprimido E para o descomprimido
+ * (maxOutputLength para o zlib no teto: bomba de descompressão vira 413, sem inflar além de maxBytes). */
 function readBody(req, maxBytes) {
   return new Promise((done, fail) => {
+    const encoding = String(req.headers['content-encoding'] || 'identity').trim().toLowerCase();
+    if (encoding !== 'identity' && encoding !== 'gzip') { fail(new HttpError(415, 'Content-Encoding aceito: gzip.')); req.resume(); return; }
     if (Number(req.headers['content-length']) > maxBytes) { fail(new HttpError(413, 'Progresso grande demais.')); req.resume(); return; }
     const chunks = [];
     let size = 0;
@@ -84,7 +91,14 @@ function readBody(req, maxBytes) {
       chunks.push(chunk);
     });
     req.on('end', () => {
-      try { done(JSON.parse(Buffer.concat(chunks).toString('utf8'))); } catch { fail(new HttpError(400, 'JSON inválido.')); }
+      let raw = Buffer.concat(chunks);
+      if (encoding === 'gzip') {
+        try { raw = gunzipSync(raw, { maxOutputLength: maxBytes }); } catch (error) {
+          fail(error?.code === 'ERR_BUFFER_TOO_LARGE' ? new HttpError(413, 'Progresso grande demais.') : new HttpError(400, 'gzip inválido.'));
+          return;
+        }
+      }
+      try { done(JSON.parse(raw.toString('utf8'))); } catch { fail(new HttpError(400, 'JSON inválido.')); }
     });
     req.on('error', fail);
   });
@@ -131,6 +145,24 @@ export function startServer(options = {}) {
   };
   /** Registra um acesso autenticado com sucesso (GET/PUT). */
   const touch = (key) => { const now = opts.now(); q.seen.run(key, now, opts.accessGapMs); q.day.run(key, dayOf(now)); };
+  /** Apaga chaves com progresso e registros de acesso, tudo ou nada. */
+  const wipe = (keys) => {
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      for (const key of keys) { q.remove.run(key); q.removeAccess.run(key); q.removeDays.run(key); }
+      db.exec('COMMIT');
+    } catch (error) { db.exec('ROLLBACK'); throw error; }
+  };
+  /** Teto de chaves: libera as reivindicadas e abandonadas (rev 1 = nunca regravada, sem progresso, sem acesso há
+   * `idleDays`). Clientes de antes da reivindicação "só com progresso" criavam uma por visita. O aparelho que ainda
+   * tiver a credencial recebe 404 e o primeiro PUT com progresso reivindica de novo (baseRev 0). */
+  function sweepIdle(now = opts.now()) {
+    const rows = db.prepare(`SELECT s.key, s.data FROM saves s LEFT JOIN acessos a ON a.key = s.key
+      WHERE s.rev = 1 AND COALESCE(a.ultimo, s.updated_at) < ?`).all(now - opts.idleDays * DAY_MS);
+    const idle = rows.filter((r) => { try { return !hasProgress(JSON.parse(r.data)); } catch { return false; } }).map((r) => r.key);
+    if (idle.length) { wipe(idle); opts.log(`limpeza: ${idle.length} chave(s) sem progresso e sem acesso há ${opts.idleDays} dias`); }
+    return idle.length;
+  }
   const limit = { ip: limiter(opts.limits.ip), key: limiter(opts.limits.key), claim: limiter(opts.limits.claim) };
 
   // O limite por chave conta só falhas de autenticação: quem não sabe o segredo não bloqueia o dono.
@@ -180,7 +212,13 @@ export function startServer(options = {}) {
       const row = rowOf(key);
       authorize(row, secret, key);
       touch(key);
-      return [200, { data: JSON.parse(row.data), rev: row.rev, updatedAt: row.updated_at }];
+      // If-None-Match com a rev que o cliente já tem: 304 sem corpo. Aceita `5`, `"5"`, `W/"5"` e listas.
+      // ponytail: a rev recomeça em 1 se a chave for apagada e reivindicada de novo; um aparelho parado na rev 1 só vê
+      // o progresso novo na próxima gravação. Se incomodar, a ETag passa a incluir created_at.
+      const etag = `"${row.rev}"`;
+      const tags = String(req.headers['if-none-match'] || '').split(',').map((tag) => tag.trim().replace(/^W\//, '').replace(/^"(.*)"$/, '$1'));
+      if (tags.includes(String(row.rev))) return [304, null, { ETag: etag }];
+      return [200, { data: JSON.parse(row.data), rev: row.rev, updatedAt: row.updated_at }, { ETag: etag }];
     }
     if (route === 'PUT') {
       const body = await readBody(req, opts.maxBytes);
@@ -223,14 +261,7 @@ export function startServer(options = {}) {
     if (route === 'DELETE') {
       const row = rowOf(key);
       authorize(row, secret, key);
-      // Tudo ou nada: o "apagar do servidor" leva também os registros de acesso.
-      db.exec('BEGIN IMMEDIATE');
-      try {
-        q.remove.run(key);
-        q.removeAccess.run(key);
-        q.removeDays.run(key);
-        db.exec('COMMIT');
-      } catch (error) { db.exec('ROLLBACK'); throw error; }
+      wipe([key]);
       return [204, null];
     }
     throw new HttpError(405, 'Método não permitido.');
@@ -242,7 +273,9 @@ export function startServer(options = {}) {
     let payload = { error: 'Erro interno.' };
     const headers = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
     try {
-      [status, payload] = await handle(req, res);
+      let extra;
+      [status, payload, extra] = await handle(req, res);
+      Object.assign(headers, extra);
     } catch (error) {
       if (error instanceof HttpError) {
         status = error.status;
@@ -251,11 +284,11 @@ export function startServer(options = {}) {
         payload = { error: error.message, ...extra };
       } else opts.log(`erro: ${error?.message}`); // nunca o corpo nem cabeçalhos
     }
-    if (status === 204) delete headers['Content-Type'];
+    if (status === 204 || status === 304) delete headers['Content-Type'];
     if (status === 413) headers.Connection = 'close';
     if (status === 405) headers.Allow = 'GET, PUT, POST, DELETE';
     res.writeHead(status, headers);
-    res.end(status === 204 || req.method === 'HEAD' ? undefined : JSON.stringify(payload));
+    res.end(status === 204 || status === 304 || req.method === 'HEAD' ? undefined : JSON.stringify(payload));
     // Log sem segredo nem corpo; a chave sai mascarada (só as 2 primeiras letras).
     opts.log(`${new Date().toISOString()} ${req.method} ${req.url.replace(/(\/api\/sync\/)([^/?]{0,2})[^/?]*/, '$1$2****').slice(0, 80)} ${status} ${Date.now() - started}ms`);
   });
@@ -302,6 +335,59 @@ export function startServer(options = {}) {
       const rows = db.prepare(`${USER_SQL} ${where} ORDER BY ${ORDERS[order]} ${dir}, s.key LIMIT ? OFFSET ?`).all(...args, limit, (page - 1) * limit);
       return { total, pagina: page, limite: limit, ordem: order, dir: dir.toLowerCase(), usuarios: rows.map((r) => row2user(r, today)) };
     }
+    if (path === '/admin/coortes') {
+      // ponytail: lê e resume todas as chaves a cada pedido (até maxKeys = 20.000); cache por dia se ficar lento.
+      const tz = opts.tzMin * 60;
+      const ret = (n) => `EXISTS (SELECT 1 FROM dias_ativos d WHERE d.key = s.key AND d.dia = date(s.created_at / 1000 + ${tz}, 'unixepoch', '+${n} day')) AS d${n}`;
+      const rows = db.prepare(`SELECT s.data, s.created_at, (SELECT COUNT(*) FROM dias_ativos d WHERE d.key = s.key) AS dias, ${[1, 7, 30].map(ret).join(', ')} FROM saves s`).all();
+      const STEPS = [['criouChave', () => true], ['primeiroDuelo', (p) => p.vitorias + p.derrotas + p.empates + p.pvp > 0], ['primeiraVitoria', (p) => p.vitorias > 0],
+        ['abriuBooster', (p) => p.boosters > 0], ['montouDeck', (p) => p.decksEditados > 0], ['jogouPvp', (p) => p.pvp > 0]];
+      const BUCKETS = [0, 1, 2, 3, 4, 7, 14, 30, 60];
+      const histogram = () => BUCKETS.map((min, i) => ({ faixa: BUCKETS[i + 1] === undefined ? `${min}+` : BUCKETS[i + 1] - 1 === min ? `${min}` : `${min}-${BUCKETS[i + 1] - 1}`, min, max: BUCKETS[i + 1] === undefined ? null : BUCKETS[i + 1] - 1, chaves: 0 }));
+      const bump = (hist, value) => { hist[BUCKETS.findLastIndex((min) => value >= min)].chaves += 1; };
+      const funil = STEPS.map(([etapa]) => ({ etapa, chaves: 0, emSequencia: 0 }));
+      const sequencia = histogram(), diasAtivos = histogram();
+      const weeks = new Map();
+      for (const r of rows) {
+        const created = dayOf(r.created_at);
+        const monday = new Date(`${created}T00:00:00Z`);
+        monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7));
+        const semana = monday.toISOString().slice(0, 10);
+        const week = weeks.get(semana) ?? weeks.set(semana, { semana, chaves: 0, ...Object.fromEntries([1, 7, 30].map((n) => [`d${n}`, { base: 0, ativos: 0, pct: null }])) }).get(semana);
+        week.chaves += 1;
+        for (const n of [1, 7, 30]) {
+          if (dayOf(r.created_at + n * DAY_MS) > today) continue; // ainda não chegou no dia N: fora da base
+          week[`d${n}`].base += 1;
+          week[`d${n}`].ativos += r[`d${n}`] ? 1 : 0;
+        }
+        let summary;
+        try { summary = progressSummary(JSON.parse(r.data), today); } catch { continue; }
+        let inOrder = true;
+        STEPS.forEach(([, test], i) => { const ok = test(summary); funil[i].chaves += ok ? 1 : 0; inOrder &&= ok; funil[i].emSequencia += inOrder ? 1 : 0; });
+        bump(sequencia, summary.sequencia);
+        bump(diasAtivos, r.dias);
+      }
+      const coortes = [...weeks.values()].sort((a, b) => a.semana.localeCompare(b.semana));
+      for (const week of coortes) for (const n of [1, 7, 30]) { const d = week[`d${n}`]; d.pct = d.base ? Math.round((d.ativos / d.base) * 1000) / 10 : null; }
+      return { hoje: today, totalChaves: rows.length, coortes, funil, histogramas: { sequencia, diasAtivos } };
+    }
+    if (path === '/admin/desafios') {
+      const dias = Number(url.searchParams.get('dias') ?? 60);
+      if (!Number.isInteger(dias) || dias < 1 || dias > 365) throw new HttpError(400, 'Parâmetro inválido (dias 1..365).');
+      // json_each no SQLite: conta sem trazer o progresso inteiro para o JS. O dia é o do aparelho do jogador.
+      const counts = db.prepare(`SELECT h.key AS dia, h.value AS r, COUNT(*) AS n FROM saves s, json_each(s.data, '$.history') h
+        WHERE h.key >= ? AND h.key <= ? AND h.value IN ('win', 'loss', 'draw') GROUP BY dia, r`).all(since(dias), today);
+      const byDay = new Map();
+      for (const c of counts) byDay.set(c.dia, { ...byDay.get(c.dia), [c.r]: c.n });
+      const pct = (n, total) => (total ? Math.round((n / total) * 1000) / 10 : null);
+      const porDia = Array.from({ length: dias }, (_, i) => {
+        const dia = dayOf(now - (dias - 1 - i) * DAY_MS);
+        const { win = 0, loss = 0, draw = 0 } = byDay.get(dia) ?? {};
+        const jogadores = win + loss + draw; // uma entrada por chave e dia: jogadores = resultados
+        return { dia, jogadores, win, loss, draw, pctWin: pct(win, jogadores), pctLoss: pct(loss, jogadores), pctDraw: pct(draw, jogadores) };
+      });
+      return { hoje: today, dias, porDia };
+    }
     const one = /^\/admin\/usuario\/([^/]+)$/.exec(path);
     if (one) {
       const key = one[1]; // cru: só A-Z0-9 (sem decodeURIComponent, que lança com %xx malformado)
@@ -340,9 +426,11 @@ export function startServer(options = {}) {
   const timers = [
     setInterval(() => { for (const item of Object.values(limit)) item.sweep(); }, 60e3),
     setInterval(() => { try { backup(); } catch (error) { opts.log(`backup falhou: ${error.message}`); } }, 3600e3),
+    setInterval(() => { try { sweepIdle(); } catch (error) { opts.log(`limpeza falhou: ${error.message}`); } }, DAY_MS),
   ];
   for (const timer of timers) timer.unref();
   try { backup(); } catch (error) { opts.log(`backup falhou: ${error.message}`); }
+  try { sweepIdle(); } catch (error) { opts.log(`limpeza falhou: ${error.message}`); } // depois do backup: o apagado fica na cópia
 
   const ready = new Promise((done) => server.listen(opts.port, opts.host, () => done(server.address().port)));
   // ponytail: sem limite de tentativas no token; com >= 32 caracteres aleatórios e porta só em loopback, não vale o código.
@@ -352,7 +440,7 @@ export function startServer(options = {}) {
     adminServer?.close(); adminServer?.closeAllConnections();
     server.close(() => { db.close(); done(); }); server.closeAllConnections();
   });
-  return { server, ready, adminReady, close, backup, db };
+  return { server, ready, adminReady, close, backup, sweepIdle, db };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

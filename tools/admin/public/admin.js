@@ -621,7 +621,7 @@ async function jogDetalhe(key) {
     $('jogDet').hidden = false; $('jogDet').scrollIntoView({ block: 'nearest' });
   } catch (e) { falha(e); }
 }
-async function jogadores() { try { if (await jogResumo()) await jogLista(); } catch (e) { $('jogConf').hidden = false; $('jogConf').textContent = e.message; } if (ultimoStatus) pintaStatus(); }
+async function jogadores() { try { if (await jogResumo()) { carregaRet(); carregaRes(); await jogLista(); } } catch (e) { $('jogConf').hidden = false; $('jogConf').textContent = e.message; } if (ultimoStatus) pintaStatus(); }
 let buscaT;
 $('jogBusca').oninput = () => { clearTimeout(buscaT); buscaT = setTimeout(() => { jog.busca = $('jogBusca').value.trim(); jog.pagina = 1; jogLista().catch(falha); }, 300); };
 $('jogAnt').onclick = () => { jog.pagina -= 1; jogLista().catch(falha); };
@@ -629,6 +629,141 @@ $('jogProx').onclick = () => { jog.pagina += 1; jogLista().catch(falha); };
 $('jogAtualizar').onclick = jogadores;
 $('jogCsv').onclick = () => baixarCsv(`jogadores-pagina-${jog.pagina}.csv`, [COLS.map(([, n]) => n), ...jogUsuarios.map((u) => [u.key, u.primeiroAcesso, u.ultimoAcesso, u.acessos, u.diasAtivos, u.bytes, u.rev])]);
 aoMostrar.jogadores = jogadores;
+
+// ---- retenção e resultados por dia (rotas /admin/coortes e /admin/desafios do sync, via proxy do painel) ----
+// ponytail: o formato do sync é tolerado em adaptaRet/adaptaRes (nomes alternativos); se o JSON mudar, ajuste só essas duas funções.
+const svgEl = (tag, attrs = {}, texto) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (texto !== undefined) e.textContent = texto; return e; };
+const pick = (o, ...ks) => { for (const k of ks) if (o?.[k] !== undefined && o[k] !== null) return o[k]; return null; };
+const numOu = (v) => (v === null || v === undefined || v === '' || Number.isNaN(Number(v)) ? null : Number(v));
+const fmtP = (v) => (v === null ? '–' : `${Math.round(v)}%`);
+const ETAPAS = { criouChave: 'Criou a chave', chave: 'Criou a chave', primeiroDuelo: '1º duelo', primeiraVitoria: '1ª vitória', abriuBooster: 'Abriu booster', booster: 'Abriu booster', montouDeck: 'Montou deck', deck: 'Montou deck', jogouPvp: 'Jogou PvP', pvp: 'Jogou PvP' };
+const lista = (v) => (Array.isArray(v) ? v : v && typeof v === 'object' ? Object.entries(v).map(([k, x]) => (x && typeof x === 'object' ? { etapa: k, ...x } : { etapa: k, n: x })) : []);
+const adaptaHist = (v) => lista(v).map((x) => ({ rot: String(pick(x, 'valor', 'faixa', 'bucket', 'dias', 'etapa') ?? '?'), n: numOu(pick(x, 'n', 'chaves', 'jogadores', 'total', 'qtd')) ?? 0 }));
+function adaptaRet(j) {
+  const D = ['d1', 'd7', 'd30'];
+  const cs = lista(pick(j, 'coortes', 'semanas')).map((c) => {
+    const r = pick(c, 'retencao', 'ativa') ?? c;
+    return { semana: String(pick(c, 'semana', 'coorte', 'inicio', 'dia', 'etapa') ?? '?'), n: numOu(pick(c, 'tamanho', 'n', 'chaves', 'total', 'jogadores')) ?? 0, d: D.map((k) => { const v = pick(r, k, k.toUpperCase()); return numOu(v && typeof v === 'object' ? v.pct : v); }) };
+  });
+  const frac = Math.max(0, ...cs.flatMap((c) => c.d.filter((x) => x !== null))) <= 1; // fração (0..1) ou percentual
+  for (const c of cs) c.d = c.d.map((x) => (x === null ? null : frac ? x * 100 : x));
+  const funil = lista(pick(j, 'funil', 'ativacao')).map((x) => ({ rot: ETAPAS[x.etapa] ?? String(pick(x, 'nome', 'rotulo', 'etapa') ?? '?'), n: numOu(pick(x, 'n', 'chaves', 'total', 'jogadores', 'qtd')) ?? 0 }));
+  const h = j?.histogramas ?? j;
+  return { cs, funil, seq: adaptaHist(pick(h, 'sequencia', 'sequencias', 'histSequencia')), dias: adaptaHist(pick(h, 'diasAtivos', 'histDiasAtivos')) };
+}
+function adaptaRes(j) {
+  return lista(pick(j, 'porDia', 'desafios', 'dias')).map((x) => {
+    const w = numOu(pick(x, 'vitorias', 'win', 'venceu', 'v')), l = numOu(pick(x, 'derrotas', 'loss', 'perdeu', 'd')), e = numOu(pick(x, 'empates', 'draw', 'empatou', 'e'));
+    const n = numOu(pick(x, 'jogadores', 'n', 'total')) ?? ((w ?? 0) + (l ?? 0) + (e ?? 0));
+    const p = (c, ...ks) => numOu(pick(x, ...ks)) ?? (c !== null && n ? c / n * 100 : null); // percentual 0..100
+    return { dia: String(pick(x, 'dia', 'data') ?? '?'), n, win: p(w, 'pctWin', 'winPct', 'pctVitoria'), loss: p(l, 'pctLoss', 'lossPct', 'pctDerrota'), draw: p(e, 'pctDraw', 'drawPct', 'pctEmpate') };
+  }).sort((a, b) => a.dia.localeCompare(b.dia));
+}
+const estado = (id, corpoId, texto, erro = false) => { $(id).textContent = texto ?? ''; $(id).className = 'aviso' + (erro ? ' erro' : ''); $(id).hidden = !texto; $(corpoId).hidden = !!texto; };
+const AMOSTRA = 30; // abaixo disso, avisa
+// histograma/barras: itens {rot, n}; horizontal=false = colunas
+function colunas(svg, itens, cor) {
+  svg.replaceChildren();
+  const W = 600, base = 116, w = W / Math.max(1, itens.length), max = Math.max(1, ...itens.map((i) => i.n));
+  svg.setAttribute('viewBox', `0 0 ${W} 140`); svg.setAttribute('preserveAspectRatio', 'none');
+  svg.append(svgEl('line', { x1: 0, x2: W, y1: base + .5, y2: base + .5 }));
+  itens.forEach((it, i) => {
+    const h = it.n ? Math.max(2, it.n / max * (base - 14)) : 1.5, x = i * w;
+    const r = svgEl('rect', { x: x + 2, y: base - h, width: Math.max(1, w - 4), height: h, rx: 1.5, tabindex: 0, role: 'img', 'aria-label': `${it.rot}: ${it.n} jogadores` });
+    r.append(svgEl('title', {}, `${it.rot}: ${it.n}`)); svg.append(r);
+    svg.append(svgEl('text', { x: x + w / 2, y: 134, 'text-anchor': 'middle' }, it.rot.length > 8 ? it.rot.slice(0, 7) + '…' : it.rot));
+  });
+}
+function pintaFunil(svg, funil) {
+  svg.replaceChildren();
+  const L = 150, W = 600, linha = 34, topo = funil[0]?.n || 1;
+  svg.setAttribute('viewBox', `0 0 ${W} ${funil.length * linha}`);
+  funil.forEach((f, i) => {
+    const y = i * linha, larg = Math.max(2, f.n / topo * (W - L - 90)), queda = i && funil[i - 1].n ? (1 - f.n / funil[i - 1].n) * 100 : null;
+    const txt = `${fmtN(f.n)} (${fmtP(f.n / topo * 100)})${queda !== null ? ` · −${Math.round(queda)}%` : ''}`;
+    const g = svgEl('g', { tabindex: 0, role: 'img', 'aria-label': `${f.rot}: ${f.n} jogadores, ${fmtP(f.n / topo * 100)} do início${queda !== null ? `, queda de ${Math.round(queda)}% desde a etapa anterior` : ''}` });
+    g.append(svgEl('title', {}, txt), svgEl('text', { class: 'rot', x: 0, y: y + 21 }, f.rot), svgEl('rect', { x: L, y: y + 6, width: larg, height: 20, rx: 2 }), svgEl('text', { x: L + larg + 6, y: y + 21 }, txt));
+    svg.append(g);
+  });
+}
+function pintaCoortes(cs) {
+  troca($('coorteCab'), el('tr', {}, ['Semana', 'Jogadores', 'D1', 'D7', 'D30'].map((t) => el('th', { scope: 'col' }, t))));
+  troca($('coorteLinhas'), cs.map((c) => el('tr', {}, el('th', { scope: 'row' }, c.semana), el('td', { className: 'numOu' }, fmtN(c.n)),
+    ...c.d.map((v, i) => {
+      const nome = ['D1', 'D7', 'D30'][i], td = el('td', { className: 'c numOu' + (v === null ? ' vazio' : ''), tabIndex: 0, 'aria-label': `Semana ${c.semana}, ${nome}: ${v === null ? 'ainda sem dados' : fmtP(v) + ' ativos'} de ${c.n} jogadores`, title: `${nome}: ${fmtP(v)} de ${c.n}` }, fmtP(v));
+      if (v !== null) td.style.background = `rgb(95 207 138 / ${(.08 + v / 100 * .72).toFixed(2)})`;
+      return td;
+    }))));
+}
+let retDados = null, resDados = null;
+async function carregaRet() {
+  estado('retEstado', 'retCorpo', 'Carregando…');
+  try {
+    const j = await api('jogadores/coortes');
+    if (j.configurado === false) return estado('retEstado', 'retCorpo', 'Estatísticas não configuradas (veja acima).');
+    const a = retDados = adaptaRet(j), total = a.cs.reduce((s, c) => s + c.n, 0);
+    if (!a.cs.length && !a.funil.length) return estado('retEstado', 'retCorpo', 'Sem dados de retenção ainda.');
+    $('retTag').textContent = `n = ${fmtN(total)} jogadores`;
+    pintaCoortes(a.cs); pintaFunil($('funil'), a.funil); colunas($('histSeq'), a.seq); colunas($('histDias'), a.dias);
+    estado('retEstado', 'retCorpo', total < AMOSTRA ? `Amostra pequena (n = ${fmtN(total)}): percentuais instáveis, não tire conclusões ainda.` : '');
+    $('retCorpo').hidden = false; // o aviso de amostra pequena convive com os dados
+  } catch (e) { estado('retEstado', 'retCorpo', e.message, true); }
+}
+const csvHist = (nome, itens) => itens && baixarCsv(nome, [['Faixa', 'Jogadores'], ...itens.map((i) => [i.rot, i.n])]);
+$('coorteCsv').onclick = () => retDados && baixarCsv('coortes.csv', [['Semana', 'Jogadores', 'D1 %', 'D7 %', 'D30 %'], ...retDados.cs.map((c) => [c.semana, c.n, ...c.d.map((v) => (v === null ? '' : Math.round(v * 10) / 10))])]);
+$('funilCsv').onclick = () => retDados && baixarCsv('funil.csv', [['Etapa', 'Jogadores', '% do início', '% queda'], ...retDados.funil.map((f, i, a) => [f.rot, f.n, a[0].n ? Math.round(f.n / a[0].n * 1000) / 10 : '', i && a[i - 1].n ? Math.round((1 - f.n / a[i - 1].n) * 1000) / 10 : ''])]);
+$('seqCsv').onclick = () => csvHist('sequencia.csv', retDados?.seq);
+$('diasCsv').onclick = () => csvHist('dias-ativos.csv', retDados?.dias);
+$('retAtualizar').onclick = carregaRet;
+
+const WR_MIN = 25, WR_MAX = 85, N_MIN = 10;
+const fora = (d) => d.n >= N_MIN && d.win !== null && (d.win < WR_MIN || d.win > WR_MAX);
+function pintaRes(dias) {
+  const svg = $('grafRes'), W = 600, base = 160, alt = base - 12, w = W / dias.length;
+  svg.replaceChildren(); svg.setAttribute('viewBox', `0 0 ${W} 190`); svg.setAttribute('preserveAspectRatio', 'none');
+  const y = (p) => base - p / 100 * alt;
+  for (const p of [WR_MIN, 50, WR_MAX]) svg.append(svgEl('line', { x1: 0, x2: W, y1: y(p), y2: y(p), 'stroke-dasharray': '3 4' }), svgEl('text', { x: 2, y: y(p) - 2 }, `${p}%`));
+  const pts = [];
+  dias.forEach((d, i) => {
+    const h = d.win ? Math.max(1.5, d.win / 100 * alt) : 1.5, f = fora(d);
+    const r = svgEl('rect', { x: i * w + 1, y: base - h, width: Math.max(1, w - 2), height: h, rx: 1.5, class: f ? 'fora clic' : d.n ? '' : 'zero' });
+    r.append(svgEl('title', {}, `${d.dia}: win-rate ${fmtP(d.win)}, n = ${d.n}`));
+    if (f) { r.setAttribute('tabindex', 0); r.setAttribute('role', 'button'); r.setAttribute('aria-label', `${d.dia}: win-rate ${fmtP(d.win)} com ${d.n} jogadores, fora do intervalo. Ver Tipo × Tipo`); r.onclick = () => resDetalhe(d); r.onkeydown = (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); resDetalhe(d); } }; }
+    else { r.setAttribute('role', 'img'); r.setAttribute('aria-label', `${d.dia}: win-rate ${fmtP(d.win)}, n = ${d.n}`); r.setAttribute('tabindex', 0); }
+    svg.append(r);
+    const jan = dias.slice(Math.max(0, i - 6), i + 1), nn = jan.reduce((s, x) => s + x.n, 0), vv = jan.reduce((s, x) => s + (x.win ?? 0) / 100 * x.n, 0);
+    if (nn) pts.push(`${(i * w + w / 2).toFixed(1)},${y(vv / nn * 100).toFixed(1)}`);
+  });
+  if (pts.length > 1) svg.append(svgEl('polyline', { points: pts.join(' ') }));
+  for (const [tx, x, anc] of [[dias[0].dia.slice(5), 0, 'start'], [dias.at(-1).dia.slice(5), W, 'end']]) svg.append(svgEl('text', { x, y: 182, 'text-anchor': anc }, tx));
+}
+async function resDetalhe(d) {
+  troca($('resDet'), el('p', { className: 'aviso' }, `${d.dia}: carregando o desafio…`));
+  try {
+    const r = await api(`desafio?data=${encodeURIComponent(d.dia)}&dias=0`);
+    if (r.erro) throw new Error(r.erro);
+    const x = r.dia, riv = x.rivais.map((v) => `${v.nome}: ${v.label}`).join(' · ');
+    troca($('resDet'), el('p', { className: 'aviso' }, `${d.dia}: win-rate ${fmtP(d.win)} com ${d.n} jogadores. Tipo × Tipo do desafio: `, el('b', {}, `${x.jogador.label} × ${x.rivais[0].label}`), `. Rivais por dificuldade: ${riv}.`));
+  } catch (e) { troca($('resDet'), el('p', { className: 'aviso erro' }, `${d.dia}: ${e.message}`)); }
+}
+async function carregaRes() {
+  estado('resEstado', 'resCorpo', 'Carregando…'); $('resCsv').disabled = true; troca($('resDet'));
+  try {
+    const j = await api('jogadores/desafios?dias=60');
+    if (j.configurado === false) return estado('resEstado', 'resCorpo', 'Estatísticas não configuradas (veja acima).');
+    const dias = resDados = adaptaRes(j), total = dias.reduce((s, d) => s + d.n, 0);
+    if (!dias.length) return estado('resEstado', 'resCorpo', 'Nenhum resultado de desafio registrado ainda.');
+    $('resTag').textContent = `${dias.length} dias · n = ${fmtN(total)} resultados`;
+    pintaRes(dias);
+    troca($('resLinhas'), dias.map((d) => el('tr', {}, el('td', {}, d.dia), el('td', { className: 'numOu' }, fmtN(d.n)), el('td', { className: 'numOu' }, fmtP(d.win)), el('td', { className: 'numOu' }, fmtP(d.loss)), el('td', { className: 'numOu' }, fmtP(d.draw)),
+      fora(d) ? el('td', {}, el('button', { type: 'button', className: 'btn sec pequeno', onclick: () => resDetalhe(d) }, 'Tipo × Tipo')) : null)));
+    $('resCsv').disabled = false;
+    estado('resEstado', 'resCorpo', total < AMOSTRA ? `Amostra pequena (n = ${fmtN(total)}): win-rate por dia é instável, o destaque só vale com ${N_MIN}+ jogadores no dia.` : '');
+    $('resCorpo').hidden = false;
+  } catch (e) { estado('resEstado', 'resCorpo', e.message, true); }
+}
+$('resCsv').onclick = () => resDados && baixarCsv('resultados-por-dia.csv', [['Dia', 'Jogadores', 'Vitória %', 'Derrota %', 'Empate %', 'Fora do intervalo'], ...resDados.map((d) => [d.dia, d.n, ...[d.win, d.loss, d.draw].map((v) => (v === null ? '' : Math.round(v * 10) / 10)), fora(d) ? 'sim' : ''])]);
+$('resAtualizar').onclick = carregaRes;
 
 // ---- histórico ----
 let histSel = null;
@@ -792,12 +927,13 @@ addEventListener('keydown', (ev) => {
   if (ev.ctrlKey || ev.metaKey || ev.altKey || document.querySelector('dialog[open]')) return;
   const alvo = ev.target;
   if (alvo instanceof HTMLElement && (alvo.closest('input, textarea, select') || alvo.isContentEditable)) return;
+  if (gAte > Date.now() && ev.key === 'k') { gAte = 0; ev.preventDefault(); ir('jogadores'); setTimeout(() => { $('h-ret').scrollIntoView({ block: 'start' }); $('h-ret').focus({ preventScroll: true }); }, 50); return; }
   if (gAte > Date.now() && Object.hasOwn(ATALHOS, ev.key)) { gAte = 0; ev.preventDefault(); ir(ATALHOS[ev.key]); return; }
   gAte = 0;
   if (ev.key === 'g') gAte = Date.now() + 1500;
   else if (ev.key === '/') { const i = $(BUSCAS[secao] ?? ''); if (i) { ev.preventDefault(); i.focus(); i.select?.(); } }
   else if (ev.key === '?') {
-    troca($('ajudaLista'), el('li', {}, el('kbd', {}, '/'), ' foca a busca da seção (Cartas, Tradução, Jogadores)'), el('li', {}, el('kbd', {}, '?'), ' esta ajuda'),
+    troca($('ajudaLista'), el('li', {}, el('kbd', {}, '/'), ' foca a busca da seção (Cartas, Tradução, Jogadores)'), el('li', {}, el('kbd', {}, '?'), ' esta ajuda'), el('li', {}, el('kbd', {}, 'g'), ' depois ', el('kbd', {}, 'k'), ' Jogadores: Retenção e resultados por dia'),
       ...SECOES.map((s) => el('li', {}, el('kbd', {}, 'g'), ' depois ', el('kbd', {}, Object.keys(ATALHOS).find((k) => ATALHOS[k] === s)), ` ${NOME_SECAO(s)}`)),
       el('li', {}, el('kbd', {}, '←'), ' ', el('kbd', {}, '→'), ' ', el('kbd', {}, 'Home'), ' ', el('kbd', {}, 'End'), ' nas abas de dificuldade'));
     $('ajuda').showModal();

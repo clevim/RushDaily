@@ -661,6 +661,7 @@ function renderDeck() {
     if (challenge) { location.href = `arena.html?player=${playerKey}&vs=${encodeURIComponent(params.get('vs'))}&deck=${editing}`; return; }
     const url = `${location.origin}${location.pathname.replace(/[^/]*$/, '')}arena.html?vs=${encodeDeck(playerKey, current())}`;
     try { await navigator.clipboard.writeText(url); toast(`Link do deck ${current().name} copiado. Mande para os amigos.`); } catch { toast(url); }
+    syncNow({ claim: true }); // a chave vai no link: reivindica já, mesmo sem progresso ainda
   });
 }
 
@@ -747,6 +748,7 @@ const SYNC_ERRORS = {
   429: 'Muitos pedidos agora. Tento de novo em instantes.',
   503: 'Servidor de sincronização cheio ou fora do ar.',
   schema: 'Outro aparelho usa uma versão mais nova do jogo: recarregue a página.',
+  trimmed: 'Progresso grande: os replays dos duelos PvP mais antigos foram apagados para caber no servidor (os resultados continuam).',
 };
 const syncError = (code) => SYNC_ERRORS[code] || `O servidor recusou (código ${Number(code) || '?'}).`;
 const ago = (at) => {

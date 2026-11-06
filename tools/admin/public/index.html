@@ -5,9 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <title>RushDaily Admin</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Dela+Gothic+One&display=swap">
 <link rel="stylesheet" href="/admin.css">
 <script type="module" src="/admin.js"></script>
 </head>
@@ -165,6 +162,31 @@
         <article class="painel"><h2>Ativos por dia <span class="tag" id="grafTag">60 dias, fuso de Brasília</span></h2><svg id="grafAtivos" class="graf" role="img" aria-label="Jogadores ativos por dia"></svg></article>
         <article class="painel"><h2>Chaves novas por dia</h2><svg id="grafNovas" class="graf novas" role="img" aria-label="Chaves novas por dia"></svg></article>
       </div>
+      <article class="painel" id="retPainel" aria-labelledby="h-ret">
+        <div class="acoes-linha"><h2 id="h-ret" tabindex="-1">Retenção <span class="tag" id="retTag"></span></h2><button class="btn sec" id="retAtualizar">Atualizar</button></div>
+        <p class="aviso" id="retEstado" role="status">Carregando…</p>
+        <div id="retCorpo" hidden>
+          <h3>Coortes por semana de criação</h3>
+          <div class="tabela"><table class="heat"><thead id="coorteCab"></thead><tbody id="coorteLinhas"></tbody></table></div>
+          <div class="acoes-linha"><button class="btn sec" id="coorteCsv">Exportar CSV (coortes)</button></div>
+          <div class="grade2">
+            <div><h3>Funil</h3><svg id="funil" class="graf funil" role="img" aria-label="Funil de ativação"></svg><div class="acoes-linha"><button class="btn sec" id="funilCsv">Exportar CSV (funil)</button></div></div>
+            <div><h3>Sequência atual (dias)</h3><svg id="histSeq" class="graf hist" role="img" aria-label="Histograma da sequência"></svg><div class="acoes-linha"><button class="btn sec" id="seqCsv">Exportar CSV (sequência)</button></div></div>
+          </div>
+          <h3>Dias ativos por jogador</h3><svg id="histDias" class="graf hist" role="img" aria-label="Histograma de dias ativos"></svg>
+          <div class="acoes-linha"><button class="btn sec" id="diasCsv">Exportar CSV (dias ativos)</button></div>
+        </div>
+      </article>
+      <article class="painel" id="resPainel" aria-labelledby="h-res">
+        <div class="acoes-linha"><h2 id="h-res" tabindex="-1">Resultados por dia <span class="tag" id="resTag"></span></h2><button class="btn sec" id="resAtualizar">Atualizar</button><button class="btn sec" id="resCsv" disabled>Exportar CSV</button></div>
+        <p class="aviso" id="resEstado" role="status">Carregando…</p>
+        <div id="resCorpo" hidden>
+          <svg id="grafRes" class="graf alto" role="img" aria-label="Win-rate do desafio por dia"></svg>
+          <p class="legenda"><span><i style="background:var(--gold)"></i>win-rate do dia</span><span><i style="background:var(--sky)"></i>média móvel de 7 dias</span><span><i style="background:var(--blood)"></i>fora do intervalo (&lt;25% ou &gt;85% com 10+ jogadores): clique ou Enter para ver o Tipo × Tipo</span></p>
+          <div id="resDet" aria-live="polite"></div>
+          <div class="tabela"><table><thead><tr><th>Dia</th><th>Jogadores</th><th>Vitória</th><th>Derrota</th><th>Empate</th></tr></thead><tbody id="resLinhas"></tbody></table></div>
+        </div>
+      </article>
       <article class="painel">
         <div class="acoes-linha"><label class="campo inline">Buscar chave<input id="jogBusca" maxlength="6" placeholder="ABC123" autocomplete="off"></label><button id="jogAtualizar" class="btn sec">Atualizar</button><button id="jogCsv" class="btn sec">Exportar CSV (página)</button></div>
         <div class="tabela"><table><thead><tr id="jogCab"></tr></thead><tbody id="jogLinhas"></tbody></table></div>

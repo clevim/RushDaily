@@ -150,3 +150,22 @@ test('regravar o local não apaga replay longo nem campos extras do booster/deck
   writeProgress(storage, 'AAA111', mergeProgress(local, { v: 1, decks: { list: [{ id: 'd1', name: 'Novo', main: [20], updatedAt: 9 }] } }));
   assert.deepEqual(JSON.parse(store.get('rushdaily-classic-decks:AAA111')).list[0], { id: 'd1', name: 'Novo', main: [20], extra: [], updatedAt: 9 });
 });
+
+test('replay cortado em outro aparelho não duplica o duelo; trimReplays corta do mais antigo; hasProgress', async () => {
+  const { hasProgress, trimReplays } = await import('../src/ui/sync-merge.js');
+  const duel = (date, replay) => ({ date, vs: 'ABC123', result: 'win', turns: 5, lp: 100, ...(replay ? { replay } : {}) });
+  const merged = mergeProgress({ v: 1, pvp: [duel('2026-10-02', 'r'.repeat(10)), duel('2026-10-01', 'q')] }, { v: 1, pvp: [duel('2026-10-02')] });
+  assert.deepEqual(merged.pvp.map((d) => [d.date, d.replay]), [['2026-10-02', 'r'.repeat(10)], ['2026-10-01', 'q']]);
+  assert.deepEqual(mergeProgress({ v: 1, pvp: [duel('2026-10-02')] }, { v: 1, pvp: [duel('2026-10-02', 'r')] }).pvp, [duel('2026-10-02', 'r')], 'converge pelos dois lados');
+  const pvp = ['2026-10-03', '2026-10-01', '2026-10-02'].map((date) => duel(date, 'x'.repeat(1000)));
+  const full = JSON.stringify(normalize({ v: 1, pvp })).length;
+  const { data, dropped } = trimReplays({ v: 1, pvp }, full - 1500);
+  assert.equal(dropped, 2);
+  assert.deepEqual(data.pvp.map((d) => [d.date, Boolean(d.replay)]), [['2026-10-03', true], ['2026-10-01', false], ['2026-10-02', false]]);
+  assert.ok(JSON.stringify(data).length <= full - 1500);
+  assert.equal(trimReplays({ v: 1, pvp }, full).dropped, 0);
+  assert.equal(hasProgress({ v: 1, collection: { 5: 3 }, decks: { list: [{ id: 'd1', updatedAt: 0 }] } }), false, 'coleção e deck inicial não contam');
+  for (const extra of [{ history: { '2026-10-01': 'loss' } }, { decks: { list: [{ id: 'd1', updatedAt: 3 }] } }, { boosters: { '2026-10-01~duelist': { cards: [] } } }, { pvp: [duel('2026-10-01')] }]) {
+    assert.equal(hasProgress({ v: 1, ...extra }), true, JSON.stringify(extra));
+  }
+});

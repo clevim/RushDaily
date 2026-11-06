@@ -39,9 +39,9 @@ O painel detecta o modo (selo "Contêiner" no topo) e mostra o que funciona ali:
 - **Tarefas:** lista fechada, uma por vez, com fila (até 10) e cancelamento. Log ao vivo (SSE) com filtro por texto, "só erros e avisos" (linhas destacadas), rolagem automática com pausa, copiar e baixar. Ao terminar: resumo legível dos testes (total, ok, falhas e quais) e das simulações (duelos, turnos, vitórias, travados, erros de script), notificação do navegador (ative em Configuração) e o título da aba muda se ela estiver em segundo plano. A tarefa em andamento aparece no topo em qualquer seção, com progresso (linhas `N/M`) e Cancelar.
 - **Cartas:** busca por id ou nome (sem acento) nas cartas Rush (`src/data/rush/cards.json`) e clássicas ativas (`src/data/classic/s*.json`); mostra a ficha, a arte e a carta montada, o que falta (arte, montagem, miniatura) e as ações só daquela carta (baixar a arte, montar/desenhar de novo).
 - **Desafio do dia:** o desafio de qualquer data (padrão: hoje, na data do aparelho, como no jogo), gerado no servidor pelo mesmo `src/engine/daily-generator.mjs`: confronto, seu deck, o rival de cada dificuldade (PV, IA, força e deck) e o **calendário mensal** (cada dia mostra Tipo × Tipo e é colorido pelo handScore do seu deck, relativo ao mês; uma barra vermelha avisa quando o dia divide um Tipo, seu ou do rival, com o dia vizinho). Abaixo, **Qualidade do desafio**: escolha 7, 30 ou 60 dias a partir da data e clique em Analisar. Por dia: handScore seu e dos 4 rivais, força (`deckPower`), Tipo × Tipo, monstros/magias/armadilhas, Lendas, tamanho do adicional, cartas inúteis (`useless`) e a validação do deck (`validateDailyDeck`); resumo com médias e os dias fora da curva (handScore abaixo do p10); distribuição dos Tipos (seu e do rival) contra o peso esperado √tamanho do gerador e os pares Tipo × Tipo nunca sorteados. Cada dia novo leva ~8 s para gerar (o gerador roda por dificuldade), por isso o painel pede em pedaços e o servidor guarda o resultado em memória; **Exportar CSV** baixa a tabela e a distribuição.
-- **Jogadores:** total de chaves, ativos hoje/7/30 dias, gráficos com seletor de 7/30/60 dias (e CSV da série), CSV da página da tabela, tabela ordenável e paginada com busca e detalhe por chave.
+- **Jogadores:** total de chaves, ativos hoje/7/30 dias, gráficos com seletor de 7/30/60 dias (e CSV da série), CSV da página da tabela, tabela ordenável e paginada com busca e detalhe por chave. **Retenção** (`GET /admin/coortes` do sync): heatmap de coortes por semana de criação (D1/D7/D30, cor pelo %), funil de ativação com % de queda entre etapas e histogramas de sequência e de dias ativos. **Resultados por dia** (`GET /admin/desafios?dias=60`): win-rate por dia com média móvel de 7 dias; dias com win-rate fora de 25%–85% (com 10+ jogadores) ficam em vermelho e, ao clicar (ou Enter), mostram o Tipo × Tipo daquele dia via `/api/desafio`. Cada tabela/gráfico tem Exportar CSV; com menos de 30 jogadores aparece o aviso de amostra pequena. O formato do JSON é lido por `adaptaRet`/`adaptaRes` em `public/admin.js` (aceitam nomes alternativos de campos); ajuste só essas funções se o sync mudar. O proxy `/api/jogadores/` precisa liberar `coortes` e `desafios?dias=`.
 - **Histórico:** as últimas 30 execuções com filtro, log completo (até ~4.000 linhas por execução, em `tools/setup/cache/admin/logs/`) e **Repetir** com os mesmos parâmetros.
-- **Atalhos:** `g` e uma letra abrem a seção (`v` visão, `d` dados, `t` tarefas, `c` cartas, `r` tradução, `a` artes, `e` desafio, `j` jogadores, `h` histórico, `o` configuração), `/` foca a busca da seção, `?` mostra a ajuda; ignorados enquanto você digita num campo. Nas abas de dificuldade: setas, Home e End. Em telas de até 520px as tabelas rolam na horizontal.
+- **Atalhos:** `g` e uma letra abrem a seção (`v` visão, `d` dados, `t` tarefas, `c` cartas, `r` tradução, `a` artes, `e` desafio, `j` jogadores, `k` Jogadores na Retenção, `h` histórico, `o` configuração), `/` foca a busca da seção, `?` mostra a ajuda; ignorados enquanto você digita num campo. Nas abas de dificuldade: setas, Home e End. Em telas de até 520px as tabelas rolam na horizontal.
 - **Configuração:** temporadas do clássico (`build --ate N`, com confirmação), teto de nós e meta da busca de puzzles, notificações, onde subir a `CACHE_VERSION` (clássicas e Rush) e o ambiente (modo, servidor de sync).
 
 ## Tarefas (lista fechada)
@@ -54,7 +54,7 @@ Setup completo (`--temporadas`, `--sem-render`; refaz só o que está desatualiz
 - **Contêiner:** só com `ADMIN_CONTAINER=1` (posto pela entrada da imagem) ele escuta em `0.0.0.0` *dentro* do contêiner; o compose publica a porta **apenas** em `127.0.0.1:4190` do host (nunca `0.0.0.0`, nunca no cloudflared nem no nginx). O token é fixo, vem de `ADMIN_PANEL_TOKEN` (32+ caracteres; sem ele o painel não sobe). O contêiner roda sem root (usuário 1000), com raiz somente leitura (escreve só no volume e no `/tmp`), `cap_drop: ALL` e `no-new-privileges`.
 - Toda a API e as imagens exigem o token no cabeçalho `x-admin-token` (comparação em tempo constante); as imagens são buscadas com o cabeçalho e viram `blob:`, então o token nunca vai para uma URL. Host e Origin só são aceitos como `127.0.0.1`/`localhost` na porta (contra DNS rebinding).
 - Executa apenas tarefas da lista, com argumentos em array (sem shell) e parâmetros validados; tarefa ou parâmetro inválido = 400. As tarefas não herdam os tokens do painel nem do sync.
-- Serve só uma lista fechada de arquivos (`index.html`, `admin.css`, `admin.js` e o logo), nunca um diretório. As rotas novas são só de leitura: `/api/carta` (busca nos JSON de dados), `/api/desafio` (data validada, aceita de -400 a +400 dias de hoje; `dias` de 0 a 14) e `/api/desafio/analise?de=&ate=[&leve=1]` (mesma validação de data, no máximo 60 dias por pedido, só os parâmetros `de`, `ate` e `leve`; os valores calculados ficam em cache de memória e o CSV é gerado no navegador) e `/arquivo/<pasta>/<id>.webp|png`, restrita às pastas `src/assets/{rush-art,rush-cards,rush-cards-sm,classic-art,classic-cards,classic-cards-sm}` com nome numérico (caminhos com `..`, `%2e` ou `\` são recusados).
+- Serve só uma lista fechada de arquivos (`index.html`, `admin.css`, `admin.js`, o logo e 4 fontes `.woff2` em `/fonts/`, as mesmas de `src/assets/fonts`; o painel não usa mais Google Fonts e a CSP só permite `'self'`), nunca um diretório. As rotas novas são só de leitura: `/api/carta` (busca nos JSON de dados), `/api/desafio` (data validada, aceita de -400 a +400 dias de hoje; `dias` de 0 a 14) e `/api/desafio/analise?de=&ate=[&leve=1]` (mesma validação de data, no máximo 60 dias por pedido, só os parâmetros `de`, `ate` e `leve`; os valores calculados ficam em cache de memória e o CSV é gerado no navegador) e `/arquivo/<pasta>/<id>.webp|png`, restrita às pastas `src/assets/{rush-art,rush-cards,rush-cards-sm,classic-art,classic-cards,classic-cards-sm}` com nome numérico (caminhos com `..`, `%2e` ou `\` são recusados).
 - O token do sync fica só no servidor do painel e **nunca vai ao navegador**.
 - Quem tem o token roda as tarefas do setup (que baixam da internet e escrevem no volume): trate a URL como senha e nunca a publique. **Nunca exponha o painel pelo Cloudflare Tunnel.** O `nginx.conf` bloqueia `/tools/` e a imagem do site nem contém o admin.
 
@@ -66,3 +66,35 @@ O servidor de sync **não guarda IP, User-Agent, nome nem e-mail**: só a chave,
 2. Rode o admin com o mesmo token: `SYNC_ADMIN_TOKEN='...' npm run admin` (e `SYNC_ADMIN_URL` se não for `http://127.0.0.1:4192`), ou grave em `tools/setup/cache/admin/config.json` (ignorado pelo git): `{"syncAdminUrl":"http://127.0.0.1:4192","syncAdminToken":"..."}`.
 
 Para testar local: `ADMIN_TOKEN=<32+ caracteres> npm run sync` (estatísticas em `127.0.0.1:8788`) e `SYNC_ADMIN_URL=http://127.0.0.1:8788 SYNC_ADMIN_TOKEN=<o mesmo> npm run admin`.
+
+## Rotas do sync para o admin
+
+Só leitura e só agregados (nenhuma chave na resposta). Mesma autenticação das outras rotas `/admin` do `rushdaily-sync` (`Authorization: Bearer <ADMIN_TOKEN>`, só `GET`); pelo painel, `GET /api/jogadores/coortes` e `GET /api/jogadores/desafios?dias=N` (proxy com lista fechada, como `resumo`/`usuarios`). Dias no fuso de Brasília (-03:00). Porcentagens com 1 casa; `null` quando a base é 0.
+
+`GET /admin/coortes`:
+
+```json
+{
+  "hoje": "2026-11-05", "totalChaves": 120,
+  "coortes": [{ "semana": "2026-10-19", "chaves": 30,
+    "d1": { "base": 30, "ativos": 12, "pct": 40 }, "d7": { "base": 30, "ativos": 6, "pct": 20 }, "d30": { "base": 0, "ativos": 0, "pct": null } }],
+  "funil": [{ "etapa": "criouChave", "chaves": 120, "emSequencia": 120 }, { "etapa": "primeiroDuelo", "chaves": 90, "emSequencia": 90 }],
+  "histogramas": {
+    "sequencia": [{ "faixa": "0", "min": 0, "max": 0, "chaves": 70 }, { "faixa": "4-6", "min": 4, "max": 6, "chaves": 5 }, { "faixa": "60+", "min": 60, "max": null, "chaves": 0 }],
+    "diasAtivos": [{ "faixa": "1", "min": 1, "max": 1, "chaves": 40 }]
+  }
+}
+```
+
+- `coortes`: uma por semana de criação da chave (`semana` = segunda-feira), em ordem. `dN`: das chaves da semana que já chegaram ao dia N depois da criação (`base`), quantas tiveram acesso exatamente nesse dia (`ativos`, pela tabela `dias_ativos`).
+- `funil`: etapas `criouChave`, `primeiroDuelo` (algum resultado no desafio do dia ou duelo PvP), `primeiraVitoria`, `abriuBooster`, `montouDeck` (deck com `updatedAt` > 0: o inicial não conta), `jogouPvp`, contadas pelo `progressSummary`. `chaves` = fez a etapa; `emSequencia` = fez ela e todas as anteriores.
+- `histogramas`: faixas fixas `0, 1, 2, 3, 4-6, 7-13, 14-29, 30-59, 60+` para `sequencia` (vitórias seguidas até hoje/ontem) e `diasAtivos` (dias com acesso).
+
+`GET /admin/desafios?dias=60` (`dias` de 1 a 365, padrão 60; fora disso, 400):
+
+```json
+{ "hoje": "2026-11-05", "dias": 60,
+  "porDia": [{ "dia": "2026-09-07", "jogadores": 14, "win": 9, "loss": 4, "draw": 1, "pctWin": 64.3, "pctLoss": 28.6, "pctDraw": 7.1 }] }
+```
+
+Um item por dia (o mais antigo primeiro, dias sem jogo com zeros), a partir do `history` salvo de cada chave (o dia é o do aparelho do jogador). `jogadores` = chaves com resultado naquele dia.

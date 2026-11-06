@@ -1,4 +1,6 @@
 // Utilidades compartilhadas pelas páginas.
+import { hasProgress, mergeProgress, readProgress, writeProgress } from './sync-merge.js';
+
 const KEY_PATTERN = /^[A-Z0-9]{6}$/;
 
 let keepKey = null; // perfil mantido depois de recusar o ?player= (pergunta uma vez por página)
@@ -7,13 +9,15 @@ export function getPlayerKey() {
   const fromUrl = new URLSearchParams(location.search).get('player')?.toUpperCase();
   if (fromUrl && KEY_PATTERN.test(fromUrl)) {
     const current = safeGet('rushdaily-player-key');
+    const other = current && current !== fromUrl && KEY_PATTERN.test(current) ? current : null;
     // Um link não troca o perfil salvo em silêncio.
-    if (current && current !== fromUrl && KEY_PATTERN.test(current)) {
+    if (other) {
       keepKey ??= !confirm(`Trocar para o perfil ${fromUrl}? Seu perfil atual é ${current}.`);
-      if (keepKey) return current;
+      if (keepKey) { takeSyncLink(null); return current; } // recusou: o segredo sai da barra de endereço mesmo assim
     }
     safeSet('rushdaily-player-key', fromUrl);
-    takeSyncLink(fromUrl);
+    // Link de ligação num aparelho que já tinha progresso em outra chave: oferece juntar em vez de só trocar.
+    if (takeSyncLink(fromUrl) && other) joinProgress(other, fromUrl);
     return fromUrl;
   }
   const saved = safeGet('rushdaily-player-key');
@@ -26,11 +30,24 @@ export function getPlayerKey() {
 export const newPlayerKey = () => Array.from(crypto.getRandomValues(new Uint8Array(3)), (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
 
 // Link de ligação de aparelho: index.html?player=K#sync=SEGREDO. O segredo sai da barra de endereço na hora.
+// Sem playerKey (link recusado) só limpa a barra. Devolve true se ligou.
 function takeSyncLink(playerKey) {
   const secret = new URLSearchParams(location.hash.slice(1)).get('sync');
-  if (secret === null) return;
+  if (secret === null) return false;
   history.replaceState(null, '', `${location.pathname}${location.search}`);
-  if (/^[A-Za-z0-9_-]{22,128}$/.test(secret)) safeSet(`rushdaily-sync:${playerKey}`, JSON.stringify({ secret, rev: 0, status: 'on', linkedAt: Date.now() }));
+  if (!playerKey || !/^[A-Za-z0-9_-]{22,128}$/.test(secret)) return false;
+  safeSet(`rushdaily-sync:${playerKey}`, JSON.stringify({ secret, rev: 0, status: 'on', linkedAt: Date.now() }));
+  return true;
+}
+
+/** Junta (por união, mergeProgress) o progresso da chave `from` deste aparelho na chave `to`. O de `from` continua salvo.
+ * O sync seguinte junta o resultado com o servidor de `to` sem contar duas vezes as cartas de um mesmo pacote. */
+function joinProgress(from, to) {
+  try {
+    const mine = readProgress(localStorage, from);
+    if (!hasProgress(mine) || !confirm(`Juntar o progresso deste aparelho (perfil ${from}) ao perfil ${to}? Coleção, boosters, histórico e decks entram somados por união; o perfil ${from} continua salvo aqui.\n\nCancelar só troca de perfil.`)) return;
+    writeProgress(localStorage, to, mergeProgress(mine, readProgress(localStorage, to)));
+  } catch { /* armazenamento indisponível ou esquema mais novo: segue só trocando */ }
 }
 
 // Data local (não UTC): o desafio vira à meia-noite de quem joga.

@@ -1,11 +1,22 @@
 // Cliente da sincronização entre aparelhos (servidor em server/server.mjs, desenho em docs/sync/README.md).
 // Importar este módulo liga o gancho: gravar uma chave de progresso (writeJson) agenda um sync.
-import { SchemaError, canonical, isProgressKey, mergeProgress, normalize, readProgress, writeProgress } from './sync-merge.js';
+import { SchemaError, canonical, hasProgress, isProgressKey, mergeProgress, normalize, readProgress, trimReplays, writeProgress } from './sync-merge.js';
 import { getPlayerKey, newPlayerKey, readJson, setWriteHook, writeJson } from './common.js';
 
 const SECRET = /^[A-Za-z0-9_-]{22,128}$/;
+const GZIP_MIN = 8 * 1024; // corpo do PUT acima disso vai comprimido (Content-Encoding: gzip)
+const SOFT_MAX = 800 * 1024; // acima disso corta os replays PvP mais antigos antes de enviar (o servidor recusa > 1 MiB)
+let gzipOk = typeof CompressionStream === 'function'; // servidor antigo recusou o gzip: manda cru até recarregar a página
 export const credKey = (playerKey) => `rushdaily-sync:${playerKey}`;
-/** { secret, rev, status: 'on' | 'off' | 'taken', at } deste aparelho. Nunca vai no corpo nem em log. */
+/** Resumo (64 bits + tamanho) do progresso que o servidor tem: com o 304 do GET, diz se o local mudou desde então.
+ * FNV-1a e não crypto.subtle, que não existe fora de contexto seguro (http na LAN). */
+const sumOf = (data) => {
+  const text = canonical(data);
+  let a = 2166136261, b = 3735928559;
+  for (let i = 0; i < text.length; i += 1) { const c = text.charCodeAt(i); a = Math.imul(a ^ c, 16777619); b = Math.imul(b ^ c ^ (i & 255), 16777619); }
+  return `${text.length}.${(a >>> 0).toString(36)}.${(b >>> 0).toString(36)}`;
+};
+/** { secret, rev, sum, status: 'on' | 'off' | 'taken', at } deste aparelho. Nunca vai no corpo nem em log. */
 export const credOf = (playerKey) => {
   const cred = readJson(credKey(playerKey), null);
   return cred && SECRET.test(cred.secret || '') ? cred : null;
@@ -17,18 +28,21 @@ function newSecret() {
   return btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
 }
 
-const api = (playerKey, secret, method, body, signal, path = '') => fetch(`api/sync/${playerKey}${path}`, {
+// body: objeto (vira JSON), string ou ArrayBuffer (já pronto, ex.: gzip).
+const api = (playerKey, secret, method, body, signal, path = '', headers = {}) => fetch(`api/sync/${playerKey}${path}`, {
   method,
   signal,
   cache: 'no-store',
-  headers: { Authorization: `Bearer ${secret}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
-  body: body ? JSON.stringify(body) : undefined,
+  headers: { Authorization: `Bearer ${secret}`, ...(body ? { 'Content-Type': 'application/json' } : {}), ...headers },
+  body: !body ? undefined : typeof body === 'string' || body instanceof ArrayBuffer ? body : JSON.stringify(body),
 });
+const gzip = (text) => new Response(new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
 
 let running = null;
 let dirty = false; // progresso gravado durante um sync em andamento: roda mais uma vez no fim
 /**
- * Busca, junta, grava e envia. Na primeira vez com internet gera o segredo e reivindica a chave.
+ * Busca, junta, grava e envia. Na primeira vez com internet gera o segredo; reivindica a chave no primeiro sync com
+ * progresso (ou com { claim: true }).
  * Nunca lança: devolve { status: 'on' | 'off' | 'taken' | 'offline' | 'error' | 'schema', changed }.
  */
 export function syncNow(options) {
@@ -41,14 +55,23 @@ export function syncNow(options) {
   return running;
 }
 
-async function run({ timeout = 4000, promoted = false } = {}) {
+async function run({ timeout = 4000, promoted = false, claim = false } = {}) {
   const playerKey = getPlayerKey();
   let cred = credOf(playerKey);
   if (cred && cred.status !== 'on') return { status: cred.status };
   if (navigator.onLine === false) return { status: 'offline' };
   if (!cred) { cred = { secret: newSecret(), rev: 0, status: 'on' }; saveCred(playerKey, cred); } // grava antes: uma queda não troca o segredo
   const signal = AbortSignal.timeout(timeout);
-  const call = (method, body, path) => api(playerKey, cred.secret, method, body, signal, path);
+  const call = (method, body, path, headers) => api(playerKey, cred.secret, method, body, signal, path, headers);
+  const put = async (data, baseRev) => {
+    const text = JSON.stringify({ data, baseRev });
+    if (gzipOk && text.length > GZIP_MIN) {
+      const res = await call('PUT', await gzip(text), '', { 'Content-Encoding': 'gzip' });
+      if (res.status !== 400 && res.status !== 415) return res;
+      gzipOk = false; // servidor de antes do gzip (JSON inválido): repete cru
+    }
+    return call('PUT', text);
+  };
   // Grava por cima da credencial atual (não da lida no início): a troca de segredo pode ter acontecido no meio.
   const update = (fields) => saveCred(playerKey, { ...(credOf(playerKey) ?? cred), ...fields });
   // Erro que a tela de Ajustes mostra (413, 429, 503, esquema...); some no próximo sync bem-sucedido.
@@ -59,7 +82,7 @@ async function run({ timeout = 4000, promoted = false } = {}) {
     if (cred.next && !promoted) {
       const { next, ...rest } = credOf(playerKey) ?? cred;
       saveCred(playerKey, { ...rest, secret: next || cred.next });
-      return run({ timeout, promoted: true });
+      return run({ timeout, promoted: true, claim });
     }
     // Já sincronizou (ou veio de um link) e agora o segredo não confere: trocaram o segredo em outro aparelho.
     update({ status: 'taken', ...(cred.at || cred.linkedAt ? { lastError: { code: 403, at: Date.now() } } : {}) });
@@ -67,20 +90,30 @@ async function run({ timeout = 4000, promoted = false } = {}) {
   };
   try {
     const before = canonical(readProgress(localStorage, playerKey));
-    let res = await call('GET');
+    // Já sincronizou: o servidor responde 304 sem corpo se a rev não mudou (servidor antigo ignora e manda 200).
+    let res = await call('GET', null, '', cred.rev ? { 'If-None-Match': `"${cred.rev}"` } : {});
     if (res.status === 403) return taken();
     if (res.status === 503 || res.status === 429) return error(res.status); // servidor cheio / muitos pedidos
     if (res.status >= 500) return { status: 'offline' }; // proxy sem o servidor de sync (502)
-    if (res.status !== 200 && res.status !== 404) return error(res.status);
-    let remote = res.status === 200 ? await res.json() : null;
+    if (res.status !== 200 && res.status !== 304 && res.status !== 404) return error(res.status);
+    // 304: o servidor ainda tem o que este aparelho viu por último (resumido em cred.sum). Sem o resumo
+    // (credencial de antes do 304), não dá para saber: reenvia o local sobre a mesma rev.
+    let remote = res.status === 200 ? await res.json() : res.status === 304 ? { rev: cred.rev, sum: cred.sum } : null;
+    let synced;
+    let trimmed = 0;
     for (let tries = 0; ; tries += 1) {
       if (tries === 3) return error(409);
       const local = readProgress(localStorage, playerKey);
-      const merged = remote ? mergeProgress(local, remote.data) : local;
+      let merged = remote?.data ? mergeProgress(local, remote.data) : local;
+      // Grande demais: corta replays antigos aqui também (senão a próxima junção os traz de volta e envia de novo).
+      if (JSON.stringify(merged).length > SOFT_MAX) ({ data: merged, dropped: trimmed } = trimReplays(merged, SOFT_MAX));
       if (canonical(merged) !== canonical(local)) writeProgress(localStorage, playerKey, merged);
-      if (remote && canonical(merged) === canonical(normalize(remote.data))) { cred.rev = remote.rev; break; }
-      res = await call('PUT', { data: merged, baseRev: remote ? remote.rev : 0 });
-      if (res.ok) { cred.rev = (await res.json()).rev; break; }
+      if (remote && (remote.data ? canonical(merged) === canonical(normalize(remote.data)) : remote.sum === sumOf(merged))) { cred.rev = remote.rev; synced = merged; break; }
+      // Chave livre e nada além da coleção inicial: só reivindica quando houver progresso (teto de chaves do servidor)
+      // ou quando a chave vai aparecer num link de desafio (claim: ninguém a reivindica antes do dono).
+      if (!remote && !claim && !hasProgress(merged)) { update({ rev: 0 }); return { status: 'on', changed: false }; }
+      res = await put(merged, remote ? remote.rev : 0);
+      if (res.ok) { cred.rev = (await res.json()).rev; synced = merged; break; }
       if (res.status === 403) return taken();
       if (res.status !== 409) return error(res.status);
       // Mudou no meio do caminho: o 409 traz o atual (ou, na corrida de reivindicação, buscamos de novo).
@@ -93,7 +126,11 @@ async function run({ timeout = 4000, promoted = false } = {}) {
         remote = await res.json();
       }
     }
-    update({ rev: cred.rev, at: Date.now(), lastError: undefined });
+    // Replays cortados: aviso em lastError 'trimmed'. Eles saem do local junto (os syncs seguintes não cortam de novo),
+    // então o aviso fica 7 dias em vez de sumir no próximo sync.
+    const prev = credOf(playerKey)?.lastError;
+    const notice = trimmed ? { code: 'trimmed', count: trimmed, at: Date.now() } : prev?.code === 'trimmed' && Date.now() - prev.at < 7 * 86400e3 ? prev : undefined;
+    update({ rev: cred.rev, sum: sumOf(synced), at: Date.now(), lastError: notice });
     return { status: 'on', changed: canonical(readProgress(localStorage, playerKey)) !== before };
   } catch (thrown) {
     if (thrown instanceof SchemaError) return fail('schema', { status: 'schema', message: thrown.message });
@@ -122,10 +159,11 @@ function flush() {
   const playerKey = getPlayerKey();
   const cred = credOf(playerKey);
   if (!cred || cred.status !== 'on' || !cred.rev) { syncNow(); return; }
-  const body = JSON.stringify({ data: readProgress(localStorage, playerKey), baseRev: cred.rev });
+  const data = readProgress(localStorage, playerKey);
+  const body = JSON.stringify({ data, baseRev: cred.rev });
   if (body.length > KEEPALIVE_MAX) { syncNow(); return; }
   fetch(`api/sync/${playerKey}`, { method: 'PUT', keepalive: true, cache: 'no-store', headers: { Authorization: `Bearer ${cred.secret}`, 'Content-Type': 'application/json' }, body })
-    .then(async (res) => { if (res.ok) saveCred(playerKey, { ...(credOf(playerKey) ?? cred), rev: (await res.json()).rev, at: Date.now() }); })
+    .then(async (res) => { if (res.ok) saveCred(playerKey, { ...(credOf(playerKey) ?? cred), rev: (await res.json()).rev, sum: sumOf(data), at: Date.now() }); })
     .catch(() => {});
 }
 if (typeof document !== 'undefined') {

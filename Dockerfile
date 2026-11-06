@@ -19,7 +19,7 @@ RUN node tools/setup/setup.mjs --so ocgcore,rush-ocg && npm run test:deploy
 FROM nginxinc/nginx-unprivileged:1.28-alpine@sha256:7377697a821c131a924a7105fafbe7414db4e9fcc77a6f08f776f33f141ec3f8
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY nginx-security.conf /etc/nginx/rushdaily-security.conf
-COPY index.html duel.html screens.html arena.html preparando.html /usr/share/nginx/html/
+COPY index.html duel.html screens.html arena.html preparando.html sw.js manifest.webmanifest /usr/share/nginx/html/
 COPY src /usr/share/nginx/html/src
 # Caminhos de dados viram links para o volume (/dados/src/...). Em src/data/classic só os JSON gerados viram link: o
 # strings-pt.mjs (código) continua o da imagem. Link sem alvo (dado ainda não gerado) responde 404, como antes do setup.

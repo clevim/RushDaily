@@ -449,7 +449,7 @@ const lerCorpo = (req, max = 20000) => new Promise((ok, no) => { let b = ''; req
 const PORTAS = [...new Set([PORTA, PORTA_PUBLICA])].join('|');
 const hostOk = (h) => new RegExp(`^(127\\.0\\.0\\.1|localhost):(${PORTAS})$`).test(h ?? ''); // contra DNS rebinding
 const originOk = (o) => !o || new RegExp(`^http://(127\\.0\\.0\\.1|localhost):(${PORTAS})$`).test(o);
-const CSP = "default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; img-src 'self' data: blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+const CSP = "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'self'; img-src 'self' data: blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 // Lista fechada de arquivos servidos (nada de servir diretório).
 const ESTATICOS = {
   '/': [join(PUBLIC, 'index.html'), 'text/html; charset=utf-8'],
@@ -457,6 +457,10 @@ const ESTATICOS = {
   '/admin.css': [join(PUBLIC, 'admin.css'), 'text/css; charset=utf-8'],
   '/admin.js': [join(PUBLIC, 'admin.js'), 'text/javascript; charset=utf-8'],
   '/logo.png': [p('src/assets/logo-mark.png'), 'image/png'],
+  '/fonts/archivo-latin.woff2': [p('src/assets/fonts/archivo-latin.woff2'), 'font/woff2'],
+  '/fonts/archivo-latin-ext.woff2': [p('src/assets/fonts/archivo-latin-ext.woff2'), 'font/woff2'],
+  '/fonts/dela-gothic-one-latin.woff2': [p('src/assets/fonts/dela-gothic-one-latin.woff2'), 'font/woff2'],
+  '/fonts/dela-gothic-one-latin-ext.woff2': [p('src/assets/fonts/dela-gothic-one-latin-ext.woff2'), 'font/woff2'],
 };
 const cabecalhos = (tipo) => ({ 'content-type': tipo, 'cache-control': 'no-store', 'content-security-policy': CSP, 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'x-frame-options': 'DENY' });
 
@@ -527,10 +531,10 @@ createServer(async (req, res) => {
     if (req.method === 'GET' && rota.startsWith('/api/jogadores/')) { // proxy só-leitura para /admin/* do servidor de sync
       const { url: base, token } = syncAdmin();
       if (!token) return json(res, 200, { configurado: false, conteiner: CONTEINER });
-      const m = /^\/api\/jogadores\/(resumo|usuarios|usuario\/[A-Z0-9]{6})$/.exec(rota);
+      const m = /^\/api\/jogadores\/(resumo|usuarios|coortes|desafios|usuario\/[A-Z0-9]{6})$/.exec(rota);
       if (!m) return json(res, 404, { erro: 'não encontrado' });
       const qs = new URLSearchParams(); // só parâmetros conhecidos
-      for (const k of ['ordem', 'dir', 'limite', 'pagina', 'busca']) if (url.searchParams.has(k)) qs.set(k, url.searchParams.get(k).slice(0, 20));
+      for (const k of ['ordem', 'dir', 'limite', 'pagina', 'busca', 'dias']) if (url.searchParams.has(k)) qs.set(k, url.searchParams.get(k).slice(0, 20));
       try {
         const r = await fetch(`${base}/admin/${m[1]}${qs.size ? `?${qs}` : ''}`, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(5000), redirect: 'error' });
         const corpo = await r.json().catch(() => ({}));

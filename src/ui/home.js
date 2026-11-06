@@ -6,6 +6,7 @@ import { RUSH_BACK, paintRushCards, rushImg, warmRushCards } from './rush-render
 import { cardStats, isMonster } from './rush-info.js';
 import { homeScene } from './scene.js';
 import { syncNow } from './sync.js';
+import { loadPool } from './pwa.js';
 import { canContinue } from './duel-save.js';
 
 const playerKey = getPlayerKey();
@@ -19,7 +20,7 @@ document.querySelector('#nav').outerHTML = nav('today', playerKey);
 bindKeyChip(playerKey);
 $('#date').textContent = longDate(date);
 
-const pool = await (await fetch('src/data/rush/cards.json')).json();
+const pool = await loadPool();
 const cards = new Map(pool.map((card) => [card.id, card]));
 const match = () => generateDailyMatch({ date, difficulty, pool });
 const AI_LABEL = { aprendiz: 'Joga sem plano', duelista: 'Usa as Invocações ilimitadas', elite: 'Responde em toda chance', caos: 'Troca monstros sem medo' };
