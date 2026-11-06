@@ -66,18 +66,37 @@ test('validação: chave 400, corpo 400/415, tamanho 413', async () => {
   assert.equal(big.status, 413);
 });
 
-test('limites: 429 por IP, por chave e por reivindicação, com Retry-After', async () => {
-  const { app, call } = await boot({ trustProxy: true, limits: { ip: [3, 60e3], key: [4, 60e3], claim: [1, 3600e3] } });
-  const asIp = (ip, path) => call('GET', path, { secret: SECRET, headers: { 'X-Real-IP': ip } });
+test('limites: 429 por IP, por falha de autenticação na chave e por reivindicação, com Retry-After', async () => {
+  const { app, call } = await boot({ trustProxy: true, limits: { ip: [3, 60e3], key: [2, 60e3], claim: [1, 3600e3] } });
+  const asIp = (ip, path, secret = SECRET) => call('GET', path, { secret, headers: { 'X-Real-IP': ip } });
   for (let index = 0; index < 3; index += 1) assert.equal((await asIp('1.1.1.1', '/api/sync/AAA111')).status, 404);
   const blocked = await asIp('1.1.1.1', '/api/sync/AAA111');
   assert.equal(blocked.status, 429);
   assert.ok(Number(blocked.headers.get('retry-after')) > 0);
   assert.equal((await asIp('2.2.2.2', '/api/sync/AAA111')).status, 404, 'outro IP segue livre');
-  assert.equal((await asIp('3.3.3.3', '/api/sync/AAA111')).status, 429, 'a chave estourou (4 pedidos)');
   const claim = (key) => call('PUT', `/api/sync/${key}`, { secret: SECRET, body: { data: data(), baseRev: 0 }, headers: { 'X-Real-IP': '4.4.4.4' } });
   assert.equal((await claim('BBB222')).status, 201);
   assert.equal((await claim('CCC333')).status, 429, 'uma chave nova por hora por IP');
+  assert.equal((await asIp('5.5.5.5', '/api/sync/BBB222', OTHER)).status, 403);
+  assert.equal((await asIp('6.6.6.6', '/api/sync/BBB222', OTHER)).status, 403);
+  assert.equal((await asIp('7.7.7.7', '/api/sync/BBB222', OTHER)).status, 429, 'a chave estourou (2 falhas de autenticação)');
+  assert.equal((await asIp('8.8.8.8', '/api/sync/BBB222')).status, 200, 'o dono continua passando');
+});
+
+test('31 GETs sem segredo não bloqueiam o dono; chave inexistente sem segredo é 401 como a existente', async () => {
+  const { call } = await boot();
+  assert.equal((await call('PUT', '/api/sync/OWN001', { secret: SECRET, body: { data: data(), baseRev: 0 } })).status, 201);
+  for (let index = 0; index < 31; index += 1) assert.ok([401, 429].includes((await call('GET', '/api/sync/OWN001')).status));
+  assert.equal((await call('GET', '/api/sync/OWN001', { secret: SECRET })).status, 200);
+  assert.equal((await call('GET', '/api/sync/NEW001')).status, 401, 'não revela que a chave não existe');
+  assert.equal((await call('DELETE', '/api/sync/NEW001')).status, 401);
+  assert.equal((await call('GET', '/api/sync/NEW001', { secret: SECRET })).status, 404);
+});
+
+test('chave com %xx (malformado ou não) é 400, nunca 500', async () => {
+  const { call, admin } = await bootAdmin();
+  for (const path of ['/api/sync/%E0%A4%A', '/api/sync/%41BC123', '/api/sync/ABC12%']) assert.equal((await call('GET', path, { secret: SECRET })).status, 400, path);
+  assert.equal((await admin('/admin/usuario/%E0%A4%A')).status, 400);
 });
 
 test('sem proxy confiável, X-Real-IP é ignorado', async () => {

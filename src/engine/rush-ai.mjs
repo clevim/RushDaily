@@ -99,8 +99,14 @@ export function decideRush(prompt, context) {
         })
         .sort((a, b) => b.card.atk - a.card.atk)[0];
       const lows = summons.filter(({ card }) => !tributesFor(levelOf(card))).sort((a, b) => b.card.atk - a.card.atk);
-      // Com monstro de tributo na mão e campo vazio, os baixos sobem mesmo fracos: viram tributo.
-      const wantsFodder = summons.some(({ card }) => tributesFor(levelOf(card)) > myMonsters.length);
+      // O motor só lista Tributo quando já há tributos no campo (medido: ~0,4% das listas), então o plano sai da mão:
+      // com monstro de tributo na mão e corpos suficientes (campo + baixos/baixados), os baixos sobem mesmo fracos.
+      const bodies = summons.length + sets.length;
+      const wantsFodder = (mine.hand || []).some((c) => {
+        const card = c && data(c.code);
+        const need = card && card.type & TYPE.MONSTER ? tributesFor(levelOf(card)) : 0;
+        return need > myMonsters.length && need <= freeZones + myMonsters.length && need - myMonsters.length <= bodies && card.atk >= 1500;
+      });
       const lostBy = ({ card }) => Math.max(0, ...weakest.slice(0, tributesFor(levelOf(card))));
       let summon = null;
       if (freeZones > 0) {
@@ -110,7 +116,7 @@ export function decideRush(prompt, context) {
         if (strong) summon = { ...strong, score: bestHit(strong.card.atk) + 300 };
         else if (tribute) summon = { ...tribute, score: bestHit(tribute.card.atk) - lostBy(tribute) + 300 };
         else if (blocker && (wantsFodder || myMonsters.length < 2 || data(blocker.loc.code).def >= threat)) summon = { ...blocker, score: 200 + (data(blocker.loc.code).def >= threat ? 200 : 0) };
-        else if (lows[0] && wantsFodder) summon = { ...lows[0], score: 250 };
+        else if (lows.length && wantsFodder) summon = { ...lows[lows.length - 1], score: 250 };
       } else if (tribute) summon = { ...tribute, score: bestHit(tribute.card.atk) - lostBy(tribute) + 300 };
       if (summon && summon.action === 0 && sets[0] && slip()) summon = { ...sets[0], score: 0 }; // erro: baixa em vez de invocar
       if (summon) options.push(summon);
@@ -157,10 +163,9 @@ export function decideRush(prompt, context) {
         }
         if (loc.can_direct && foeMonsters.length && (!best || atk > best.score)) best = { index, target: null, score: atk }; // efeito de ataque direto
       });
-      if (best && slip()) { // erro: ataca o alvo pior, ou não ataca
-        cands.sort((a, b) => a.score - b.score);
-        best = cands.length > 1 ? cands[0] : null;
-      }
+      // Erro: ataca o alvo pior. Nunca cancela golpe letal nem encerra a Batalha (sem candidato, mantém o melhor).
+      const lethal = best && (live(prompt.attacks[best.index])?.attack ?? 0) >= state.lp[foe];
+      if (best && !lethal && slip() && cands.length > 1) { cands.sort((a, b) => a.score - b.score); best = cands[0]; }
       if (best) {
         const seq = prompt.attacks[best.index].sequence;
         memory.swings.set(seq, (memory.swings.get(seq) || 0) + 1);
@@ -182,6 +187,11 @@ export function decideRush(prompt, context) {
       const own = prompt.selects.findIndex((s) => s.location === L.MZONE || s.location === L.HAND);
       // Caos guarda a Armadilha do campo: só reage se o rival mostra ameaça relevante (senão espera o próximo gatilho).
       if (reacting && caos && prompt.selects[0].location === L.SZONE && !(foeMonsters.length && (threat >= 1500 || state.lp[me] <= threat * 2))) {
+        memory.tried.delete(chainKey);
+        return { type: R.SELECT_CHAIN, index: null };
+      }
+      // Elite: filtro mais brando (ameaça < 1200 e PV a salvo: espera o próximo gatilho).
+      if (reacting && level === 'elite' && prompt.selects[0].location === L.SZONE && !(foeMonsters.length && (threat >= 1200 || state.lp[me] <= threat * 2))) {
         memory.tried.delete(chainKey);
         return { type: R.SELECT_CHAIN, index: null };
       }

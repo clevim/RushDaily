@@ -51,6 +51,8 @@ jobs:
       - name: Dados mínimos para os testes
         run: node tools/setup/setup.mjs --so ocgcore,rush-ocg
 
+      # test:deploy omite booster, gestures, strings-pt, classic-store e puzzles: leem src/data/classic (gitignored, só
+      # existe após o setup do clássico), que o CI não gera.
       - name: Testes
         run: npm run test:deploy
 

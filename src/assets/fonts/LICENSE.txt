@@ -1,0 +1,4 @@
+Archivo (c) The Archivo Project Authors (github.com/Omnibus-Type/Archivo)
+Dela Gothic One (c) The Dela Gothic Project Authors (github.com/syakuzen/DelaGothic)
+Ambas sob a SIL Open Font License 1.1: https://openfontlicense.org
+Arquivos woff2 obtidos do Google Fonts, apenas subsets latin e latin-ext.

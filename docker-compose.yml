@@ -74,8 +74,12 @@ services:
       - no-new-privileges:true
     volumes:
       - sync-data:/data
-      # Backup diário (7 arquivos) em outro disco, de preferência (crie a pasta com dono 1000:1000):
-      # - /srv/backup/rushdaily:/data/backup
+      # Backup diário (7 arquivos) FORA do volume do banco: `docker compose down -v` apaga sync-data mas não sync-backup.
+      # SYNC_BACKUP_HOST_DIR no .env: sem valor, usa o volume nomeado sync-backup; com caminho absoluto (ex. /srv/backup/rushdaily,
+      # outro disco, pasta com dono 1000:1000) vira bind mount. O banco continua em sync-data, nada muda de lugar.
+      # Migração: backups antigos ficam em sync-data/backup, ocultos por este mount (nada é apagado). O servidor gera um
+      # backup novo por dia; para copiar os antigos: docker run --rm -v <projeto>_sync-data:/o -v <projeto>_sync-backup:/n alpine cp -a /o/backup/. /n/
+      - ${SYNC_BACKUP_HOST_DIR:-sync-backup}:/data/backup
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8787/api/health"]
       interval: 30s
@@ -138,4 +142,5 @@ networks:
 
 volumes:
   sync-data:
+  sync-backup:
   rushdaily-dados:

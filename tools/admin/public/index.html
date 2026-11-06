@@ -139,6 +139,19 @@
       <button class="btn fantasma" id="diaHoje">Hoje</button>
     </div>
     <div id="desafio" aria-live="polite"></div>
+    <article class="painel" id="calPainel">
+      <h2>Calendário <span class="tag" id="calMesTag"></span></h2>
+      <div class="acoes-linha"><button class="btn sec" id="calAnt" aria-label="Mês anterior">‹ Mês</button><button class="btn sec" id="calProx" aria-label="Próximo mês">Mês ›</button><span class="tag" id="calEstado" role="status"></span></div>
+      <div id="calendario"></div>
+    </article>
+    <article class="painel" id="quaPainel">
+      <h2>Qualidade do desafio <span class="tag">cada dia novo leva ~8 s para gerar; o que já saiu fica em cache</span></h2>
+      <div class="acoes-linha">
+        <label class="campo inline">Período a partir da data acima<select id="quaDias"><option value="7">7 dias</option><option value="30" selected>30 dias</option><option value="60">60 dias</option></select></label>
+        <button class="btn" id="quaRodar">Analisar</button><button class="btn sec" id="quaCsv" disabled>Exportar CSV</button><span class="tag" id="quaEstado" role="status"></span>
+      </div>
+      <div id="qualidade" aria-live="polite"></div>
+    </article>
   </section>
 
   <!-- Jogadores -->
@@ -147,12 +160,13 @@
     <div id="jogConf" class="aviso" hidden></div>
     <div id="jog" hidden>
       <div class="kpis" id="cartoes"></div>
+        <div class="acoes-linha"><label class="campo inline">Período dos gráficos<select id="grafDias"><option value="7">7 dias</option><option value="30">30 dias</option><option value="60" selected>60 dias</option></select></label><button class="btn sec" id="grafCsv">Exportar CSV</button></div>
       <div class="grade2">
-        <article class="painel"><h2>Ativos por dia <span class="tag">60 dias, fuso de Brasília</span></h2><svg id="grafAtivos" class="graf" role="img" aria-label="Jogadores ativos por dia"></svg></article>
+        <article class="painel"><h2>Ativos por dia <span class="tag" id="grafTag">60 dias, fuso de Brasília</span></h2><svg id="grafAtivos" class="graf" role="img" aria-label="Jogadores ativos por dia"></svg></article>
         <article class="painel"><h2>Chaves novas por dia</h2><svg id="grafNovas" class="graf novas" role="img" aria-label="Chaves novas por dia"></svg></article>
       </div>
       <article class="painel">
-        <div class="acoes-linha"><label class="campo inline">Buscar chave<input id="jogBusca" maxlength="6" placeholder="ABC123" autocomplete="off"></label><button id="jogAtualizar" class="btn sec">Atualizar</button></div>
+        <div class="acoes-linha"><label class="campo inline">Buscar chave<input id="jogBusca" maxlength="6" placeholder="ABC123" autocomplete="off"></label><button id="jogAtualizar" class="btn sec">Atualizar</button><button id="jogCsv" class="btn sec">Exportar CSV (página)</button></div>
         <div class="tabela"><table><thead><tr id="jogCab"></tr></thead><tbody id="jogLinhas"></tbody></table></div>
         <div class="pag"><button class="btn sec" id="jogAnt">Anterior</button><span id="jogPag" class="tag"></span><button class="btn sec" id="jogProx">Próxima</button></div>
       </article>
@@ -211,6 +225,7 @@
 </main>
 
 <dialog id="dlg" aria-labelledby="dlgTxt"><form method="dialog"><p id="dlgTxt"></p><div class="acoes-linha fim"><button value="nao" class="btn sec">Voltar</button><button value="sim" class="btn" id="dlgOk">Confirmar</button></div></form></dialog>
+<dialog id="ajuda" aria-labelledby="ajudaTit"><form method="dialog"><h2 id="ajudaTit">Atalhos de teclado</h2><ul id="ajudaLista" class="ajuda"></ul><div class="acoes-linha fim"><button class="btn">Fechar</button></div></form></dialog>
 <div id="msg" role="status" hidden></div>
 </body>
 </html>

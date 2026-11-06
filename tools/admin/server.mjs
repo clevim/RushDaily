@@ -311,9 +311,9 @@ function buscarCartas(q) {
 
 // ---- desafio do dia: o mesmo gerador do jogo (src/engine/daily-generator.mjs) sobre src/data/rush/cards.json ----
 let gerador, geradorFalhou = 0; // módulo do jogo; se falhar (setup incompleto), tenta de novo depois de 30 s
-const cacheDesafio = new Map();
+const cacheDesafio = new Map(), cacheAnalise = new Map();
 let poolDoCache = null;
-async function desafio(data, dias) {
+async function contexto() { // gerador do jogo + pool + cache por dia/dificuldade (compartilhado por desafio() e analise())
   if (!gerador && Date.now() - geradorFalhou > 30000) {
     const u = pathToFileURL(p('src/engine/daily-generator.mjs')).href + (geradorFalhou ? `?r=${Date.now()}` : '');
     try { gerador = await import(u); } catch (e) { geradorFalhou = Date.now(); console.error(`desafio indisponível: ${e.message}`); }
@@ -321,16 +321,21 @@ async function desafio(data, dias) {
   if (!gerador) return { erro: 'O gerador do desafio (src/engine) ou o motor (src/vendor/ocgcore) não está disponível aqui. Rode o setup (etapa ocgcore).' };
   const pool = dado('src/data/rush/cards.json');
   if (!pool?.length) return { erro: 'Sem src/data/rush/cards.json: rode a etapa rush-ocg do setup.' };
-  if (pool !== poolDoCache) { cacheDesafio.clear(); poolDoCache = pool; }
+  if (pool !== poolDoCache) { cacheDesafio.clear(); cacheAnalise.clear(); poolDoCache = pool; }
   const byId = new Map(pool.map((c) => [c.id, c]));
   const gera = (d, dif) => {
     const k = `${d}:${dif}`;
-    if (!cacheDesafio.has(k)) { if (cacheDesafio.size > 200) cacheDesafio.clear(); cacheDesafio.set(k, gerador.generateDailyMatch({ date: d, difficulty: dif, pool })); }
+    if (!cacheDesafio.has(k)) { if (cacheDesafio.size > 400) cacheDesafio.clear(); cacheDesafio.set(k, gerador.generateDailyMatch({ date: d, difficulty: dif, pool })); }
     return cacheDesafio.get(k);
   };
+  return { pool, byId, gera, difs: gerador.listDifficulties() };
+}
+async function desafio(data, dias) {
+  const ctx = await contexto();
+  if (ctx.erro) return ctx;
+  const { byId, gera, difs } = ctx;
   const cartas = {};
   const usa = (lista) => { for (const id of lista) if (!cartas[id]) { const c = byId.get(id); if (c) cartas[id] = { n: c.name, t: c.type, a: c.atk, d: c.def, l: c.level, lg: !!c.legend, at: c.attribute, r: c.race }; } return lista; };
-  const difs = gerador.listDifficulties();
   const base = gera(data, difs[0].id);
   const lado = (s) => ({ label: s.label, lp: s.lp, power: s.power ?? gerador.deckPower(s.deck, byId), deck: { main: usa(s.deck.main), extra: usa(s.deck.extra) } });
   const dia = { data, jogador: lado(base.player), rivais: difs.map((d) => { const m = gera(data, d.id); return { id: d.id, nome: d.label, rating: d.rating, modifier: d.modifier, ai: m.enemy.ai, ...lado(m.enemy) }; }) };
@@ -344,6 +349,40 @@ async function desafio(data, dias) {
   return { dia, proximos, cartas };
 }
 const dataOk = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s ?? '') && !Number.isNaN(Date.parse(`${s}T12:00:00Z`)) && Math.abs(Date.parse(`${s}T12:00:00Z`) - Date.now()) < 400 * 86400000;
+
+// ---- qualidade do desafio: métricas por dia, só leitura (mesmo gerador; handScore/useless do motor de decks) ----
+let rushDeck;
+const MAX_ANALISE = 60;
+const ms = (iso) => Date.parse(`${iso}T12:00:00Z`);
+async function analise(de, ate, leve = false) {
+  const ctx = await contexto();
+  if (ctx.erro) return ctx;
+  rushDeck ??= await import(pathToFileURL(p('src/engine/rush-deck.mjs')).href);
+  const { pool, byId, gera, difs } = ctx;
+  const stats = (side) => {
+    const main = side.deck.main.map((id) => byId.get(id)).filter(Boolean), extra = side.deck.extra.map((id) => byId.get(id)).filter(Boolean);
+    const mon = main.filter((c) => c.type & 1).length, mag = main.filter((c) => c.type & 2).length;
+    const todas = [...main, ...extra];
+    return { hand: Number(rushDeck.handScore(side.deck, byId).toFixed(3)), power: side.power ?? gerador.deckPower(side.deck, byId), monstros: mon, magias: mag, armadilhas: main.length - mon - mag,
+      lendas: todas.filter((c) => c.legend).length, extra: extra.length, inuteis: rushDeck.useless(main, extra), problemas: gerador.validateDailyDeck(side.deck, byId) };
+  };
+  // Cada dia custa ~8 s (4 dificuldades x ~2 s do gerador): calcula até ~15 s por pedido e devolve `faltam`; o painel repete até zerar (o cache guarda o que já saiu).
+  const dias = [], inicio = Date.now(), total = Math.round((ms(ate) - ms(de)) / 86400000) + 1;
+  for (let t = ms(de); t <= ms(ate); t += 86400000) {
+    const d = new Date(t).toISOString().slice(0, 10);
+    if (!cacheAnalise.has(d) || (!leve && cacheAnalise.get(d).leve)) {
+      if (Date.now() - inicio > 15000) break;
+      await new Promise((ok) => setImmediate(ok));
+      if (cacheAnalise.size > 400) cacheAnalise.clear();
+      const usados = leve ? [difs.find((x) => x.id === 'duelist') ?? difs[0]] : difs, ms4 = usados.map((x) => gera(d, x.id)), base = ms4[0];
+      cacheAnalise.set(d, { data: d, leve, jogador: { ...stats(base.player), tipo: base.player.label, race: base.player.theme.race }, tipoRival: base.enemy.label, raceRival: base.enemy.theme.race,
+        rivais: ms4.map((m, i) => ({ id: usados[i].id, nome: usados[i].label, ...stats(m.enemy) })) });
+    }
+    dias.push(cacheAnalise.get(d));
+  }
+  const temas = rushDeck.rushThemes(pool).sort((a, b) => a.race - b.race).map((t) => ({ race: t.race, nome: gerador.RACE_PLURAL[t.race] || t.name, size: t.size, peso: Math.sqrt(t.size) }));
+  return { dias, faltam: total - dias.length, temas };
+}
 
 
 // ---- tradução Rush (tools/rush/traducao/*.json) e artes Rush faltando ----
@@ -467,6 +506,16 @@ createServer(async (req, res) => {
       const q = url.searchParams.get('q') ?? '';
       if (q.length > 60) return json(res, 400, { erro: 'busca longa demais' });
       return json(res, 200, { cartas: buscarCartas(q), rushDisponivel: !!dado('src/data/rush/cards.json'), classicoDisponivel: temporadas().length > 0 });
+    }
+    if (req.method === 'GET' && rota === '/api/desafio/analise') {
+      const de = url.searchParams.get('de'), ate = url.searchParams.get('ate');
+      if ([...url.searchParams.keys()].some((k) => !['de', 'ate', 'leve'].includes(k))) return json(res, 400, { erro: 'parâmetros aceitos: de, ate, leve' });
+      const leve = url.searchParams.get('leve');
+      if (leve !== null && leve !== '0' && leve !== '1') return json(res, 400, { erro: 'leve: 0 ou 1' });
+      if (!dataOk(de) || !dataOk(ate)) return json(res, 400, { erro: 'de/ate: AAAA-MM-DD (até 400 dias de hoje)' });
+      const n = (ms(ate) - ms(de)) / 86400000 + 1;
+      if (n < 1 || n > MAX_ANALISE) return json(res, 400, { erro: `intervalo: de 1 a ${MAX_ANALISE} dias (de <= ate)` });
+      return json(res, 200, await analise(de, ate, leve === '1'));
     }
     if (req.method === 'GET' && rota === '/api/desafio') {
       const data = url.searchParams.get('data');

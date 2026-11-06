@@ -741,6 +741,14 @@ const SYNC_STATUS = {
   taken: 'Esta chave já está ligada a outro aparelho (ou o segredo foi trocado nele).',
   none: 'Ainda não sincronizou: precisa de internet. Tenta sozinha a cada abertura.',
 };
+/** Último erro gravado pelo sync (cred.lastError.code); some no próximo sync bem-sucedido. */
+const SYNC_ERRORS = {
+  413: 'O progresso ficou grande demais para o servidor.',
+  429: 'Muitos pedidos agora. Tento de novo em instantes.',
+  503: 'Servidor de sincronização cheio ou fora do ar.',
+  schema: 'Outro aparelho usa uma versão mais nova do jogo: recarregue a página.',
+};
+const syncError = (code) => SYNC_ERRORS[code] || `O servidor recusou (código ${Number(code) || '?'}).`;
 const ago = (at) => {
   const minutes = Math.round((Date.now() - at) / 60000);
   return minutes < 1 ? 'agora há pouco' : minutes < 60 ? `há ${minutes} min` : minutes < 1440 ? `há ${Math.round(minutes / 60)} h` : `em ${new Date(at).toLocaleDateString('pt-BR')}`;
@@ -792,14 +800,20 @@ async function qrSvg(text) {
 function renderSync(block) {
   const cred = credOf(playerKey);
   const status = cred?.status || 'none';
+  // Aparelho que já sincronizava e recebeu 403: quase sempre o segredo foi trocado no outro aparelho, não roubo da chave.
+  const rotated = status === 'taken' && cred.lastError?.code === 403;
+  const lastError = status === 'on' && cred.lastError ? `<p class="note sync-warn">${syncError(cred.lastError.code)}</p>` : '';
   const busy = (button, task) => async () => { button.disabled = true; try { await task(); } finally { button.disabled = false; } };
   block.innerHTML = `<h2 id="sync-title">Sincronizar aparelhos</h2>
-    <p class="note sync-status ${status === 'taken' ? 'sync-warn' : ''}">${SYNC_STATUS[status] || SYNC_STATUS.none}${status === 'on' && cred.at ? ` Última sincronização ${ago(cred.at)}.` : ''}</p>
-    ${status === 'taken' ? `<p class="note">Se o outro aparelho é seu, abra nele <b>Ajustes › Sincronizar aparelhos › Ligar outro aparelho</b> e abra aqui o link ou o QR. Se não é, gere uma chave nova: o progresso deste aparelho vai junto (o desafio do dia e os próximos boosters mudam com a chave).</p>` : ''}
+    <p class="note sync-status ${status === 'taken' ? 'sync-warn' : ''}">${rotated ? 'Segredo trocado em outro aparelho: abra o link novo.' : SYNC_STATUS[status] || SYNC_STATUS.none}${status === 'on' && cred.at ? ` Última sincronização ${ago(cred.at)}.` : ''}</p>
+    ${lastError}
+    ${rotated ? '<p class="note">No aparelho onde trocou o segredo, abra <b>Ajustes › Sincronizar aparelhos › Ligar outro aparelho</b> e abra aqui o link ou o QR.</p>' : ''}
+    ${status === 'taken' && !rotated ? `<p class="note">Se o outro aparelho é seu, abra nele <b>Ajustes › Sincronizar aparelhos › Ligar outro aparelho</b> e abra aqui o link ou o QR. Se não é, gere uma chave nova: o progresso deste aparelho vai junto (o desafio do dia e os próximos boosters mudam com a chave).</p>` : ''}
     <div class="sync-actions">
       ${status === 'on' || status === 'none' ? '<button class="btn ghost" type="button" data-sync="now">Sincronizar agora</button>' : ''}
       ${status === 'off' ? '<button class="btn" type="button" data-sync="enable">Ligar sincronização</button>' : ''}
-      ${status === 'taken' ? '<button class="btn" type="button" data-sync="new-key">Gerar nova chave</button><button class="btn ghost" type="button" data-sync="retry">Tentar de novo</button>' : ''}
+      ${status === 'taken' && !rotated ? '<button class="btn" type="button" data-sync="new-key">Gerar nova chave</button><button class="btn ghost" type="button" data-sync="retry">Tentar de novo</button>' : ''}
+      ${rotated ? '<button class="btn" type="button" data-sync="retry">Tentar de novo</button><button class="text-danger" type="button" data-sync="new-key">Não é meu: gerar nova chave</button>' : ''}
     </div>
     ${status === 'on' ? `<details class="sync-link-box" id="sync-details">
       <summary class="btn">Ligar outro aparelho</summary>
@@ -813,7 +827,7 @@ function renderSync(block) {
 
   const on = (name, task) => { const button = block.querySelector(`[data-sync="${name}"]`); button?.addEventListener('click', busy(button, task)); };
   const report = (result) => {
-    const text = { on: result.changed ? 'Progresso atualizado com o outro aparelho.' : 'Tudo sincronizado.', taken: 'Esta chave já tem dono em outro aparelho.', offline: 'Sem conexão com o servidor. Tento de novo mais tarde.', schema: 'Outro aparelho usa uma versão mais nova do jogo: recarregue a página.', error: 'O servidor recusou agora. Tente mais tarde.' }[result.status];
+    const text = { on: result.changed ? 'Progresso atualizado com o outro aparelho.' : 'Tudo sincronizado.', taken: credOf(playerKey)?.lastError?.code === 403 ? 'Segredo trocado em outro aparelho: abra o link novo.' : 'Esta chave já tem dono em outro aparelho.', offline: 'Sem conexão com o servidor. Tento de novo mais tarde.', schema: SYNC_ERRORS.schema, error: syncError(result.code) }[result.status];
     if (text) toast(text);
     renderSync(block);
   };

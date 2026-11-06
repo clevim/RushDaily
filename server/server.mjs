@@ -133,14 +133,18 @@ export function startServer(options = {}) {
   const touch = (key) => { const now = opts.now(); q.seen.run(key, now, opts.accessGapMs); q.day.run(key, dayOf(now)); };
   const limit = { ip: limiter(opts.limits.ip), key: limiter(opts.limits.key), claim: limiter(opts.limits.claim) };
 
-  const bearer = (req) => {
+  // O limite por chave conta só falhas de autenticação: quem não sabe o segredo não bloqueia o dono.
+  // ponytail: o segredo certo passa mesmo com a chave no limite (senão qualquer um derruba o dono); força bruta
+  // continua inviável (>= 132 bits) e o limite por IP segue valendo. Se aceitar segredo curto um dia, rever.
+  const denied = (key, error) => { wait(limit.key.take(key)); throw error; };
+  const bearer = (req, key) => {
     const match = /^Bearer ([A-Za-z0-9_-]{22,128})$/.exec(req.headers.authorization || '');
-    if (!match) throw new HttpError(401, 'Falta o segredo de sincronização.');
+    if (!match) denied(key, new HttpError(401, 'Falta o segredo de sincronização.'));
     return match[1];
   };
   // Comparação em tempo constante (digests de 32 bytes).
-  const authorize = (row, req) => {
-    if (!timingSafeEqual(hashOf(row.salt, bearer(req)), row.hash)) throw new HttpError(403, 'Segredo não confere para esta chave.');
+  const authorize = (row, secret, key) => {
+    if (!timingSafeEqual(hashOf(row.salt, secret), row.hash)) denied(key, new HttpError(403, 'Segredo não confere para esta chave.'));
   };
   const rowOf = (key) => {
     const row = q.get.get(key);
@@ -163,21 +167,22 @@ export function startServer(options = {}) {
     const match = /^\/api\/sync\/([^/]+)(\/rotate)?$/.exec(pathname);
     if (!match) throw new HttpError(404, 'Não encontrado.');
     wait(limit.ip.take(clientIp(req)));
-    const key = decodeURIComponent(match[1]);
+    const key = match[1]; // cru (sem decodeURIComponent): a chave é só A-Z0-9, e %xx malformado não vira 500
     if (!KEY.test(key)) throw new HttpError(400, 'Chave inválida: 6 letras maiúsculas ou números.');
-    wait(limit.key.take(key));
     const rotate = Boolean(match[2]);
     const route = `${req.method}${rotate ? ' rotate' : ''}`;
     if ((route === 'PUT' || route === 'POST rotate') && !/^application\/json\b/i.test(req.headers['content-type'] || '')) throw new HttpError(415, 'Envie application/json.');
+    // Segredo antes de procurar a chave: sem segredo é sempre 401 (não revela se a chave existe).
+    const known = ['GET', 'PUT', 'POST rotate', 'DELETE'].includes(route);
+    const secret = known ? bearer(req, key) : null;
 
     if (route === 'GET') {
       const row = rowOf(key);
-      authorize(row, req);
+      authorize(row, secret, key);
       touch(key);
       return [200, { data: JSON.parse(row.data), rev: row.rev, updatedAt: row.updated_at }];
     }
     if (route === 'PUT') {
-      const secret = bearer(req);
       const body = await readBody(req, opts.maxBytes);
       if (!body || typeof body !== 'object' || !Number.isSafeInteger(body.baseRev) || !validData(body.data)) throw new HttpError(400, 'Corpo esperado: { data: { v, ...seções }, baseRev }.');
       const text = JSON.stringify(body.data);
@@ -189,11 +194,15 @@ export function startServer(options = {}) {
         wait(limit.claim.take(clientIp(req)));
         if (q.count.get().n >= opts.maxKeys) throw new HttpError(503, 'Servidor cheio: sincronização indisponível para chaves novas.');
         const salt = randomBytes(16);
-        try { q.insert.run(key, salt, hashOf(salt, secret), text, now, now); } catch { throw new HttpError(409, 'A chave acabou de ser reivindicada por outro aparelho.', { rev: 1 }); }
+        try { q.insert.run(key, salt, hashOf(salt, secret), text, now, now); } catch (error) {
+          // Só a chave duplicada (PRIMARY KEY/UNIQUE) é "outro reivindicou"; disco cheio, banco travado etc. viram 500.
+          if (error?.errcode === 1555 || error?.errcode === 2067) throw new HttpError(409, 'A chave acabou de ser reivindicada por outro aparelho.', { rev: 1 });
+          throw error;
+        }
         touch(key);
         return [201, { rev: 1, updatedAt: now }];
       }
-      authorize(row, req);
+      authorize(row, secret, key);
       touch(key);
       if (body.baseRev !== row.rev || q.update.run(text, now, key, body.baseRev).changes !== 1) {
         // Mudou desde a última leitura: devolve o atual para o cliente juntar (mergeProgress) e reenviar.
@@ -204,7 +213,7 @@ export function startServer(options = {}) {
     }
     if (route === 'POST rotate') {
       const row = rowOf(key);
-      authorize(row, req);
+      authorize(row, secret, key);
       const body = await readBody(req, 1024);
       if (!SECRET.test(body?.secret || '')) throw new HttpError(400, 'Segredo novo inválido (base64url, 22 a 128 caracteres).');
       const salt = randomBytes(16);
@@ -213,10 +222,15 @@ export function startServer(options = {}) {
     }
     if (route === 'DELETE') {
       const row = rowOf(key);
-      authorize(row, req);
-      q.remove.run(key);
-      q.removeAccess.run(key); // o "apagar do servidor" leva também os registros de acesso
-      q.removeDays.run(key);
+      authorize(row, secret, key);
+      // Tudo ou nada: o "apagar do servidor" leva também os registros de acesso.
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        q.remove.run(key);
+        q.removeAccess.run(key);
+        q.removeDays.run(key);
+        db.exec('COMMIT');
+      } catch (error) { db.exec('ROLLBACK'); throw error; }
       return [204, null];
     }
     throw new HttpError(405, 'Método não permitido.');
@@ -290,7 +304,7 @@ export function startServer(options = {}) {
     }
     const one = /^\/admin\/usuario\/([^/]+)$/.exec(path);
     if (one) {
-      const key = decodeURIComponent(one[1]);
+      const key = one[1]; // cru: só A-Z0-9 (sem decodeURIComponent, que lança com %xx malformado)
       if (!KEY.test(key)) throw new HttpError(400, 'Chave inválida.');
       const r = db.prepare(`${USER_SQL} WHERE s.key = ?`).get(key);
       if (!r) throw new HttpError(404, 'Chave não encontrada.');

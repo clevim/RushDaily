@@ -4,7 +4,7 @@
 import createCore, { OcgLocation as L, OcgMessageType as M, OcgPosition as P, OcgResponseType as R } from '../vendor/ocgcore/index.js';
 import { RUSH_ZONES, TYPE, createDuel } from '../engine/ocg.mjs';
 import { decideRush } from '../engine/rush-ai.mjs';
-import { DIFFICULTY_IDS, generateDailyMatch, getDifficulty } from '../engine/daily-generator.mjs';
+import { DIFFICULTY_IDS, GEN_VERSION, generateDailyMatch, getDifficulty } from '../engine/daily-generator.mjs';
 import { HEART_CARD, HEART_CODE, HEART_SCRIPT, HEART_SCRIPT_NAME } from '../engine/heart.mjs';
 import { ATTRIBUTES, RACES, describe } from '../data/classic/strings-pt.mjs';
 import { cardStats, isMonster } from './rush-info.js';
@@ -14,6 +14,7 @@ import { POS_TITLE, RIVAL_TURN, TRAP_SET_WHY, addMenuCorner, bindCardGestures, b
 import { armConfirm, battleForecast, createPacer, disarmConfirm, escape, getPlayerKey, heartUnlocked, readJson, reducedMotion, removeKey, settingsFor, today, toast, useHeart, writeJson } from './common.js';
 import { maximumTrios } from './maximum.js';
 import { duelScene, enigmaBurst, enigmaMini } from './scene.js';
+import { recordAttempt, resumable } from './duel-save.js';
 import { resultGrid } from './share.js';
 import { queueSync, syncNow } from './sync.js';
 
@@ -45,9 +46,10 @@ const match = generateDailyMatch({ date, difficulty, pool });
 const FORMAT = match.format;
 const decks = [match.player.deck, match.enemy.deck];
 const startLp = [match.player.lp, match.enemy.lp];
-// Partida salva do dia (v2: respostas do motor). Saves do motor antigo são ignorados.
-const savedRaw = readJson(saveKey, null);
-const saved = savedRaw?.v === 2 ? savedRaw : null;
+// Partida salva do dia (v2: respostas do motor + gen do gerador). Save de outro motor ou de outros decks do dia é descartado.
+const { saved, stale } = resumable(readJson(saveKey, null));
+if (!saved) removeKey(saveKey);
+if (stale) toast('O jogo foi atualizado e os decks de hoje mudaram: sua partida salva recomeçou.');
 // O Coração entra no duelo se havia carga no começo; a partida retomada mantém a escolha.
 const withHeart = saved ? Boolean(saved.heart) : heartUnlocked(playerKey);
 const cardOf = (code) => cards.get(code) || { id: code, name: `Carta ${code}`, type: 0, desc: '', level: 0, atk: 0, def: 0 };
@@ -87,7 +89,7 @@ const duelSeed = saved ? (saved.seed || match.seed) : `${match.seed}:${crypto.ge
 const duel = createDuel(lib, { seed: duelSeed, format: FORMAT, decks, lp: startLp, hands: match.enemy.hand ? [FORMAT.hand, match.enemy.hand] : null, skills: withHeart ? [{ team: ME, code: HEART_CODE }] : [], cards, readScript, onError: (text) => console.warn('[motor]', text) });
 let responses = [];
 let view = duel.snapshot();
-const aiMemory = {};
+const aiMemory = { ...saved?.ai }; // primeiro turno e sorteio da IA voltam com a partida (a reprodução não chama a IA)
 
 /* ---------- Cartas ---------- */
 
@@ -765,7 +767,8 @@ async function openPile(controller, kind) {
 /* ---------- Laço do duelo ---------- */
 
 function save(extra = {}) {
-  writeJson(saveKey, { v: 2, seed: duelSeed, heart: withHeart, responses, ...(surrendered && { surrender: true }) });
+  const ai = { firstTurn: aiMemory.firstTurn, rng: aiMemory.rng };
+  writeJson(saveKey, { v: 2, gen: GEN_VERSION, seed: duelSeed, heart: withHeart, responses, ai, ...(surrendered && { surrender: true }), ...extra });
 }
 
 /* ---------- Desistir (segurar o Deck): termina como derrota pelo fluxo normal ---------- */
@@ -779,7 +782,7 @@ function surrender() {
   if ($('#ask').open) $('#ask').close(); // pergunta do motor aberta: fica sem resposta (o duelo acabou)
   save();
   render();
-  finish(FOE, false);
+  finish(FOE, Boolean(saved?.done));
 }
 bindSurrender({
   enabled: () => !surrendered && duel.state.winner === null, // a qualquer momento
@@ -821,6 +824,7 @@ async function pump(redo = []) {
 /* ---------- Fim do duelo ---------- */
 
 let rewardDay = date; // qual booster esta vitória liberou (null: o desta dificuldade já saiu hoje)
+const attemptsKey = `rushdaily-attempts:${playerKey}`; // só do aparelho: o histórico sincronizado segue 'win'|'loss'|'draw'
 let firstWin = true; // 1ª vitória do dia: é ela que traz a peça do Enigma
 function finish(winner, already) {
   const won = winner === ME;
@@ -832,6 +836,7 @@ function finish(winner, already) {
     firstWin = history[playerKey]?.[date] !== 'win';
     history[playerKey] = { ...(history[playerKey] || {}), [date]: history[playerKey]?.[date] === 'win' ? 'win' : result };
     writeJson('rushdaily-history', history);
+    writeJson(attemptsKey, recordAttempt(readJson(attemptsKey, {}), `${date}~${difficulty}`, won, Math.min(duel.state.turn, FORMAT.turnLimit)));
     // Booster sorteado pela chave do jogador: cada um tira cartas diferentes do mesmo desafio.
     // Um booster por dificuldade vencida no dia ("dia~<id>"); a peça vem só com a 1ª vitória do dia.
     if (won) {
@@ -1008,7 +1013,8 @@ $('#rematch').addEventListener('click', () => { removeKey(saveKey); location.rel
 // Grade para colar no grupo (sem cartas): o desafio do dia é igual para todos, então dá para comparar.
 $('#share').addEventListener('click', async () => {
   const winner = duel.state.winner;
-  const text = resultGrid({
+  const { tries, winTurn } = readJson(attemptsKey, {})[`${date}~${difficulty}`] || {};
+  const text = resultGrid({ tries, winTurn,
     date, difficulty: settings.label, rating: settings.rating, outcome: winner === ME ? 'win' : winner === FOE ? 'loss' : 'draw',
     turns: Math.min(duel.state.turn, FORMAT.turnLimit), start: startLp, lpByTurn,
     vs: `${match.player.label} 🆚 ${match.enemy.label}`, url: new URL('.', location.href).href,

@@ -172,7 +172,8 @@ export function validateRushDeck(deck, byId, limits = RUSH_LIMITS) {
  * race: força o Tipo do tema (ex.: confronto do desafio diário); sem ele, sorteia entre rushThemes.
  * Devolve { main, extra, theme: { race, name, attribute, setcode } }.
  */
-export function buildRushDeck({ seed, pool, format = FORMATS.rush, race = null }) {
+function buildOne({ seed, pool: rawPool, format = FORMATS.rush, race = null }) {
+  const pool = [...rawPool].sort((a, b) => a.id - b.id); // a ordem do cards.json não muda o deck
   const random = seeded(`rush:${seed}`);
   const byId = new Map(pool.map((card) => [card.id, card]));
   const themes = rushThemes(pool);
@@ -183,11 +184,11 @@ export function buildRushDeck({ seed, pool, format = FORMATS.rush, race = null }
   const attrCount = new Map();
   for (const card of ofRace) attrCount.set(card.attribute, (attrCount.get(card.attribute) || 0) + 1);
   const attribute = weightedPick(random, [...attrCount].map(([attr, n]) => [attr, n * n]));
-  // Arquétipo (setcode) do Tipo com 4+ cartas: metade das vezes vira um segundo eixo.
+  // Arquétipo (setcode): só com 4+ monstros jogáveis do Tipo (conjunto só de Magia/Armadilha não forma deck), peso pelos monstros.
   const setCount = new Map();
-  for (const card of pool) if (card.setcode !== '0' && playable(card) && (card.race === theme.race || !isMonster(card))) setCount.set(card.setcode, (setCount.get(card.setcode) || 0) + 1);
+  for (const card of ofRace) if (card.setcode !== '0') setCount.set(card.setcode, (setCount.get(card.setcode) || 0) + 1);
   const sets = [...setCount].filter(([, n]) => n >= 4);
-  const setcode = sets.length && random() < 0.5 ? weightedPick(random, sets.map(([code, n]) => [code, n])) : null;
+  const setcode = sets.length && random() < 0.7 ? weightedPick(random, sets) : null;
   const raceName = theme.name;
   const racePtName = racePt(theme.race);
   const attrName = ATTRIBUTES_PT[attribute];
@@ -208,7 +209,10 @@ export function buildRushDeck({ seed, pool, format = FORMATS.rush, race = null }
       if (!quota) {
         // Pacote (Máximo, matérias de Fusão) estourou a cota: a vaga sai de outra cota, de monstro se possível.
         quota = plan.find((q) => q.test(card));
-        const donor = plan.find((q) => q !== quota && q.have < q.n && q.monster === quota.monster) || plan.find((q) => q !== quota && q.have < q.n);
+        // Doa primeiro quem tem folga fora da cota baixa (a mão precisa de monstro jogável sem Tributo); a baixa só até 16 de 40.
+        const slack = (q) => q !== quota && q.have < q.n;
+        const donor = plan.find((q) => slack(q) && q.monster === quota.monster && q.key !== 'low')
+          || plan.find((q) => slack(q) && q.key === 'low' && q.n > Math.round(16 * format.main / 40)) || plan.find(slack);
         if (donor) { donor.n -= 1; quota.n += 1; }
       }
       quota.have += 1;
@@ -242,25 +246,25 @@ export function buildRushDeck({ seed, pool, format = FORMATS.rush, race = null }
     return w;
   };
 
-  // Pacote de Máximo do tema (as três peças, 2 cópias cada) em parte dos decks.
+  // Estrelas: as Fusões escolhidas, as peças de Máximo e um Tributo forte do Tipo; o resto do deck favorece cartas que as citam.
+  const starNames = new Set();
+  // Pacote de Máximo do tema (as três peças, 3 cópias cada: com 2 o trio fecha em ~5% das mãos) em parte dos decks.
   const centers = pool.filter((card) => card.maximum === 'C' && byId.get(card.id - 1)?.maximum === 'L' && byId.get(card.id + 1)?.maximum === 'R'
     && (card.race === theme.race || card.attribute === attribute));
   if (centers.length && random() < 0.35) {
     const center = centers[Math.floor(random() * centers.length)];
-    for (const piece of [byId.get(center.id - 1), center, byId.get(center.id + 1)]) add(piece, 2);
+    for (const piece of [byId.get(center.id - 1), center, byId.get(center.id + 1)]) { starNames.add(piece.name).add(piece.nameEn); add(piece, 3); }
   }
   // Pacote de Fusão do tema: uma Fusão do Tipo cujas matérias citadas existem no pool entra com 2 cópias de cada matéria.
   const byName = new Map(pool.filter(playable).flatMap((card) => [[card.nameEn, card], [card.name, card]]));
   const fusionCandidates = pool.filter((card) => card.type & TYPE.FUSION && card.race === theme.race && !card.legend)
     .map((card) => ({ card, mats: materialsOf(card).map((name) => byName.get(name)) }))
     .filter(({ mats }) => mats.length >= 2 && mats.every((mat) => mat && !mat.legend && level(mat) <= 6));
-  // Estrelas: as Fusões escolhidas e um Tributo forte do Tipo (1 cópia); o resto do deck favorece cartas que as citam.
-  const starNames = new Set();
   const tributes = ofRace.filter((card) => level(card) >= 7 && !card.legend && card.type & TYPE.EFFECT);
   if (tributes.length) {
-    const star = tributes[Math.floor(random() * tributes.length)];
+    const star = byId.get(weightedPick(random, tributes.map((c) => [c.id, c.attribute === attribute ? 3 : 1])));
     starNames.add(star.name).add(star.nameEn);
-    add(star, 1);
+    add(star, 2);
   }
   if (fusionCandidates.length) {
     const first = fusionCandidates[Math.floor(random() * fusionCandidates.length)];
@@ -279,18 +283,38 @@ export function buildRushDeck({ seed, pool, format = FORMATS.rush, race = null }
     const inTheme = options.filter(themed);
     // ~80% dos monstros e ~60% das Magias/Armadilhas vêm do tema, quando há opção.
     const share = isMonster(options[0]) ? 0.8 : 0.6;
-    const list = inTheme.length && (random() < share || inTheme.length === options.length) ? inTheme : options.filter((card) => !themed(card));
+    let off = options.filter((card) => !themed(card));
+    if (isMonster(options[0])) off = off.filter((card) => card.attribute === attribute).length ? off.filter((card) => card.attribute === attribute) : off; // fora do Tipo, ao menos o Atributo de apoio
+    const list = inTheme.length && (random() < share || inTheme.length === options.length) ? inTheme : off;
     return byId.get(weightedPick(random, (list.length ? list : options).map((c) => [c.id, weights.get(c.id)])));
   };
+  // Arquétipo: 2 a 3 nomes de monstro de Nível baixo do setcode, com 2 a 3 cópias cada.
+  if (setcode) {
+    const core = ofRace.filter((card) => card.setcode === setcode && level(card) <= 4 && !card.legend && allowed(card));
+    for (let i = 0; i < 2 + Math.floor(random() * 2) && core.length; i += 1) {
+      const [card] = core.splice(Math.floor(random() * core.length), 1);
+      if (allowed(card)) add(card, Math.min(2 + Math.floor(random() * 2), free(card)));
+    }
+  }
+  // Lendas: uma por categoria (a regra permite), de preferência do tema. A Magia Lenda fica livre se o deck tem Fusão (Polymerization).
+  for (const kind of ['monster', 'spell', 'trap']) {
+    if ((kind === 'spell' && planned.length) || random() < 0.2) continue;
+    const options = pool.filter((card) => card.legend && category(card) === kind && allowed(card) && room(card)
+      && (kind !== 'spell' || !/Fusion|Polymerization/i.test(card.nameEn ?? '')));
+    if (options.length) add(pickFrom(options), 1);
+  }
   for (const quota of plan) {
     while (quota.have < quota.n) {
-      const options = pool.filter((card) => allowed(card) && quota.test(card));
+      let options = pool.filter((card) => allowed(card) && quota.test(card));
       if (!options.length) break;
+      // Sobrou pouco: completa cópias de nomes já no deck em vez de abrir um nome novo com 1 cópia.
+      const owned = quota.n - quota.have < 3 ? options.filter((card) => counts.get(nameKey(card))) : [];
+      if (owned.length) options = owned;
       const card = pickFrom(options);
       // Cópias: Lenda 1; nível baixo costuma ir em 2 ou 3; nível 7+ em 1 ou 2.
       // Suporte e técnicas: 1 cópia (2 se do tema); motor (monstros de nível baixo): 2 ou 3.
       const want = card.legend ? 1 : isMonster(card) && level(card) >= 7 ? 1 + Math.floor(random() * 2)
-        : isMonster(card) ? 2 + Math.floor(random() * 2) : 1 + (themed(card) ? 1 : 0);
+        : isMonster(card) ? 2 + Math.floor(random() * 2) : themed(card) ? 3 : 2;
       add(card, Math.min(want, free(card), quota.n - quota.have));
     }
   }
@@ -404,4 +428,38 @@ export function buildRushDeck({ seed, pool, format = FORMATS.rush, race = null }
     }
   }
   return { main, extra, theme: { race: theme.race, name: raceName, attribute, setcode } };
+}
+
+/** Nota de consistência do deck: simula mãos de 5 e mede quantas cartas da mão têm o requisito atendido pela própria mão
+ * (+ Fusões do adicional) e se há monstro de Nível baixo (jogável sem Tributo). Mesma seed, mesma nota. */
+export function handScore(deck, byId, { hands = 200, seed = 'mao' } = {}) {
+  const random = seeded(`mao:${seed}`);
+  const cards = deck.main.map((id) => byId.get(id));
+  const extra = deck.extra.map((id) => byId.get(id));
+  let low = 0; let ready = 0;
+  for (let h = 0; h < hands; h += 1) {
+    const hand = [];
+    const taken = new Set();
+    while (hand.length < 5) { const i = Math.floor(random() * cards.length); if (!taken.has(i)) { taken.add(i); hand.push(cards[i]); } }
+    if (hand.some((c) => isMonster(c) && level(c) <= 4)) low += 1;
+    ready += Math.min(3, hand.filter((c) => (isMonster(c) ? level(c) <= 4 : true) && meetsRequirements(c, hand, extra)).length) / 3;
+  }
+  const names = new Set(cards.map(nameKey)).size;
+  return low / hands + ready / hands + (names >= 16 && names <= 24 ? 0.2 : 0);
+}
+
+/**
+ * Deck Rush de 40 (+ adicional). Com candidates > 1, monta várias variações da seed e fica com a de melhor handScore
+ * (o desafio diário usa isso no jogador; o rival fica com 1 para os 4 decks manterem a escala de força).
+ */
+export function buildRushDeck({ candidates = 1, ...options }) {
+  if (candidates <= 1) return buildOne(options);
+  const byId = new Map(options.pool.map((card) => [card.id, card]));
+  let best = null;
+  for (let n = 0; n < candidates; n += 1) {
+    const deck = buildOne({ ...options, seed: n ? `${options.seed}#${n}` : options.seed });
+    const score = handScore(deck, byId, { seed: options.seed, hands: 1000 });
+    if (!best || score > best.score) best = { deck, score };
+  }
+  return best.deck;
 }

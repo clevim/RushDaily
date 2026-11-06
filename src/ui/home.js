@@ -6,6 +6,7 @@ import { RUSH_BACK, paintRushCards, rushImg, warmRushCards } from './rush-render
 import { cardStats, isMonster } from './rush-info.js';
 import { homeScene } from './scene.js';
 import { syncNow } from './sync.js';
+import { canContinue } from './duel-save.js';
 
 const playerKey = getPlayerKey();
 const date = today();
@@ -67,12 +68,12 @@ function render() {
   $('#status').innerHTML = result === 'win' ? (boosterPending ? `Vitória registrada. Seu booster está esperando: ${boosterLink}.` : thisTaken ? 'Vitória registrada e o booster desta dificuldade aberto. Vença em outra dificuldade para ganhar o dela (sem peça do Enigma).' : 'Vitória registrada. Vença nesta dificuldade para ganhar o booster dela (sem peça do Enigma).')
     : result === 'loss' ? 'Você perdeu hoje. A revanche continua aberta.'
       : result === 'draw' ? 'Empate. A revanche continua aberta.'
-        : ongoing?.v === 2 && ongoing.responses?.length && !ongoing.done ? 'Sua partida de hoje está salva: entre para continuar.'
+        : canContinue(ongoing) ? 'Sua partida de hoje está salva: entre para continuar.'
           : Object.keys(readJson('rushdaily-history', {})[playerKey] || {}).length ? 'Vença o duelo de hoje para ganhar um booster.'
             : 'Primeira vez? Você vence zerando os PV (pontos de vida) do rival. O duelo começa com dicas, e "Como jogar" explica as palavras. Vencer dá um booster.';
   $('#classic').href = `arena.html?player=${playerKey}`;
   $('#enter').href = `duel.html?player=${playerKey}&difficulty=${difficulty}`;
-  $('#enter').textContent = ongoing?.v === 2 && ongoing.responses?.length && !ongoing.done ? 'Continuar o duelo' : 'Entrar na arena';
+  $('#enter').textContent = canContinue(ongoing) ? 'Continuar o duelo' : 'Entrar na arena';
 
   const main = uniqueCards(data.player.deck.main).sort((a, b) => order(cards.get(a.id), cards.get(b.id)));
   const ids = data.player.deck.main.map((id) => cards.get(id));

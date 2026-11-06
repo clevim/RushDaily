@@ -63,6 +63,20 @@ function deck(value) {
   return { id, name: (str(value.name, 40) ?? 'Deck').trim() || 'Deck', main: ids(value.main), extra: ids(value.extra).slice(0, 15), updatedAt: time(value.updatedAt) };
 }
 
+function duelOf(duel) {
+  if (!isObj(duel) || !isDay(duel.date) || !str(duel.vs, 6, /^[A-Z0-9]{6}$/)) return null;
+  return {
+    date: duel.date,
+    vs: duel.vs,
+    result: RESULTS.includes(duel.result) ? duel.result : null,
+    turns: int(duel.turns, 999),
+    lp: int(duel.lp, 1e6),
+    ...(str(duel.replay, REPLAY_MAX, /^[A-Za-z0-9_-]+$/) ? { replay: duel.replay } : {}),
+  };
+}
+
+const reward = (value) => (isObj(value) && value.pending === true && str(value.seed, 80) ? { seed: value.seed, difficulty: str(value.difficulty, 20) || 'duelist', pending: true } : null);
+
 /** Progresso no formato atual, com padrões nas seções que faltam. Esquema mais novo que este código: SchemaError. */
 export function normalize(data) {
   const src = isObj(data) ? data : {};
@@ -71,17 +85,9 @@ export function normalize(data) {
   if (v > SCHEMA_VERSION) throw new SchemaError(`Progresso salvo por uma versão mais nova do jogo (esquema ${v}). Recarregue a página.`);
   const out = { v: SCHEMA_VERSION };
   out.history = Object.fromEntries(entries(src.history).filter(([day, result]) => isDay(day) && RESULTS.includes(result)));
-  out.pvp = (Array.isArray(src.pvp) ? src.pvp : []).filter((duel) => isObj(duel) && isDay(duel.date) && str(duel.vs, 6, /^[A-Z0-9]{6}$/)).slice(0, PVP_MAX).map((duel) => ({
-    date: duel.date,
-    vs: duel.vs,
-    result: RESULTS.includes(duel.result) ? duel.result : null,
-    turns: int(duel.turns, 999),
-    lp: int(duel.lp, 1e6),
-    ...(str(duel.replay, REPLAY_MAX, /^[A-Za-z0-9_-]+$/) ? { replay: duel.replay } : {}),
-  }));
+  out.pvp = (Array.isArray(src.pvp) ? src.pvp : []).map(duelOf).filter(Boolean).slice(0, PVP_MAX);
   out.boosters = Object.fromEntries(entries(src.boosters).filter(([day]) => isSlot(day)).map(([day, value]) => [day, booster(value)]).filter(([, value]) => value));
-  out.rewards = Object.fromEntries(entries(src.rewards).filter(([day, value]) => isSlot(day) && isObj(value) && value.pending === true && str(value.seed, 80))
-    .map(([day, value]) => [day, { seed: value.seed, difficulty: str(value.difficulty, 20) || 'duelist', pending: true }]));
+  out.rewards = Object.fromEntries(entries(src.rewards).filter(([day]) => isSlot(day)).map(([day, value]) => [day, reward(value)]).filter(([, value]) => value));
   out.collection = Object.fromEntries(entries(src.collection).filter(([id, count]) => isCardId(id) && int(count, 999) !== null && count > 0));
   out.foils = Object.fromEntries(entries(src.foils).filter(([id]) => isCardId(id)).map(([id, list]) => [id, [...new Set(Array.isArray(list) ? list.filter((foil) => FOILS.includes(foil)) : [])]]).filter(([, list]) => list.length));
   out.pity = int(src.pity, 9999) ?? 0;
@@ -120,21 +126,33 @@ function pityOf(boosters) {
   return points;
 }
 
+/** Desempate que não depende de qual lado é o local: os dois aparelhos escolhem o mesmo (a junção converge). */
+const stable = (a, b) => (canonical(a) >= canonical(b) ? a : b);
+/** União de objetos por chave; valor diferente na mesma chave: desempate estável. */
+const unite = (a, b) => {
+  const out = { ...a };
+  for (const [key, value] of Object.entries(b)) out[key] = key in out ? stable(out[key], value) : value;
+  return out;
+};
+
 function mergeDecks(local, remote, now) {
   const deleted = { ...remote.deleted };
   for (const [id, at] of Object.entries(local.deleted)) deleted[id] = Math.max(at, deleted[id] || 0);
   const byId = new Map();
-  // Ordem: a do aparelho local, depois os decks que só o outro tem. Empate de updatedAt: fica o local.
+  // Vence o updatedAt maior; empate (inclusive 0, o "Deck inicial"): desempate estável pelo conteúdo.
   for (const item of [...remote.list, ...local.list]) {
     const seen = byId.get(item.id);
-    if (!seen || item.updatedAt >= seen.updatedAt) byId.set(item.id, item);
+    byId.set(item.id, !seen || item.updatedAt > seen.updatedAt ? item : item.updatedAt < seen.updatedAt ? seen : stable(seen, item));
   }
-  const order = [...new Set([...local.list, ...remote.list].map((item) => item.id))];
+  // Ordem: a do servidor, depois os decks que só este aparelho tem (o servidor manda: os aparelhos convergem).
+  const order = [...new Set([...remote.list, ...local.list].map((item) => item.id))];
   // Lápide vence a edição feita antes dela; editar depois de apagar (no outro aparelho) traz o deck de volta.
   const list = order.map((id) => byId.get(id)).filter((item) => !(deleted[item.id] >= item.updatedAt));
   for (const [id, at] of Object.entries(deleted)) if (now - at > TOMBSTONE_DAYS * 864e5) delete deleted[id];
-  const pick = remote.activeAt > local.activeAt ? remote : local;
-  const active = list.some((item) => item.id === pick.active) ? pick.active : list.find((item) => item.id === local.active)?.id ?? list[0]?.id ?? null;
+  const newer = remote.activeAt > local.activeAt || (remote.activeAt === local.activeAt && (remote.active ?? '') > (local.active ?? ''));
+  const [first, second] = newer ? [remote, local] : [local, remote];
+  const has = (id) => list.some((item) => item.id === id);
+  const active = has(first.active) ? first.active : has(second.active) ? second.active : list[0]?.id ?? null;
   return { active, activeAt: Math.max(local.activeAt, remote.activeAt), list, deleted };
 }
 
@@ -155,14 +173,16 @@ export function mergeProgress(localData, remoteData, now = Date.now()) {
 
   const seen = new Set();
   const fingerprint = (duel) => [duel.date, duel.vs, duel.result, duel.turns, duel.lp, duel.replay || ''].join('|');
+  // Mesmo dia: desempate pela impressão digital (não pela posição, que muda conforme o lado local).
   out.pvp = [...local.pvp, ...remote.pvp].filter((duel) => !seen.has(fingerprint(duel)) && seen.add(fingerprint(duel)))
-    .map((duel, index) => [duel, index]).sort(([a, i], [b, j]) => b.date.localeCompare(a.date) || i - j).map(([duel]) => duel).slice(0, PVP_MAX);
+    .sort((a, b) => b.date.localeCompare(a.date) || (fingerprint(a) < fingerprint(b) ? -1 : fingerprint(a) > fingerprint(b) ? 1 : 0)).slice(0, PVP_MAX);
 
   // Pacote do dia aberto nos dois aparelhos (offline): fica o primeiro aberto; as cartas dos dois continuam na coleção.
   out.boosters = { ...remote.boosters };
   for (const [day, value] of Object.entries(local.boosters)) {
     const other = out.boosters[day];
-    if (!other || !other.openedAt || (value.openedAt && value.openedAt <= other.openedAt)) out.boosters[day] = value;
+    if (!other || (value.openedAt && (!other.openedAt || value.openedAt < other.openedAt))) out.boosters[day] = value;
+    else if ((value.openedAt || '') === (other.openedAt || '')) out.boosters[day] = stable(other, value);
   }
 
   // Coleção: cada lado já somou os próprios pacotes. Somando a cada lado os pacotes que só o outro abriu,
@@ -181,13 +201,14 @@ export function mergeProgress(localData, remoteData, now = Date.now()) {
   out.pity = Object.keys(out.boosters).length ? pityOf(out.boosters) : Math.max(local.pity, remote.pity);
 
   // Booster ganho e ainda fechado: união, menos os dias cujo pacote já foi aberto em algum aparelho (não abre duas vezes).
-  out.rewards = Object.fromEntries(Object.entries({ ...remote.rewards, ...local.rewards }).filter(([day]) => !out.boosters[day]));
+  out.rewards = Object.fromEntries(Object.entries(unite(remote.rewards, local.rewards)).filter(([day]) => !out.boosters[day]));
 
   out.decks = mergeDecks(local.decks, remote.decks, now);
-  out.recover = { ...remote.recover, ...local.recover };
+  out.recover = unite(remote.recover, local.recover);
   // "Coração usado" é evento (o mês gasto): união. Um mês gasto em qualquer aparelho fica gasto em todos.
   out.heartUsed = [...new Set([...local.heartUsed, ...remote.heartUsed])].sort();
-  out.settings = remote.settings.updatedAt > local.settings.updatedAt ? remote.settings : local.settings;
+  const { settings: a } = remote, { settings: b } = local;
+  out.settings = a.updatedAt > b.updatedAt ? a : a.updatedAt < b.updatedAt ? b : stable(a, b);
   return out;
 }
 
@@ -218,18 +239,40 @@ export function readProgress(storage, playerKey) {
 }
 
 /** Grava o progresso (já juntado) nas chaves de sempre. Não apaga nada que não seja recompensa já aberta. */
+// Registro que a junção não mudou fica como está no aparelho: replay longo (que não viaja), campos extras
+// (ex.: `difficulty` do booster) e campos que esta versão ainda não conhece não se perdem ao regravar.
+const same = (raw, value, normalizeOne) => raw != null && canonical(normalizeOne(raw)) === canonical(value);
+
 export function writeProgress(storage, playerKey, data) {
   const progress = normalize(data);
   const history = parse(storage, 'rushdaily-history', {});
-  put(storage, 'rushdaily-history', { ...(isObj(history) ? history : {}), [playerKey]: progress.history });
-  put(storage, `rushdaily-classic-pvp:${playerKey}`, progress.pvp);
-  for (const [day, value] of Object.entries(progress.boosters)) put(storage, `rushdaily-classic-booster:${playerKey}:${day}`, value);
+  const mine = isObj(history) && isObj(history[playerKey]) ? history[playerKey] : {};
+  put(storage, 'rushdaily-history', { ...(isObj(history) ? history : {}), [playerKey]: { ...mine, ...progress.history } });
+  const duels = parse(storage, `rushdaily-classic-pvp:${playerKey}`, []);
+  const unused = Array.isArray(duels) ? [...duels] : [];
+  put(storage, `rushdaily-classic-pvp:${playerKey}`, progress.pvp.map((duel) => {
+    const index = unused.findIndex((raw) => same(raw, duel, duelOf));
+    return index < 0 ? duel : unused.splice(index, 1)[0];
+  }));
+  for (const [day, value] of Object.entries(progress.boosters)) {
+    const key = `rushdaily-classic-booster:${playerKey}:${day}`;
+    if (!same(parse(storage, key, null), value, booster)) put(storage, key, value);
+  }
   for (const day of Object.keys(byDay(storage, `rushdaily-reward:${playerKey}:`))) if (!progress.rewards[day]) storage.removeItem(`rushdaily-reward:${playerKey}:${day}`);
-  for (const [day, value] of Object.entries(progress.rewards)) put(storage, `rushdaily-reward:${playerKey}:${day}`, value);
+  for (const [day, value] of Object.entries(progress.rewards)) {
+    const key = `rushdaily-reward:${playerKey}:${day}`;
+    if (!same(parse(storage, key, null), value, reward)) put(storage, key, value);
+  }
   put(storage, `rushdaily-classic-collection:${playerKey}`, progress.collection);
   put(storage, `rushdaily-classic-foils:${playerKey}`, progress.foils);
   put(storage, `rushdaily-classic-pity:${playerKey}`, progress.pity);
-  put(storage, `rushdaily-classic-decks:${playerKey}`, progress.decks);
+  const decks = parse(storage, `rushdaily-classic-decks:${playerKey}`, {});
+  const oldList = isObj(decks) && Array.isArray(decks.list) ? decks.list : [];
+  put(storage, `rushdaily-classic-decks:${playerKey}`, {
+    ...(isObj(decks) ? decks : {}),
+    ...progress.decks,
+    list: progress.decks.list.map((item) => oldList.find((raw) => isObj(raw) && raw.id === item.id && same(raw, item, deck)) ?? item),
+  });
   put(storage, `rushdaily-enigma-recover:${playerKey}`, progress.recover);
   put(storage, `rushdaily-heart-used:${playerKey}`, progress.heartUsed);
   // Ajustes: só a dificuldade viaja; "reduzir animações" continua sendo do aparelho.

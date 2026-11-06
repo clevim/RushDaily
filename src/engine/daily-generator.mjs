@@ -62,6 +62,9 @@ function themeLabel(theme) {
  * O desafio de `date` (AAAA-MM-DD) na dificuldade pedida. A chave do jogador não entra na seed.
  * Devolve { version, date, seed, format, difficulty, player: { deck, theme, label, lp }, enemy: { deck, theme, label, lp, ai, power } }.
  */
+/** Versão do gerador: muda quando os decks do dia mudam (partidas salvas de outra versão não retomam). */
+export const GEN_VERSION = 3;
+
 export function generateDailyMatch({ date, difficulty = DEFAULT_DIFFICULTY, pool }) {
   const settings = getDifficulty(difficulty);
   const byId = new Map(pool.map((card) => [card.id, card]));
@@ -75,14 +78,14 @@ export function generateDailyMatch({ date, difficulty = DEFAULT_DIFFICULTY, pool
   };
   const mine = pick(themes);
   const rival = pick(themes.filter((theme) => theme.race !== mine.race));
-  const player = buildRushDeck({ seed: `diario:${date}:voce`, pool, format: DAILY_FORMAT, race: mine.race });
+  const player = buildRushDeck({ seed: `diario:${date}:voce`, pool, format: DAILY_FORMAT, race: mine.race, candidates: 8 });
   // Rival: quatro decks do Tipo dele, do mais fraco ao mais forte; a dificuldade escolhe a posição.
-  const candidates = [0, 1, 2, 3].map((n) => buildRushDeck({ seed: `diario:${date}:rival:${n}`, pool, format: DAILY_FORMAT, race: rival.race }))
+  const candidates = [0, 1, 2, 3].map((n) => buildRushDeck({ seed: `diario:${date}:rival:${n}`, pool, format: DAILY_FORMAT, race: rival.race, candidates: 8 }))
     .map((deck) => ({ deck, power: deckPower(deck, byId) }))
     .sort((a, b) => a.power - b.power);
   const enemy = candidates[settings.deckRank];
   return {
-    version: 2,
+    version: GEN_VERSION,
     date,
     seed: `${date}:${settings.id}`,
     format: DAILY_FORMAT,

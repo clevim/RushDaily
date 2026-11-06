@@ -97,9 +97,10 @@ const hearts = (lp, max) => {
 
 /**
  * Resumo legível sem legenda: barras de PV finais dos dois lados + maior golpe do duelo.
- * { date, difficulty, rating, outcome: 'win'|'loss'|'draw', turns, start: [você, rival], lpByTurn }
+ * { date, difficulty, rating, outcome: 'win'|'loss'|'draw', turns, start: [você, rival], lpByTurn, tries?, winTurn? }
+ * tries/winTurn (opcionais): tentativas do dia nesta dificuldade e turno da 1ª vitória; sem eles, o texto é o de sempre.
  */
-export function resultGrid({ date, difficulty, rating, outcome, turns, start, lpByTurn = [], vs = '', url = '' }) {
+export function resultGrid({ date, difficulty, rating, outcome, turns, start, lpByTurn = [], vs = '', url = '', tries = 0, winTurn = 0 }) {
   let last = start;
   let biggest = 0;
   for (let turn = 1; turn <= turns; turn += 1) {
@@ -113,6 +114,7 @@ export function resultGrid({ date, difficulty, rating, outcome, turns, start, lp
     `RushDaily ${day}/${month} · ${difficulty} ${'★'.repeat(rating)}${'☆'.repeat(Math.max(0, 4 - rating))}`,
     ...(vs ? [vs] : []),
     `${label} em ${turns} turno${turns === 1 ? '' : 's'}`,
+    ...(tries > 0 ? [`🔁 ${tries}ª tentativa do dia${winTurn ? ` · 1ª vitória no turno ${winTurn}` : ''}`] : []),
     `Você ${hearts(last[0], start[0])} ${last[0].toLocaleString('pt-BR')} PV`,
     `Rival ${hearts(last[1], start[1])} ${last[1].toLocaleString('pt-BR')} PV`,
     ...(biggest > 0 ? [`💥 Maior golpe: ${biggest.toLocaleString('pt-BR')} de dano`] : []),

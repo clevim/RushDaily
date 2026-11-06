@@ -104,3 +104,49 @@ test('canonical ignora a ordem das chaves; isProgressKey separa progresso de est
   assert.ok(isProgressKey('rushdaily-classic-booster:AAA111:2026-10-01') && isProgressKey('rushdaily-history'));
   assert.ok(!isProgressKey('rushdaily-classic-game:AAA111:treino:2026-10-01') && !isProgressKey('rushdaily-sync:AAA111') && !isProgressKey('rushdaily-ai-memory:AAA111'));
 });
+
+test('junção converge: duas rodadas de sync em A e B e a seguinte não muda nada (PvP no mesmo dia, deck inicial e ajustes com updatedAt 0)', async () => {
+  const { canonical } = await import('../src/ui/sync-merge.js');
+  const duel = (vs, lp) => ({ date: '2026-10-02', vs, result: 'win', turns: 5, lp });
+  const starter = (main) => ({ id: 'd1', name: 'Deck inicial', main, extra: [], updatedAt: 0 });
+  const pairs = [
+    [{ v: 1, pvp: [duel('AAA111', 100)] }, { v: 1, pvp: [duel('BBB222', 200), duel('CCC333', 50)] }],
+    [{ v: 1, decks: { active: 'd1', list: [starter([10, 10])] } }, { v: 1, decks: { active: 'd1', list: [starter([20])] } }],
+    [{ v: 1, decks: { active: 'd2', list: [starter([10]), { id: 'd2', name: 'A', main: [], extra: [], updatedAt: 5 }] } }, { v: 1, decks: { active: 'd3', list: [starter([10]), { id: 'd3', name: 'B', main: [], extra: [], updatedAt: 5 }] } }],
+    [{ v: 1, settings: { difficulty: 'king', updatedAt: 0 } }, { v: 1, settings: { difficulty: 'duelist', updatedAt: 0 } }],
+    [{ v: 1, boosters: { '2026-10-05': pack('', 'common', 10) } }, { v: 1, boosters: { '2026-10-05': pack('', 'gold', 20) } }],
+  ];
+  for (const [a0, b0] of pairs) {
+    for (const [first, second] of [[a0, b0], [b0, a0]]) {
+      let S = { v: 1 };
+      const B = (S = mergeProgress(first, S, 1));
+      const A = (S = mergeProgress(second, S, 1));
+      // Rodada nova: ninguém precisa enviar nada e os dois ficam iguais ao servidor.
+      assert.equal(canonical(mergeProgress(B, S, 1)), canonical(S), `B diverge: ${canonical(a0)}`);
+      assert.equal(canonical(mergeProgress(A, S, 1)), canonical(S), `A diverge: ${canonical(a0)}`);
+    }
+  }
+});
+
+test('regravar o local não apaga replay longo nem campos extras do booster/deck', () => {
+  const replay = 'r'.repeat(5000);
+  const long = { date: '2026-10-02', vs: 'ABC123', result: 'win', turns: 7, lp: 1200, replay };
+  const opened = { ...pack('2026-10-01T10:00:00Z', 'gold', 10), difficulty: 'chaos', novo: { x: 1 } };
+  const store = new Map(Object.entries({
+    'rushdaily-classic-pvp:AAA111': JSON.stringify([long]),
+    'rushdaily-classic-booster:AAA111:2026-10-01~chaos': JSON.stringify(opened),
+    'rushdaily-classic-decks:AAA111': JSON.stringify({ active: 'd1', list: [{ id: 'd1', name: 'X', main: [10], extra: [], updatedAt: 3, capa: 10 }], futuro: true }),
+  }));
+  const storage = { getItem: (key) => store.get(key) ?? null, setItem: (key, value) => store.set(key, String(value)), removeItem: (key) => store.delete(key), key: (index) => [...store.keys()][index], get length() { return store.size; } };
+  const local = readProgress(storage, 'AAA111');
+  assert.equal(local.pvp[0].replay, undefined, 'replay longo não viaja');
+  writeProgress(storage, 'AAA111', mergeProgress(local, { v: 1, history: { '2026-10-03': 'win' } }));
+  assert.equal(JSON.parse(store.get('rushdaily-classic-pvp:AAA111'))[0].replay, replay);
+  assert.deepEqual(JSON.parse(store.get('rushdaily-classic-booster:AAA111:2026-10-01~chaos')), opened);
+  const decks = JSON.parse(store.get('rushdaily-classic-decks:AAA111'));
+  assert.equal(decks.list[0].capa, 10);
+  assert.equal(decks.futuro, true);
+  // Deck trocado pelo do outro aparelho: vale o novo, sem herdar campos do antigo.
+  writeProgress(storage, 'AAA111', mergeProgress(local, { v: 1, decks: { list: [{ id: 'd1', name: 'Novo', main: [20], updatedAt: 9 }] } }));
+  assert.deepEqual(JSON.parse(store.get('rushdaily-classic-decks:AAA111')).list[0], { id: 'd1', name: 'Novo', main: [20], extra: [], updatedAt: 9 });
+});

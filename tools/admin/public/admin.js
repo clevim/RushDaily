@@ -397,10 +397,10 @@ async function carregaDesafio(data) {
   $('diaData').value = data;
   troca($('desafio'), el('p', { className: 'vazio' }, 'Gerando o desafio…'));
   try {
-    const r = await api(`desafio?data=${data}&dias=7`);
+    const r = await api(`desafio?data=${data}&dias=0`);
     desafioCarregado = data;
     if (r.erro) { troca($('desafio'), el('p', { className: 'aviso erro' }, r.erro)); return; }
-    const { dia, proximos, cartas } = r;
+    const { dia, cartas } = r;
     let escolhido = 1;
     const painelRival = el('div');
     const abas = el('div', { className: 'abas', role: 'tablist', 'aria-label': 'Dificuldade' });
@@ -410,7 +410,11 @@ async function carregaDesafio(data) {
       painelRival.replaceChildren(el('p', { className: 'desc' }, rv.modifier), el('dl', { className: 'dl' }, [['PV do rival', fmtN(rv.lp)], ['IA', rv.ai], ['Força do deck', fmtN(rv.power)], ['Cartas', `${rv.deck.main.length} + ${rv.deck.extra.length}`]].flatMap(([k, v]) => [el('dt', {}, k), el('dd', {}, v)])), deckEl(rv.deck, cartas));
     };
     abas.append(...dia.rivais.map((rv, i) => el('button', { className: 'btn sec pequeno', role: 'tab', type: 'button', onclick: () => { escolhido = i; pintaRival(); },
-      onkeydown: (ev) => { if (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft') { escolhido = (escolhido + (ev.key === 'ArrowRight' ? 1 : 3)) % 4; pintaRival(); abas.children[escolhido].focus(); } } }, rv.nome)));
+      onkeydown: (ev) => {
+        const n = dia.rivais.length, alvo = { ArrowRight: (escolhido + 1) % n, ArrowLeft: (escolhido + n - 1) % n, Home: 0, End: n - 1 }[ev.key];
+        if (alvo === undefined) return;
+        ev.preventDefault(); escolhido = alvo; pintaRival(); abas.children[escolhido].focus();
+      } }, rv.nome)));
     painelRival.setAttribute('role', 'tabpanel');
     pintaRival();
     troca($('desafio'), 
@@ -419,11 +423,121 @@ async function carregaDesafio(data) {
         el('div', {}, el('span', {}, 'Rival'), el('b', {}, dia.rivais[0].label), el('span', {}, `${fmtN(dia.rivais[0].lp)} a ${fmtN(dia.rivais.at(-1).lp)} PV conforme a dificuldade`))),
       el('div', { className: 'grade2' },
         el('article', { className: 'painel' }, el('h2', {}, 'Seu deck', el('span', { className: 'tag' }, `${dia.jogador.deck.main.length} + ${dia.jogador.deck.extra.length} cartas, igual em todas as dificuldades`)), deckEl(dia.jogador.deck, cartas)),
-        el('article', { className: 'painel' }, el('h2', {}, 'Rival por dificuldade'), abas, painelRival)),
-      el('article', { className: 'painel' }, el('h2', {}, 'Próximos dias'), el('div', { className: 'tabela' }, el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'Dia'), el('th', {}, 'Confronto'))),
-        el('tbody', {}, proximos.map((p) => el('tr', { className: 'clic', tabIndex: 0, onclick: () => carregaDesafio(p.data), onkeydown: (ev) => ev.key === 'Enter' && carregaDesafio(p.data) }, el('td', {}, diaLongo(p.data)), el('td', {}, `${p.jogador} contra ${p.rival}`))))))));
+        el('article', { className: 'painel' }, el('h2', {}, 'Rival por dificuldade'), abas, painelRival)));
+    calMostra(dia.data);
   } catch (e) { troca($('desafio'), el('p', { className: 'aviso erro' }, e.message)); }
 }
+// ---- CSV (Blob no navegador; células de texto iniciadas por = + - @ ganham ' para não virarem fórmula) ----
+const celulaCsv = (v) => { let t = v === null || v === undefined ? '' : String(v); if (typeof v !== 'number' && /^[=+\-@\t\r]/.test(t)) t = "'" + t; return /[",;\n\r]/.test(t) ? `"${t.replaceAll('"', '""')}"` : t; };
+const baixarCsv = (nome, linhas) => {
+  const blob = new Blob(['﻿' + linhas.map((l) => l.map(celulaCsv).join(',')).join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
+  const u = URL.createObjectURL(blob), a = el('a', { href: u, download: nome });
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 1000);
+};
+
+// ---- análise do desafio: pede em pedaços (o servidor devolve `faltam` e o cache guarda o que já saiu) ----
+async function analisa(de, ate, leve, aoProgredir, ativo) {
+  for (;;) {
+    const r = await api(`desafio/analise?de=${de}&ate=${ate}${leve ? '&leve=1' : ''}`);
+    if (r.erro) throw new Error(r.erro);
+    if (ativo && !ativo()) return null;
+    aoProgredir?.(r);
+    if (!r.faltam) return r;
+  }
+}
+const mediaDe = (l) => (l.length ? l.reduce((a, b) => a + b, 0) / l.length : 0);
+const f2 = (n) => Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// ---- calendário mensal ----
+let calMes = null, calSeq = 0;
+const NOME_MES = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+const compartilhaTipo = (a, b) => a.race === b.race || a.race === b.raceRival || a.raceRival === b.race || a.raceRival === b.raceRival;
+function calMostra(dataSel) {
+  const mes = dataSel.slice(0, 7);
+  if (mes === calMes) { calMarca(dataSel); return; }
+  calMes = mes;
+  const seq = ++calSeq, primeiro = `${mes}-01`;
+  const ultimo = somaDias(`${somaDias(`${mes}-28`, 4).slice(0, 7)}-01`, -1);
+  $('calMesTag').textContent = NOME_MES(primeiro);
+  $('calEstado').textContent = 'Gerando…';
+  const pinta = (r) => {
+    const mapa = new Map(r.dias.map((d) => [d.data, d]));
+    const maos = r.dias.filter((d) => d.data >= primeiro && d.data <= ultimo).map((d) => d.jogador.hand);
+    const lo = Math.min(...maos), hi = Math.max(...maos);
+    const celulas = [...['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'].map((n) => el('div', { className: 'sem' }, n)), ...Array(new Date(`${primeiro}T12:00:00Z`).getUTCDay()).fill(0).map(() => el('div'))];
+    let reps = 0;
+    for (let d = primeiro; d <= ultimo; d = somaDias(d, 1)) {
+      const x = mapa.get(d);
+      const b = el('button', { type: 'button', 'data-d': d, onclick: () => carregaDesafio(d) }, el('b', {}, String(Number(d.slice(8)))));
+      if (x) {
+        const t = hi > lo ? (x.jogador.hand - lo) / (hi - lo) : 1;
+        b.style.background = `hsl(${Math.round(t * 120)} 55% 22%)`; // vermelho = mão fraca, verde = forte (relativo ao mês)
+        const prox = mapa.get(somaDias(d, 1)), ant = mapa.get(somaDias(d, -1));
+        const rep = (prox && compartilhaTipo(x, prox)) || (ant && compartilhaTipo(x, ant));
+        if (rep) { b.classList.add('rep'); reps += 1; }
+        b.append(el('span', {}, `${x.jogador.tipo} × ${x.tipoRival}`));
+        b.title = `${d}: ${x.jogador.tipo} contra ${x.tipoRival} · mão ${f2(x.jogador.hand)}${rep ? ' · Tipo repetido em dia vizinho' : ''}`;
+      }
+      celulas.push(b);
+    }
+    troca($('calendario'), el('div', { className: 'cal' }, celulas),
+      el('p', { className: 'leg' }, 'Cor = handScore do seu deck (relativo ao mês: vermelho fraco, verde forte). Barra vermelha = o dia divide um Tipo (seu ou do rival) com o dia vizinho.' + (reps ? ` ${reps} dia(s) assim neste mês.` : '')));
+    calMarca(desafioCarregado);
+  };
+  analisa(somaDias(primeiro, -1), somaDias(ultimo, 1), true, (r) => { if (seq === calSeq) { pinta(r); $('calEstado').textContent = r.faltam ? `Gerando… faltam ${r.faltam} dias` : ''; } }, () => seq === calSeq).catch((e) => { if (seq === calSeq) $('calEstado').textContent = e.message; });
+}
+const calMarca = (d) => { for (const b of $('calendario').querySelectorAll('button')) { if (b.dataset.d === d) b.setAttribute('aria-current', 'date'); else b.removeAttribute('aria-current'); } };
+$('calAnt').onclick = () => carregaDesafio(somaDias(`${calMes ?? hojeLocal().slice(0, 7)}-01`, -1).slice(0, 8) + '01');
+$('calProx').onclick = () => carregaDesafio(somaDias(`${calMes ?? hojeLocal().slice(0, 7)}-28`, 4).slice(0, 8) + '01');
+
+// ---- qualidade do desafio ----
+let quaUltima = null;
+$('quaRodar').onclick = async () => {
+  const n = Number($('quaDias').value), de = $('diaData').value || hojeLocal(), ate = somaDias(de, n - 1);
+  $('quaRodar').disabled = true; $('quaCsv').disabled = true;
+  try {
+    const r = await analisa(de, ate, false, (p) => { $('quaEstado').textContent = p.faltam ? `Gerando… ${p.dias.length}/${n} dias` : ''; });
+    quaUltima = r; pintaQualidade(r);
+  } catch (e) { falha(e); $('quaEstado').textContent = e.message; }
+  $('quaRodar').disabled = false;
+};
+function pintaQualidade({ dias, temas }) {
+  const maos = dias.map((d) => d.jogador.hand), ord = [...maos].sort((a, b) => a - b), p10 = ord[Math.floor(0.1 * (ord.length - 1))];
+  const lista = (d) => [d.jogador, ...d.rivais];
+  const fora = dias.filter((d) => d.jogador.hand < p10);
+  const ruins = dias.filter((d) => lista(d).some((x) => x.inuteis > 0 || x.problemas.length));
+  const resumo = [['Mão (você), média', f2(mediaDe(maos))], ['Mão (rivais), média', f2(mediaDe(dias.flatMap((d) => d.rivais.map((r) => r.hand))))], ['Mão p10', f2(p10)], ['Dias fora da curva (< p10)', fora.length],
+    ['Força (você), média', fmtN(Math.round(mediaDe(dias.map((d) => d.jogador.power))))], ['Força (rivais), média', fmtN(Math.round(mediaDe(dias.flatMap((d) => d.rivais.map((r) => r.power)))))], ['Dias com carta inútil ou deck ilegal', ruins.length],
+    ['Lendas (você), média', f2(mediaDe(dias.map((d) => d.jogador.lendas)))]];
+  const cab = ['Dia', 'Confronto', 'Mão (você)', 'Mão rivais', 'Força (você)', 'Força rivais', 'M/S/A', 'Lendas', 'Adicional', 'Inúteis', 'Validação'];
+  const fmtRiv = (d, c, f = (x) => x) => d.rivais.map((r) => f(r[c])).join(' / ');
+  const linhas = dias.map((d) => {
+    const prob = lista(d).flatMap((x) => x.problemas);
+    return el('tr', { className: d.jogador.hand < p10 ? 'fora' : '' }, el('td', {}, d.data), el('td', {}, `${d.jogador.tipo} × ${d.tipoRival}`), el('td', { className: 'num' }, f2(d.jogador.hand)), el('td', { className: 'num' }, fmtRiv(d, 'hand', f2)),
+      el('td', { className: 'num' }, fmtN(d.jogador.power)), el('td', { className: 'num' }, fmtRiv(d, 'power', fmtN)), el('td', {}, `${d.jogador.monstros}/${d.jogador.magias}/${d.jogador.armadilhas}`),
+      el('td', { className: 'num' }, `${d.jogador.lendas} · ${fmtRiv(d, 'lendas')}`), el('td', { className: 'num' }, `${d.jogador.extra} · ${fmtRiv(d, 'extra')}`),
+      el('td', { className: 'num' + (lista(d).some((x) => x.inuteis) ? ' mal' : '') }, `${d.jogador.inuteis} · ${fmtRiv(d, 'inuteis')}`), el('td', { className: prob.length ? 'mal' : '' }, prob.length ? prob.join('; ') : 'ok'));
+  });
+  // distribuição de Tipos contra o peso esperado sqrt(size) (o rival exclui o Tipo do jogador; aqui o esperado do rival é aproximado pelo mesmo peso)
+  const n = dias.length, somaPeso = temas.reduce((a, t) => a + t.peso, 0);
+  const contaJ = new Map(), contaR = new Map(), pares = new Set();
+  for (const d of dias) { contaJ.set(d.jogador.race, (contaJ.get(d.jogador.race) || 0) + 1); contaR.set(d.raceRival, (contaR.get(d.raceRival) || 0) + 1); pares.add(`${d.jogador.race}:${d.raceRival}`); }
+  const nunca = temas.filter((t) => !contaJ.has(t.race) && !contaR.has(t.race)).map((t) => t.nome);
+  const totalPares = temas.length * (temas.length - 1);
+  const distRows = temas.map((t) => [t.nome, t.size, n * t.peso / somaPeso, contaJ.get(t.race) || 0, contaR.get(t.race) || 0]);
+  quaUltima.csv = [['Dia', 'Confronto', 'Mão (você)', ...dias[0].rivais.map((r) => `Mão ${r.nome}`), 'Força (você)', ...dias[0].rivais.map((r) => `Força ${r.nome}`), 'Monstros', 'Magias', 'Armadilhas', 'Lendas (você)', 'Adicional (você)', 'Inúteis (você)', 'Validação'], ...dias.map((d) => [d.data, `${d.jogador.tipo} x ${d.tipoRival}`, d.jogador.hand, ...d.rivais.map((r) => r.hand), d.jogador.power, ...d.rivais.map((r) => r.power), d.jogador.monstros, d.jogador.magias, d.jogador.armadilhas, d.jogador.lendas, d.jogador.extra, d.jogador.inuteis, lista(d).flatMap((x) => x.problemas).join('; ')])];
+  quaUltima.csvDist = [['Tipo', 'Cartas no pool', 'Esperado', 'Você', 'Rival'], ...distRows.map((r) => [r[0], r[1], Number(r[2].toFixed(2)), r[3], r[4]])];
+  $('quaCsv').disabled = false; $('quaEstado').textContent = `${n} dias analisados`;
+  troca($('qualidade'),
+    el('dl', { className: 'dl' }, resumo.flatMap(([k, v]) => [el('dt', {}, k), el('dd', {}, String(v))])),
+    el('div', { className: 'tabela' }, el('table', {}, el('thead', {}, el('tr', {}, cab.map((c) => el('th', {}, c)))), el('tbody', {}, linhas))),
+    el('p', { className: 'leg' }, 'Rivais na ordem Aprendiz / Duelista / Elite / Caos. Linha vermelha = mão abaixo do p10. Inúteis = cartas cujo requisito o próprio deck não atende (você · rivais).'),
+    el('h3', {}, `Distribuição de Tipos em ${n} dias`),
+    el('div', { className: 'tabela' }, el('table', {}, el('thead', {}, el('tr', {}, ['Tipo', 'Cartas no pool', 'Esperado', 'Você', 'Rival'].map((c) => el('th', {}, c)))),
+      el('tbody', {}, distRows.map((r) => el('tr', {}, el('td', {}, r[0]), el('td', { className: 'num' }, fmtN(r[1])), el('td', { className: 'num' }, f2(r[2])), el('td', { className: 'num' }, String(r[3])), el('td', { className: 'num' }, String(r[4]))))))),
+    el('p', { className: 'leg' }, `Esperado = dias × √tamanho ÷ soma das √tamanhos (o gerador sorteia por esse peso). Tipos nunca sorteados (nenhum dos lados): ${nunca.length ? nunca.join(', ') : 'nenhum'}. Pares Tipo × Tipo vistos: ${pares.size} de ${totalPares} possíveis; ${totalPares - pares.size} nunca sorteados neste período.`));
+}
+$('quaCsv').onclick = () => { if (!quaUltima?.csv) return; baixarCsv(`desafio-qualidade-${quaUltima.dias[0].data}.csv`, quaUltima.csv); baixarCsv(`desafio-tipos-${quaUltima.dias[0].data}.csv`, quaUltima.csvDist); };
 $('diaAnt').onclick = () => carregaDesafio(somaDias($('diaData').value || hojeLocal(), -1));
 $('diaProx').onclick = () => carregaDesafio(somaDias($('diaData').value || hojeLocal(), 1));
 $('diaHoje').onclick = () => carregaDesafio(hojeLocal());
@@ -450,6 +564,20 @@ function grafico(svg, serie, campo) {
     const t = document.createElementNS(NS, 'text'); t.setAttribute('x', x); t.setAttribute('y', 134); t.setAttribute('text-anchor', anc); t.textContent = tx; svg.append(t);
   }
 }
+const grafN = () => Number($('grafDias').value) || 60;
+function pintaGraficos() {
+  const r = jogResumoCache, n = grafN();
+  if (!r?.ativosPorDia?.length) return;
+  grafico($('grafAtivos'), r.ativosPorDia.slice(-n), 'ativos'); grafico($('grafNovas'), r.novasPorDia.slice(-n), 'novas');
+  $('grafTag').textContent = `${n} dias, fuso de Brasília`;
+}
+$('grafDias').onchange = pintaGraficos;
+$('grafCsv').onclick = () => {
+  const r = jogResumoCache, n = grafN();
+  if (!r?.ativosPorDia) return;
+  const novas = new Map(r.novasPorDia.map((d) => [d.dia, d.novas]));
+  baixarCsv(`jogadores-${n}dias.csv`, [['Dia', 'Ativos', 'Novas'], ...r.ativosPorDia.slice(-n).map((d) => [d.dia, d.ativos, novas.get(d.dia) ?? 0])]);
+};
 async function jogResumo() {
   const r = await api('jogadores/resumo');
   jogResumoCache = r;
@@ -463,13 +591,14 @@ async function jogResumo() {
   }
   $('jogConf').hidden = true; $('jog').hidden = false;
   troca($('cartoes'), ...[['Chaves', r.totalChaves], ['Ativos hoje', r.ativosHoje], ['Ativos 7 dias', r.ativos7d], ['Ativos 30 dias', r.ativos30d]].map(([nome, v]) => el('div', { className: 'kpi' }, el('b', {}, fmtN(v)), el('span', {}, nome))));
-  grafico($('grafAtivos'), r.ativosPorDia, 'ativos'); grafico($('grafNovas'), r.novasPorDia, 'novas');
+  pintaGraficos();
   return true;
 }
+let jogUsuarios = [];
 async function jogLista() {
   const q = new URLSearchParams({ ordem: jog.ordem, dir: jog.dir, pagina: jog.pagina, limite: jog.limite, ...(jog.busca ? { busca: jog.busca } : {}) });
   const r = await api('jogadores/usuarios?' + q);
-  jog.total = r.total;
+  jog.total = r.total; jogUsuarios = r.usuarios;
   troca($('jogCab'), ...COLS.map(([k, nome]) => el('th', { className: 'ord', 'aria-sort': jog.ordem === k ? (jog.dir === 'asc' ? 'ascending' : 'descending') : 'none' },
     el('button', { type: 'button', onclick: () => ordena(k) }, nome + (jog.ordem === k ? (jog.dir === 'asc' ? ' ▲' : ' ▼') : '')))));
   troca($('jogLinhas'), ...r.usuarios.map((u) => el('tr', { className: 'clic', tabIndex: 0, onclick: () => jogDetalhe(u.key), onkeydown: (ev) => ev.key === 'Enter' && jogDetalhe(u.key) },
@@ -498,6 +627,7 @@ $('jogBusca').oninput = () => { clearTimeout(buscaT); buscaT = setTimeout(() => 
 $('jogAnt').onclick = () => { jog.pagina -= 1; jogLista().catch(falha); };
 $('jogProx').onclick = () => { jog.pagina += 1; jogLista().catch(falha); };
 $('jogAtualizar').onclick = jogadores;
+$('jogCsv').onclick = () => baixarCsv(`jogadores-pagina-${jog.pagina}.csv`, [COLS.map(([, n]) => n), ...jogUsuarios.map((u) => [u.key, u.primeiroAcesso, u.ultimoAcesso, u.acessos, u.diasAtivos, u.bytes, u.rev])]);
 aoMostrar.jogadores = jogadores;
 
 // ---- histórico ----
@@ -652,3 +782,24 @@ function arteItem(c) {
 }
 $('artesTodas').onclick = () => executar('artes-rush', {}, 'Baixar todas as artes Rush que faltam (Yugipedia e, se falhar, EDOPro)?');
 aoMostrar.artes = artesCarrega;
+
+// ---- atalhos de teclado: g + letra abre a seção, / foca a busca, ? mostra a ajuda ----
+const ATALHOS = { v: 'visao', d: 'dados', t: 'tarefas', c: 'cartas', r: 'traducao', a: 'artes', e: 'desafio', j: 'jogadores', h: 'historico', o: 'config' };
+const BUSCAS = { cartas: 'buscaCarta', traducao: 'tradBusca', jogadores: 'jogBusca' };
+const NOME_SECAO = (s) => document.querySelector(`#nav a[data-s="${s}"]`)?.textContent.trim() ?? s;
+let gAte = 0;
+addEventListener('keydown', (ev) => {
+  if (ev.ctrlKey || ev.metaKey || ev.altKey || document.querySelector('dialog[open]')) return;
+  const alvo = ev.target;
+  if (alvo instanceof HTMLElement && (alvo.closest('input, textarea, select') || alvo.isContentEditable)) return;
+  if (gAte > Date.now() && Object.hasOwn(ATALHOS, ev.key)) { gAte = 0; ev.preventDefault(); ir(ATALHOS[ev.key]); return; }
+  gAte = 0;
+  if (ev.key === 'g') gAte = Date.now() + 1500;
+  else if (ev.key === '/') { const i = $(BUSCAS[secao] ?? ''); if (i) { ev.preventDefault(); i.focus(); i.select?.(); } }
+  else if (ev.key === '?') {
+    troca($('ajudaLista'), el('li', {}, el('kbd', {}, '/'), ' foca a busca da seção (Cartas, Tradução, Jogadores)'), el('li', {}, el('kbd', {}, '?'), ' esta ajuda'),
+      ...SECOES.map((s) => el('li', {}, el('kbd', {}, 'g'), ' depois ', el('kbd', {}, Object.keys(ATALHOS).find((k) => ATALHOS[k] === s)), ` ${NOME_SECAO(s)}`)),
+      el('li', {}, el('kbd', {}, '←'), ' ', el('kbd', {}, '→'), ' ', el('kbd', {}, 'Home'), ' ', el('kbd', {}, 'End'), ' nas abas de dificuldade'));
+    $('ajuda').showModal();
+  }
+});
